@@ -1,0 +1,33 @@
+{
+  "name": "Contract_Tuple",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "getResult",
+        "parameters": [],
+        "returntype": "Array",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "t1",
+        "parameters": [],
+        "returntype": "Any",
+        "offset": 7,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "Version": "3.9.1",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

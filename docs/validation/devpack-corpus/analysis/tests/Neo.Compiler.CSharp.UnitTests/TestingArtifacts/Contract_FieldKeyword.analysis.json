@@ -1,0 +1,96 @@
+{
+  "contract": "Contract_FieldKeyword",
+  "timestamp": "2026-02-19T04:56:33.941042+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 3,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "dos": "medium",
+      "upgradeability": "high"
+    },
+    "weighted_score": 70,
+    "confidence_weighted_score": 55,
+    "detector_average_confidence": {
+      "dos": 0.7,
+      "upgradeability": 0.85
+    }
+  },
+  "total": 4,
+  "findings": [
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 54,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=20 with loop back-edges detected.",
+      "offset": 59,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=34 with loop back-edges detected.",
+      "offset": 72,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=34 with loop back-edges detected.",
+      "offset": 90,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

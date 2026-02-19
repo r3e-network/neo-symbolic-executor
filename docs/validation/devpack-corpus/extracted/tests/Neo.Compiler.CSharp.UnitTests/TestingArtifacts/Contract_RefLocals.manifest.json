@@ -1,0 +1,101 @@
+{
+  "name": "Contract_RefLocals",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "incrementViaRefLocal",
+        "parameters": [
+          {
+            "name": "value",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "rebindRefLocal",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 59,
+        "safe": false
+      },
+      {
+        "name": "rewriteArrayElement",
+        "parameters": [
+          {
+            "name": "index",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 120,
+        "safe": false
+      },
+      {
+        "name": "updateInstanceField",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 147,
+        "safe": false
+      },
+      {
+        "name": "updateStaticField",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 220,
+        "safe": false
+      },
+      {
+        "name": "updateNestedHolder",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 282,
+        "safe": false
+      },
+      {
+        "name": "_initialize",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 361,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

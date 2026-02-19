@@ -1,0 +1,320 @@
+{
+  "contract": "Contract_Polymorphism",
+  "timestamp": "2026-02-19T04:56:36.775792+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 14,
+    "medium": 6,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "dos": "medium",
+      "overflow": "high"
+    },
+    "weighted_score": 620,
+    "confidence_weighted_score": 412,
+    "detector_average_confidence": {
+      "dos": 0.656,
+      "overflow": 0.665
+    }
+  },
+  "total": 20,
+  "findings": [
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation ADD may overflow or underflow without runtime guard.",
+      "offset": 5,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 51,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation MUL may overflow or underflow without runtime guard.",
+      "offset": 182,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 228,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 235,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 281,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation MUL may overflow or underflow without runtime guard.",
+      "offset": 296,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.684,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=6.00, peak_complexity=6, uncertainty=0.462, penalty=0.116, confidence 0.800->0.684.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 342,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.664,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=6.00, peak_complexity=6, uncertainty=0.546, penalty=0.136, confidence 0.800->0.664.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation ADD may overflow or underflow without runtime guard.",
+      "offset": 343,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.684,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=6.00, peak_complexity=6, uncertainty=0.462, penalty=0.116, confidence 0.800->0.684.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 389,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.643,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=6.00, peak_complexity=6, uncertainty=0.629, penalty=0.157, confidence 0.800->0.643.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 415,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 441,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation ADD may overflow or underflow without runtime guard.",
+      "offset": 448,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 494,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.622,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=7, avg_complexity=6.00, peak_complexity=6, uncertainty=0.713, penalty=0.178, confidence 0.800->0.622.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=20 with loop back-edges detected.",
+      "offset": 542,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.626,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.700->0.626.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=5 with loop back-edges detected.",
+      "offset": 548,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=26 with loop back-edges detected.",
+      "offset": 554,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=12 with loop back-edges detected.",
+      "offset": 560,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=20 with loop back-edges detected.",
+      "offset": 568,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.626,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.700->0.626.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=39 with loop back-edges detected.",
+      "offset": 574,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.584,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=6.00, peak_complexity=6, uncertainty=0.462, penalty=0.116, confidence 0.700->0.584.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

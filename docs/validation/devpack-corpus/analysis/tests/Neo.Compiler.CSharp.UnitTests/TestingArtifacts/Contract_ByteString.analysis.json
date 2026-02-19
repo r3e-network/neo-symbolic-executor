@@ -1,0 +1,366 @@
+{
+  "contract": "Contract_ByteString",
+  "timestamp": "2026-02-19T04:56:32.330040+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 16,
+    "medium": 7,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dangerous_call_flags": "high",
+      "overflow": "high",
+      "unchecked_return": "medium"
+    },
+    "weighted_score": 710,
+    "confidence_weighted_score": 576,
+    "detector_average_confidence": {
+      "access_control": 0.839,
+      "dangerous_call_flags": 0.839,
+      "overflow": 0.726,
+      "unchecked_return": 0.689
+    }
+  },
+  "total": 23,
+  "findings": [
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 285,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 285,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 302,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 302,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 331,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 377,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.726,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.800->0.726.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 389,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.776,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.850->0.776.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 389,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.776,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.850->0.776.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 408,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 408,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 427,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 427,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 447,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 447,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 466,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 466,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:strLen' is not validated before continuing.",
+      "offset": 285,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:memorySearch' is not validated before continuing.",
+      "offset": 302,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:memorySearch' is not validated before continuing.",
+      "offset": 389,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.626,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=6.00, peak_complexity=6, uncertainty=0.296, penalty=0.074, confidence 0.700->0.626.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:memorySearch' is not validated before continuing.",
+      "offset": 408,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:memorySearch' is not validated before continuing.",
+      "offset": 427,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:memorySearch' is not validated before continuing.",
+      "offset": 447,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:stringSplit' is not validated before continuing.",
+      "offset": 466,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

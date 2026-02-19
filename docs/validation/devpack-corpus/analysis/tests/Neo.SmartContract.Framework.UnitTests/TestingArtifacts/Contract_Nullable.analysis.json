@@ -1,0 +1,292 @@
+{
+  "contract": "Contract_Nullable",
+  "timestamp": "2026-02-19T04:56:40.402040+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 18,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dangerous_call_flags": "high"
+    },
+    "weighted_score": 720,
+    "confidence_weighted_score": 565,
+    "detector_average_confidence": {
+      "access_control": 0.785,
+      "dangerous_call_flags": 0.785
+    }
+  },
+  "total": 18,
+  "findings": [
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1380,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1380,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1403,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1403,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1426,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1426,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1449,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1449,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1472,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1472,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1495,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1495,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1518,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1518,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1541,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1541,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1604,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1604,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

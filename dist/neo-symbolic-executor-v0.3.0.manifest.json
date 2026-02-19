@@ -1,0 +1,9 @@
+{
+  "name": "neo-symbolic-executor",
+  "version": "0.3.0",
+  "artifact": "neo-symbolic-executor-v0.3.0.tar.gz",
+  "sha256": "7464285bd58bcbe2c75f6c450729d23b868ebfbeaf9c3ec88e654c506f1dea85",
+  "size_bytes": 186942,
+  "release_notes": "docs/releases/v0.3.0.md",
+  "validation_summary": "docs/validation/devpack-corpus/summary.json"
+}

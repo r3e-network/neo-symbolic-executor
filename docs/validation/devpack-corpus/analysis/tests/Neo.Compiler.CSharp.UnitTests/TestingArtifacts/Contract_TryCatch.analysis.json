@@ -1,0 +1,108 @@
+{
+  "contract": "Contract_TryCatch",
+  "timestamp": "2026-02-19T04:56:38.512493+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 5,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "medium",
+    "detector_max_severity": {
+      "dos": "medium"
+    },
+    "weighted_score": 50,
+    "confidence_weighted_score": 30,
+    "detector_average_confidence": {
+      "dos": 0.61
+    }
+  },
+  "total": 5,
+  "findings": [
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=20 with loop back-edges detected.",
+      "offset": 98,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=19 with loop back-edges detected.",
+      "offset": 211,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=22 with loop back-edges detected.",
+      "offset": 228,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.593,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=5.00, peak_complexity=5, uncertainty=0.427, penalty=0.107, confidence 0.700->0.593.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=14 with loop back-edges detected.",
+      "offset": 497,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=15 with loop back-edges detected.",
+      "offset": 574,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

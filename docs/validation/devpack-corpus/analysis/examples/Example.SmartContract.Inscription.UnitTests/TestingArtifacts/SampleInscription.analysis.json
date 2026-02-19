@@ -1,0 +1,84 @@
+{
+  "contract": "SampleInscription",
+  "timestamp": "2026-02-19T04:56:30.294809+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 3,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "medium",
+    "detector_max_severity": {
+      "admin_centralization": "medium",
+      "gas_exhaustion": "medium",
+      "manifest_permissions": "medium"
+    },
+    "weighted_score": 30,
+    "confidence_weighted_score": 20,
+    "detector_average_confidence": {
+      "admin_centralization": 0.7,
+      "gas_exhaustion": 0.635,
+      "manifest_permissions": 0.7
+    }
+  },
+  "total": 3,
+  "findings": [
+    {
+      "detector": "admin_centralization",
+      "title": "Single Admin Control",
+      "severity": "medium",
+      "description": "Critical operations are gated by a single witness check.",
+      "offset": 4,
+      "recommendation": "Use multisig governance and optional timelock for sensitive methods.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "governance",
+        "centralization"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 66588 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    },
+    {
+      "detector": "manifest_permissions",
+      "title": "Overly Broad Manifest Permissions",
+      "severity": "medium",
+      "description": "Manifest allows unrestricted contract/method calls, expanding the callable trust surface.",
+      "offset": -1,
+      "recommendation": "Restrict manifest permissions to explicit contract hashes and method names.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "manifest",
+        "least-privilege"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

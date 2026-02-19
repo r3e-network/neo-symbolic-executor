@@ -1,0 +1,52 @@
+{
+  "name": "Contract_SupportedStandard26",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [
+    "NEP-26"
+  ],
+  "abi": {
+    "methods": [
+      {
+        "name": "onNEP11Payment",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "Hash160"
+          },
+          {
+            "name": "amount",
+            "type": "Integer"
+          },
+          {
+            "name": "tokenId",
+            "type": "String"
+          },
+          {
+            "name": "data",
+            "type": "Any"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 0,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [
+    {
+      "contract": "*",
+      "methods": "*"
+    }
+  ],
+  "trusts": [],
+  "extra": {
+    "Description": "<Description Here>",
+    "Author": "<Your Name Or Company Here>",
+    "Version": "<Version String Here>",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

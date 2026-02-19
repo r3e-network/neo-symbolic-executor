@@ -1,0 +1,379 @@
+{
+  "name": "SampleLootNFT",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [
+    "NEP-11"
+  ],
+  "abi": {
+    "methods": [
+      {
+        "name": "symbol",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 0,
+        "safe": true
+      },
+      {
+        "name": "decimals",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 8,
+        "safe": true
+      },
+      {
+        "name": "totalSupply",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 10,
+        "safe": true
+      },
+      {
+        "name": "balanceOf",
+        "parameters": [
+          {
+            "name": "owner",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 56,
+        "safe": true
+      },
+      {
+        "name": "ownerOf",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "ByteArray"
+          }
+        ],
+        "returntype": "Hash160",
+        "offset": 237,
+        "safe": true
+      },
+      {
+        "name": "properties",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "ByteArray"
+          }
+        ],
+        "returntype": "Map",
+        "offset": 396,
+        "safe": true
+      },
+      {
+        "name": "tokens",
+        "parameters": [],
+        "returntype": "InteropInterface",
+        "offset": 501,
+        "safe": true
+      },
+      {
+        "name": "tokensOf",
+        "parameters": [
+          {
+            "name": "owner",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "InteropInterface",
+        "offset": 529,
+        "safe": true
+      },
+      {
+        "name": "transfer",
+        "parameters": [
+          {
+            "name": "to",
+            "type": "Hash160"
+          },
+          {
+            "name": "tokenId",
+            "type": "ByteArray"
+          },
+          {
+            "name": "data",
+            "type": "Any"
+          }
+        ],
+        "returntype": "Boolean",
+        "offset": 617,
+        "safe": false
+      },
+      {
+        "name": "verify",
+        "parameters": [],
+        "returntype": "Boolean",
+        "offset": 978,
+        "safe": false
+      },
+      {
+        "name": "setOwner",
+        "parameters": [
+          {
+            "name": "newOwner",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "Hash160",
+        "offset": 1048,
+        "safe": false
+      },
+      {
+        "name": "getOwner",
+        "parameters": [],
+        "returntype": "Hash160",
+        "offset": 986,
+        "safe": true
+      },
+      {
+        "name": "update",
+        "parameters": [
+          {
+            "name": "nefFile",
+            "type": "ByteArray"
+          },
+          {
+            "name": "manifest",
+            "type": "String"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 1111,
+        "safe": false
+      },
+      {
+        "name": "destroy",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 1119,
+        "safe": false
+      },
+      {
+        "name": "getCredential",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 1123,
+        "safe": true
+      },
+      {
+        "name": "getWeapon",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1171,
+        "safe": true
+      },
+      {
+        "name": "getChest",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1390,
+        "safe": true
+      },
+      {
+        "name": "getHead",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1407,
+        "safe": true
+      },
+      {
+        "name": "getWaist",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1424,
+        "safe": true
+      },
+      {
+        "name": "getFoot",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1441,
+        "safe": true
+      },
+      {
+        "name": "getHand",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1458,
+        "safe": true
+      },
+      {
+        "name": "getNeck",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1475,
+        "safe": true
+      },
+      {
+        "name": "getRing",
+        "parameters": [
+          {
+            "name": "credential",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1492,
+        "safe": true
+      },
+      {
+        "name": "tokenURI",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "String",
+        "offset": 1509,
+        "safe": true
+      },
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 1557,
+        "safe": false
+      },
+      {
+        "name": "ownerClaim",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 1873,
+        "safe": false
+      },
+      {
+        "name": "_initialize",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 1961,
+        "safe": false
+      }
+    ],
+    "events": [
+      {
+        "name": "Transfer",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "Hash160"
+          },
+          {
+            "name": "to",
+            "type": "Hash160"
+          },
+          {
+            "name": "amount",
+            "type": "Integer"
+          },
+          {
+            "name": "tokenId",
+            "type": "ByteArray"
+          }
+        ]
+      },
+      {
+        "name": "EventMsg",
+        "parameters": [
+          {
+            "name": "obj",
+            "type": "String"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "contract": "0x726cb6e0cd8628a1350a611384688911ab75f51b",
+      "methods": [
+        "sha256"
+      ]
+    },
+    {
+      "contract": "0xacce6fd80d44e1796aa0c2c625e9e4e0ce39efc0",
+      "methods": [
+        "deserialize",
+        "itoa",
+        "serialize"
+      ]
+    },
+    {
+      "contract": "0xfffdc93764dbaddd97c48f252a53ea4643faa3fd",
+      "methods": [
+        "destroy",
+        "getContract",
+        "update"
+      ]
+    },
+    {
+      "contract": "*",
+      "methods": [
+        "onNEP11Payment"
+      ]
+    }
+  ],
+  "trusts": [],
+  "extra": {
+    "Author": "core-dev",
+    "Description": "This is a text Example.SmartContract.NFT",
+    "Sourcecode": "https://github.com/neo-project/neo-devpack-dotnet/tree/master/examples/",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

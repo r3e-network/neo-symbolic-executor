@@ -1,0 +1,100 @@
+{
+  "contract": "SampleOracle",
+  "timestamp": "2026-02-19T04:56:30.635508+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 2,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dangerous_call_flags": "high",
+      "manifest_permissions": "medium",
+      "unchecked_return": "medium"
+    },
+    "weighted_score": 100,
+    "confidence_weighted_score": 82,
+    "detector_average_confidence": {
+      "access_control": 0.85,
+      "dangerous_call_flags": 0.85,
+      "manifest_permissions": 0.7,
+      "unchecked_return": 0.7
+    }
+  },
+  "total": 4,
+  "findings": [
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 142,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 142,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:request' is not validated before continuing.",
+      "offset": 142,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "manifest_permissions",
+      "title": "Overly Broad Manifest Permissions",
+      "severity": "medium",
+      "description": "Manifest allows unrestricted contract/method calls, expanding the callable trust surface.",
+      "offset": -1,
+      "recommendation": "Restrict manifest permissions to explicit contract hashes and method names.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "manifest",
+        "least-privilege"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

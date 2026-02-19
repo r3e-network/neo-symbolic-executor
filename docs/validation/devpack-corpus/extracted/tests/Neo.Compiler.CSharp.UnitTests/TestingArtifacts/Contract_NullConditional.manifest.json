@@ -1,0 +1,93 @@
+{
+  "name": "Contract_NullConditional",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "assignChild",
+        "parameters": [
+          {
+            "name": "createNode",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "assignSibling",
+        "parameters": [
+          {
+            "name": "createNode",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 54,
+        "safe": false
+      },
+      {
+        "name": "assignStatic",
+        "parameters": [
+          {
+            "name": "createNode",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 110,
+        "safe": false
+      },
+      {
+        "name": "assignGrandChild",
+        "parameters": [
+          {
+            "name": "createRoot",
+            "type": "Boolean"
+          },
+          {
+            "name": "createChild",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 175,
+        "safe": false
+      },
+      {
+        "name": "assignSiblingFromOther",
+        "parameters": [
+          {
+            "name": "seedLeft",
+            "type": "Boolean"
+          },
+          {
+            "name": "seedRight",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 246,
+        "safe": false
+      },
+      {
+        "name": "_initialize",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 327,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

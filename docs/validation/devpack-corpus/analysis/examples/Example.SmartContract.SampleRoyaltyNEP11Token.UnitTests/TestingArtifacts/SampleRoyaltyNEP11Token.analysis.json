@@ -1,0 +1,427 @@
+{
+  "contract": "SampleRoyaltyNEP11Token",
+  "timestamp": "2026-02-19T04:56:30.720430+00:00",
+  "summary": {
+    "critical": 1,
+    "high": 9,
+    "medium": 16,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "critical",
+    "detector_max_severity": {
+      "access_control": "high",
+      "admin_centralization": "medium",
+      "dangerous_call_flags": "high",
+      "dos": "medium",
+      "dynamic_call_target": "high",
+      "gas_exhaustion": "medium",
+      "manifest_permissions": "medium",
+      "overflow": "high",
+      "reentrancy": "critical",
+      "unchecked_return": "medium",
+      "upgradeability": "high"
+    },
+    "weighted_score": 620,
+    "confidence_weighted_score": 453,
+    "detector_average_confidence": {
+      "access_control": 0.796,
+      "admin_centralization": 0.7,
+      "dangerous_call_flags": 0.74,
+      "dos": 0.682,
+      "dynamic_call_target": 0.752,
+      "gas_exhaustion": 0.552,
+      "manifest_permissions": 0.7,
+      "overflow": 0.652,
+      "reentrancy": 0.752,
+      "unchecked_return": 0.599,
+      "upgradeability": 0.85
+    }
+  },
+  "total": 26,
+  "findings": [
+    {
+      "detector": "reentrancy",
+      "title": "Potential Reentrancy",
+      "severity": "critical",
+      "description": "External call executes before storage write. If the callee re-enters, contract state may be manipulated before completion. Risk amplifiers detected: multiple external calls occur before the first state write; external calls use dynamic or over-privileged call flags; execution reaches deep internal call-chain depth before state effects.",
+      "offset": 773,
+      "recommendation": "Apply checks-effects-interactions ordering and explicit reentrancy lock for methods performing external calls.",
+      "confidence": 0.752,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.900->0.752.",
+      "tags": [
+        "SWC-107",
+        "reentrancy",
+        "amplified-risk"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation ADD may overflow or underflow without runtime guard.",
+      "offset": 248,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.652,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.800->0.652.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 529,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 529,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 773,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.743,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=5.00, peak_complexity=5, uncertainty=0.427, penalty=0.107, confidence 0.850->0.743.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 806,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.702,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.850->0.702.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 966,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.702,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.850->0.702.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1000,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.702,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.850->0.702.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dynamic_call_target",
+      "title": "Dynamic External Contract Target",
+      "severity": "high",
+      "description": "System.Contract.Call receives a non-concrete contract hash at runtime.",
+      "offset": 1000,
+      "recommendation": "Validate contract hashes against explicit allowlists before performing external calls.",
+      "confidence": 0.752,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.900->0.752.",
+      "tags": [
+        "external-call",
+        "dynamic-dispatch"
+      ]
+    },
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 2398,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:deserialize' is not validated before continuing.",
+      "offset": 529,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:deserialize' is not validated before continuing.",
+      "offset": 773,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.593,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=5.00, peak_complexity=5, uncertainty=0.427, penalty=0.107, confidence 0.700->0.593.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Late Authorization Check",
+      "severity": "medium",
+      "description": "Authorization check occurs after at least one sensitive operation.",
+      "offset": 782,
+      "recommendation": "Run Runtime.CheckWitness before state changes or external calls.",
+      "confidence": 0.743,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=3, avg_complexity=5.00, peak_complexity=5, uncertainty=0.427, penalty=0.107, confidence 0.850->0.743.",
+      "tags": [
+        "authorization",
+        "execution-order"
+      ]
+    },
+    {
+      "detector": "admin_centralization",
+      "title": "Single Admin Control",
+      "severity": "medium",
+      "description": "Critical operations are gated by a single witness check.",
+      "offset": 782,
+      "recommendation": "Use multisig governance and optional timelock for sensitive methods.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "governance",
+        "centralization"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:serialize' is not validated before continuing.",
+      "offset": 806,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": 869,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'Contract.Call:onNEP11Payment' is not validated before continuing.",
+      "offset": 1000,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=7 with loop back-edges detected.",
+      "offset": 1549,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=7 with loop back-edges detected.",
+      "offset": 1710,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=7 with loop back-edges detected.",
+      "offset": 1822,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=7 with loop back-edges detected.",
+      "offset": 1961,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=11 with loop back-edges detected.",
+      "offset": 2251,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=6 with loop back-edges detected.",
+      "offset": 2392,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=7 with loop back-edges detected.",
+      "offset": 2401,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 66650 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    },
+    {
+      "detector": "manifest_permissions",
+      "title": "Overly Broad Manifest Permissions",
+      "severity": "medium",
+      "description": "Manifest allows unrestricted contract/method calls, expanding the callable trust surface.",
+      "offset": -1,
+      "recommendation": "Restrict manifest permissions to explicit contract hashes and method names.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "manifest",
+        "least-privilege"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

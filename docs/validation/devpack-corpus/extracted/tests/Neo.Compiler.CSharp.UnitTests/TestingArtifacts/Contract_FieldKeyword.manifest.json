@@ -1,0 +1,101 @@
+{
+  "name": "Contract_FieldKeyword",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "update",
+        "parameters": [
+          {
+            "name": "value",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 54,
+        "safe": false
+      },
+      {
+        "name": "recordLastPositiveSequence",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 67,
+        "safe": false
+      },
+      {
+        "name": "recordLastNonZeroSequence",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 85,
+        "safe": false
+      },
+      {
+        "name": "accumulateWallet",
+        "parameters": [
+          {
+            "name": "firstDeposit",
+            "type": "Integer"
+          },
+          {
+            "name": "secondDeposit",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 103,
+        "safe": false
+      },
+      {
+        "name": "trackPositiveWallet",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Boolean"
+          },
+          {
+            "name": "second",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Boolean",
+        "offset": 207,
+        "safe": false
+      },
+      {
+        "name": "_initialize",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 259,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

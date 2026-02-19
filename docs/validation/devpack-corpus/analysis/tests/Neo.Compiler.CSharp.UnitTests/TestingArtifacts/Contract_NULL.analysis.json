@@ -1,0 +1,83 @@
+{
+  "contract": "Contract_NULL",
+  "timestamp": "2026-02-19T04:56:35.565521+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 2,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dos": "medium",
+      "gas_exhaustion": "medium"
+    },
+    "weighted_score": 60,
+    "confidence_weighted_score": 44,
+    "detector_average_confidence": {
+      "access_control": 0.785,
+      "dos": 0.635,
+      "gas_exhaustion": 0.635
+    }
+  },
+  "total": 3,
+  "findings": [
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 183,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=99 with loop back-edges detected.",
+      "offset": -1,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 65563 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "contract": "Ownable",
+  "timestamp": "2026-02-19T04:56:41.967063+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 4,
+    "medium": 5,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dos": "medium",
+      "gas_exhaustion": "medium",
+      "manifest_permissions": "medium",
+      "upgradeability": "high"
+    },
+    "weighted_score": 210,
+    "confidence_weighted_score": 164,
+    "detector_average_confidence": {
+      "access_control": 0.764,
+      "dos": 0.7,
+      "gas_exhaustion": 0.614,
+      "manifest_permissions": 0.7,
+      "upgradeability": 0.828
+    }
+  },
+  "total": 9,
+  "findings": [
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 154,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.785,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.850->0.785.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 226,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 275,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 312,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=6 with loop back-edges detected.",
+      "offset": 33,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=6 with loop back-edges detected.",
+      "offset": 278,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=5 with loop back-edges detected.",
+      "offset": 312,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 98363 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    },
+    {
+      "detector": "manifest_permissions",
+      "title": "Overly Broad Manifest Permissions",
+      "severity": "medium",
+      "description": "Manifest allows unrestricted contract/method calls, expanding the callable trust surface.",
+      "offset": -1,
+      "recommendation": "Restrict manifest permissions to explicit contract hashes and method names.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "manifest",
+        "least-privilege"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

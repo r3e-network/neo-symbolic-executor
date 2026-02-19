@@ -1,0 +1,1045 @@
+[
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.ContractCall.UnitTests/TestingArtifacts/SampleContractCall.artifacts.cs",
+    "contract_name": "SampleContractCall",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.ContractCall.UnitTests/TestingArtifacts/SampleContractCall.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.ContractCall.UnitTests/TestingArtifacts/SampleContractCall.manifest.json",
+    "relative_group": "examples/Example.SmartContract.ContractCall.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Event.UnitTests/TestingArtifacts/SampleEvent.artifacts.cs",
+    "contract_name": "SampleEvent",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Event.UnitTests/TestingArtifacts/SampleEvent.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Event.UnitTests/TestingArtifacts/SampleEvent.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Event.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Exception.UnitTests/TestingArtifacts/SampleException.artifacts.cs",
+    "contract_name": "SampleException",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Exception.UnitTests/TestingArtifacts/SampleException.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Exception.UnitTests/TestingArtifacts/SampleException.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Exception.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.FaunFeatures.UnitTests/TestingArtifacts/SampleFaunFeatures.artifacts.cs",
+    "contract_name": "SampleFaunFeatures",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.FaunFeatures.UnitTests/TestingArtifacts/SampleFaunFeatures.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.FaunFeatures.UnitTests/TestingArtifacts/SampleFaunFeatures.manifest.json",
+    "relative_group": "examples/Example.SmartContract.FaunFeatures.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.HelloWorld.UnitTests/TestingArtifacts/SampleHelloWorld.artifacts.cs",
+    "contract_name": "SampleHelloWorld",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.HelloWorld.UnitTests/TestingArtifacts/SampleHelloWorld.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.HelloWorld.UnitTests/TestingArtifacts/SampleHelloWorld.manifest.json",
+    "relative_group": "examples/Example.SmartContract.HelloWorld.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Inscription.UnitTests/TestingArtifacts/SampleInscription.artifacts.cs",
+    "contract_name": "SampleInscription",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Inscription.UnitTests/TestingArtifacts/SampleInscription.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Inscription.UnitTests/TestingArtifacts/SampleInscription.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Inscription.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Modifier.UnitTests/TestingArtifacts/SampleModifier.artifacts.cs",
+    "contract_name": "SampleModifier",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Modifier.UnitTests/TestingArtifacts/SampleModifier.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Modifier.UnitTests/TestingArtifacts/SampleModifier.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Modifier.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.NEP17.UnitTests/TestingArtifacts/SampleNep17Token.artifacts.cs",
+    "contract_name": "SampleNep17Token",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.NEP17.UnitTests/TestingArtifacts/SampleNep17Token.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.NEP17.UnitTests/TestingArtifacts/SampleNep17Token.manifest.json",
+    "relative_group": "examples/Example.SmartContract.NEP17.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.NFT.UnitTests/TestingArtifacts/SampleLootNFT.cs",
+    "contract_name": "SampleLootNFT",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.NFT.UnitTests/TestingArtifacts/SampleLootNFT.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.NFT.UnitTests/TestingArtifacts/SampleLootNFT.manifest.json",
+    "relative_group": "examples/Example.SmartContract.NFT.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Oracle.UnitTests/TestingArtifacts/SampleOracle.artifacts.cs",
+    "contract_name": "SampleOracle",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Oracle.UnitTests/TestingArtifacts/SampleOracle.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Oracle.UnitTests/TestingArtifacts/SampleOracle.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Oracle.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.SampleRoyaltyNEP11Token.UnitTests/TestingArtifacts/SampleRoyaltyNEP11Token.artifacts.cs",
+    "contract_name": "SampleRoyaltyNEP11Token",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.SampleRoyaltyNEP11Token.UnitTests/TestingArtifacts/SampleRoyaltyNEP11Token.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.SampleRoyaltyNEP11Token.UnitTests/TestingArtifacts/SampleRoyaltyNEP11Token.manifest.json",
+    "relative_group": "examples/Example.SmartContract.SampleRoyaltyNEP11Token.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Storage.UnitTests/TestingArtifacts/SampleStorage.artifacts.cs",
+    "contract_name": "SampleStorage",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Storage.UnitTests/TestingArtifacts/SampleStorage.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Storage.UnitTests/TestingArtifacts/SampleStorage.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Storage.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.Transfer.UnitTests/TestingArtifacts/SampleTransferContract.artifacts.cs",
+    "contract_name": "SampleTransferContract",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Transfer.UnitTests/TestingArtifacts/SampleTransferContract.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.Transfer.UnitTests/TestingArtifacts/SampleTransferContract.manifest.json",
+    "relative_group": "examples/Example.SmartContract.Transfer.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/examples/Example.SmartContract.ZKP.UnitTests/TestingArtifacts/SampleZKP.artifacts.cs",
+    "contract_name": "SampleZKP",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.ZKP.UnitTests/TestingArtifacts/SampleZKP.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/examples/Example.SmartContract.ZKP.UnitTests/TestingArtifacts/SampleZKP.manifest.json",
+    "relative_group": "examples/Example.SmartContract.ZKP.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract1.cs",
+    "contract_name": "Contract1",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract1.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract1.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract2.cs",
+    "contract_name": "Contract2",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract2.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract2.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes.cs",
+    "contract_name": "Contract_ABIAttributes",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes2.cs",
+    "contract_name": "Contract_ABIAttributes2",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes2.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes2.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes3.cs",
+    "contract_name": "Contract_ABIAttributes3",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes3.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABIAttributes3.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABISafe.cs",
+    "contract_name": "Contract_ABISafe",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABISafe.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ABISafe.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Abort.cs",
+    "contract_name": "Contract_Abort",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Abort.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Abort.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Array.cs",
+    "contract_name": "Contract_Array",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Array.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Array.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assert.cs",
+    "contract_name": "Contract_Assert",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assert.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assert.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assignment.cs",
+    "contract_name": "Contract_Assignment",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assignment.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Assignment.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_AttributeChanged.cs",
+    "contract_name": "Contract_AttributeChanged",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_AttributeChanged.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_AttributeChanged.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BigInteger.cs",
+    "contract_name": "Contract_BigInteger",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BigInteger.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BigInteger.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BinaryExpression.cs",
+    "contract_name": "Contract_BinaryExpression",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BinaryExpression.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_BinaryExpression.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Boolean.cs",
+    "contract_name": "Contract_Boolean",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Boolean.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Boolean.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Break.cs",
+    "contract_name": "Contract_Break",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Break.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Break.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteArrayAssignment.cs",
+    "contract_name": "Contract_ByteArrayAssignment",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteArrayAssignment.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteArrayAssignment.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteString.cs",
+    "contract_name": "Contract_ByteString",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteString.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ByteString.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Char.cs",
+    "contract_name": "Contract_Char",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Char.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Char.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckWitness.cs",
+    "contract_name": "Contract_CheckWitness",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckWitness.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckWitness.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckedUnchecked.cs",
+    "contract_name": "Contract_CheckedUnchecked",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckedUnchecked.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_CheckedUnchecked.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ClassInit.cs",
+    "contract_name": "Contract_ClassInit",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ClassInit.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ClassInit.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ComplexAssign.cs",
+    "contract_name": "Contract_ComplexAssign",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ComplexAssign.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ComplexAssign.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Concat.cs",
+    "contract_name": "Contract_Concat",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Concat.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Concat.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ConcatByteStringAddAssign.cs",
+    "contract_name": "Contract_ConcatByteStringAddAssign",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ConcatByteStringAddAssign.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ConcatByteStringAddAssign.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Continue.cs",
+    "contract_name": "Contract_Continue",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Continue.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Continue.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ContractCall.cs",
+    "contract_name": "Contract_ContractCall",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ContractCall.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_ContractCall.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Debug.cs",
+    "contract_name": "Contract_Debug",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Debug.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Debug.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Default.cs",
+    "contract_name": "Contract_Default",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Default.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Default.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Delegate.cs",
+    "contract_name": "Contract_Delegate",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Delegate.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Delegate.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DirectInit.cs",
+    "contract_name": "Contract_DirectInit",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DirectInit.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DirectInit.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DivisionOverflow.cs",
+    "contract_name": "Contract_DivisionOverflow",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DivisionOverflow.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_DivisionOverflow.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Enum.cs",
+    "contract_name": "Contract_Enum",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Enum.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Enum.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Event.cs",
+    "contract_name": "Contract_Event",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Event.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Event.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Extensions.cs",
+    "contract_name": "Contract_Extensions",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Extensions.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Extensions.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_FieldKeyword.cs",
+    "contract_name": "Contract_FieldKeyword",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_FieldKeyword.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_FieldKeyword.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Foreach.cs",
+    "contract_name": "Contract_Foreach",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Foreach.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Foreach.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_GoTo.cs",
+    "contract_name": "Contract_GoTo",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_GoTo.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_GoTo.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inc_Dec.cs",
+    "contract_name": "Contract_Inc_Dec",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inc_Dec.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inc_Dec.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IndexOrRange.cs",
+    "contract_name": "Contract_IndexOrRange",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IndexOrRange.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IndexOrRange.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Initializer.cs",
+    "contract_name": "Contract_Initializer",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Initializer.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Initializer.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inline.cs",
+    "contract_name": "Contract_Inline",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inline.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Inline.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Instance.cs",
+    "contract_name": "Contract_Instance",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Instance.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Instance.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Integer.cs",
+    "contract_name": "Contract_Integer",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Integer.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Integer.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IntegerParse.cs",
+    "contract_name": "Contract_IntegerParse",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IntegerParse.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_IntegerParse.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_InvokeCsNef.cs",
+    "contract_name": "Contract_InvokeCsNef",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_InvokeCsNef.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_InvokeCsNef.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Lambda.cs",
+    "contract_name": "Contract_Lambda",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Lambda.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Lambda.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Linq.cs",
+    "contract_name": "Contract_Linq",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Linq.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Linq.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Logical.cs",
+    "contract_name": "Contract_Logical",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Logical.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Logical.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Math.cs",
+    "contract_name": "Contract_Math",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Math.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Math.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MemberAccess.cs",
+    "contract_name": "Contract_MemberAccess",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MemberAccess.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MemberAccess.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleA.cs",
+    "contract_name": "Contract_MultipleA",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleA.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleA.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleB.cs",
+    "contract_name": "Contract_MultipleB",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleB.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_MultipleB.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP11.cs",
+    "contract_name": "Contract_NEP11",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP11.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP11.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP17.cs",
+    "contract_name": "Contract_NEP17",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP17.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NEP17.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NULL.cs",
+    "contract_name": "Contract_NULL",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NULL.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NULL.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NameofUnboundGeneric.cs",
+    "contract_name": "Contract_NameofUnboundGeneric",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NameofUnboundGeneric.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NameofUnboundGeneric.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NativeContracts.cs",
+    "contract_name": "Contract_NativeContracts",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NativeContracts.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NativeContracts.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullConditional.cs",
+    "contract_name": "Contract_NullConditional",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullConditional.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullConditional.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullableType.cs",
+    "contract_name": "Contract_NullableType",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullableType.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_NullableType.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment1.cs",
+    "contract_name": "Contract_OnDeployment1",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment1.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment1.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment2.cs",
+    "contract_name": "Contract_OnDeployment2",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment2.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_OnDeployment2.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Optimize.cs",
+    "contract_name": "Contract_Optimize",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Optimize.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Optimize.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Out.cs",
+    "contract_name": "Contract_Out",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Out.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Out.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Overflow.cs",
+    "contract_name": "Contract_Overflow",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Overflow.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Overflow.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Params.cs",
+    "contract_name": "Contract_Params",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Params.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Params.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Partial.cs",
+    "contract_name": "Contract_Partial",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Partial.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Partial.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PartialCrossFile.cs",
+    "contract_name": "Contract_PartialCrossFile",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PartialCrossFile.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PartialCrossFile.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Pattern.cs",
+    "contract_name": "Contract_Pattern",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Pattern.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Pattern.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Polymorphism.cs",
+    "contract_name": "Contract_Polymorphism",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Polymorphism.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Polymorphism.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PostfixUnary.cs",
+    "contract_name": "Contract_PostfixUnary",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PostfixUnary.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PostfixUnary.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Property.cs",
+    "contract_name": "Contract_Property",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Property.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Property.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PropertyMethod.cs",
+    "contract_name": "Contract_PropertyMethod",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PropertyMethod.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_PropertyMethod.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Record.cs",
+    "contract_name": "Contract_Record",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Record.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Record.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Recursion.cs",
+    "contract_name": "Contract_Recursion",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Recursion.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Recursion.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Reentrancy.cs",
+    "contract_name": "Contract_Reentrancy",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Reentrancy.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Reentrancy.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefForeachSpan.cs",
+    "contract_name": "Contract_RefForeachSpan",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefForeachSpan.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefForeachSpan.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefLocals.cs",
+    "contract_name": "Contract_RefLocals",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefLocals.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefLocals.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefSupport.cs",
+    "contract_name": "Contract_RefSupport",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefSupport.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_RefSupport.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Returns.cs",
+    "contract_name": "Contract_Returns",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Returns.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Returns.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Stack.cs",
+    "contract_name": "Contract_Stack",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Stack.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Stack.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticByteArray.cs",
+    "contract_name": "Contract_StaticByteArray",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticByteArray.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticByteArray.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticClass.cs",
+    "contract_name": "Contract_StaticClass",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticClass.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticClass.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticConstruct.cs",
+    "contract_name": "Contract_StaticConstruct",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticConstruct.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticConstruct.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVar.cs",
+    "contract_name": "Contract_StaticVar",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVar.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVar.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVarInit.cs",
+    "contract_name": "Contract_StaticVarInit",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVarInit.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_StaticVarInit.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Storage.cs",
+    "contract_name": "Contract_Storage",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Storage.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Storage.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_String.cs",
+    "contract_name": "Contract_String",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_String.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_String.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Switch.cs",
+    "contract_name": "Contract_Switch",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Switch.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Switch.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Syscall_Out.cs",
+    "contract_name": "Contract_Syscall_Out",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Syscall_Out.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Syscall_Out.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Throw.cs",
+    "contract_name": "Contract_Throw",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Throw.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Throw.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TryCatch.cs",
+    "contract_name": "Contract_TryCatch",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TryCatch.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TryCatch.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Tuple.cs",
+    "contract_name": "Contract_Tuple",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Tuple.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Tuple.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TypeConvert.cs",
+    "contract_name": "Contract_TypeConvert",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TypeConvert.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_TypeConvert.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types.cs",
+    "contract_name": "Contract_Types",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_BigInteger.cs",
+    "contract_name": "Contract_Types_BigInteger",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_BigInteger.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_BigInteger.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_ECPoint.cs",
+    "contract_name": "Contract_Types_ECPoint",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_ECPoint.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_Types_ECPoint.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_UIntTypes.cs",
+    "contract_name": "Contract_UIntTypes",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_UIntTypes.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_UIntTypes.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_WriteInTry.cs",
+    "contract_name": "Contract_WriteInTry",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_WriteInTry.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_WriteInTry.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_shift.cs",
+    "contract_name": "Contract_shift",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_shift.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts/Contract_shift.manifest.json",
+    "relative_group": "tests/Neo.Compiler.CSharp.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Attribute.cs",
+    "contract_name": "Contract_Attribute",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Attribute.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Attribute.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Blockchain.cs",
+    "contract_name": "Contract_Blockchain",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Blockchain.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Blockchain.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Contract.cs",
+    "contract_name": "Contract_Contract",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Contract.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Contract.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Create.cs",
+    "contract_name": "Contract_Create",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Create.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Create.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Crypto.cs",
+    "contract_name": "Contract_Crypto",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Crypto.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Crypto.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExecutionEngine.cs",
+    "contract_name": "Contract_ExecutionEngine",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExecutionEngine.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExecutionEngine.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExtraAttribute.cs",
+    "contract_name": "Contract_ExtraAttribute",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExtraAttribute.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ExtraAttribute.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_GuardHelpers_Inline.cs",
+    "contract_name": "Contract_GuardHelpers_Inline",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_GuardHelpers_Inline.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_GuardHelpers_Inline.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Helper.cs",
+    "contract_name": "Contract_Helper",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Helper.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Helper.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_IOracle.cs",
+    "contract_name": "Contract_IOracle",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_IOracle.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_IOracle.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Json.cs",
+    "contract_name": "Contract_Json",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Json.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Json.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_List.cs",
+    "contract_name": "Contract_List",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_List.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_List.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ManifestAttribute.cs",
+    "contract_name": "Contract_ManifestAttribute",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ManifestAttribute.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_ManifestAttribute.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Map.cs",
+    "contract_name": "Contract_Map",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Map.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Map.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Native.cs",
+    "contract_name": "Contract_Native",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Native.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Native.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Nullable.cs",
+    "contract_name": "Contract_Nullable",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Nullable.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Nullable.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Pointers.cs",
+    "contract_name": "Contract_Pointers",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Pointers.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Pointers.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Regex.cs",
+    "contract_name": "Contract_Regex",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Regex.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Regex.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Runtime.cs",
+    "contract_name": "Contract_Runtime",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Runtime.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Runtime.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SequencePointInserter.cs",
+    "contract_name": "Contract_SequencePointInserter",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SequencePointInserter.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SequencePointInserter.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StaticStorageMap.cs",
+    "contract_name": "Contract_StaticStorageMap",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StaticStorageMap.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StaticStorageMap.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StdLib.cs",
+    "contract_name": "Contract_StdLib",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StdLib.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_StdLib.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Storage.cs",
+    "contract_name": "Contract_Storage",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Storage.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Storage.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Stored.cs",
+    "contract_name": "Contract_Stored",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Stored.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Stored.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_String.cs",
+    "contract_name": "Contract_String",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_String.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_String.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard11Enum.cs",
+    "contract_name": "Contract_SupportedStandard11Enum",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard11Enum.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard11Enum.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard17Enum.cs",
+    "contract_name": "Contract_SupportedStandard17Enum",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard17Enum.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard17Enum.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard26.cs",
+    "contract_name": "Contract_SupportedStandard26",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard26.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard26.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard27.cs",
+    "contract_name": "Contract_SupportedStandard27",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard27.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandard27.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandards.cs",
+    "contract_name": "Contract_SupportedStandards",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandards.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_SupportedStandards.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_UInt.cs",
+    "contract_name": "Contract_UInt",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_UInt.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_UInt.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Update.cs",
+    "contract_name": "Contract_Update",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Update.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts/Contract_Update.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Framework.UnitTests/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractnep17/TestingArtifacts/Nep17ContractTemplate.artifacts.cs",
+    "contract_name": "Nep17Contract",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractnep17/TestingArtifacts/Nep17ContractTemplate.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractnep17/TestingArtifacts/Nep17ContractTemplate.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Template.UnitTests/templates/neocontractnep17/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractoracle/TestingArtifacts/OracleRequestTemplate.artifacts.cs",
+    "contract_name": "OracleRequest",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractoracle/TestingArtifacts/OracleRequestTemplate.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractoracle/TestingArtifacts/OracleRequestTemplate.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Template.UnitTests/templates/neocontractoracle/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractowner/TestingArtifacts/OwnableTemplate.artifacts.cs",
+    "contract_name": "Ownable",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractowner/TestingArtifacts/OwnableTemplate.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractowner/TestingArtifacts/OwnableTemplate.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Template.UnitTests/templates/neocontractowner/TestingArtifacts"
+  },
+  {
+    "source_cs": "/tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractsolution/TestingArtifacts/NeoContractSolutionTemplate.artifacts.cs",
+    "contract_name": "Contract",
+    "nef_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractsolution/TestingArtifacts/NeoContractSolutionTemplate.nef",
+    "manifest_path": "/home/neo/git/neo-symbolic-executor/docs/validation/devpack-corpus/extracted/tests/Neo.SmartContract.Template.UnitTests/templates/neocontractsolution/TestingArtifacts/NeoContractSolutionTemplate.manifest.json",
+    "relative_group": "tests/Neo.SmartContract.Template.UnitTests/templates/neocontractsolution/TestingArtifacts"
+  }
+]

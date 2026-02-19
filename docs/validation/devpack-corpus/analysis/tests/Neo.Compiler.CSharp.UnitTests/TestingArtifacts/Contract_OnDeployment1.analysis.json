@@ -1,0 +1,52 @@
+{
+  "contract": "Contract_OnDeployment1",
+  "timestamp": "2026-02-19T04:56:35.963050+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "upgradeability": "high"
+    },
+    "weighted_score": 40,
+    "confidence_weighted_score": 34,
+    "detector_average_confidence": {
+      "upgradeability": 0.85
+    }
+  },
+  "total": 1,
+  "findings": [
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "high",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 0,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "name": "Contract_RefSupport",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "incrementRefLocal",
+        "parameters": [
+          {
+            "name": "value",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "incrementRefStaticField",
+        "parameters": [
+          {
+            "name": "value",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 67,
+        "safe": false
+      },
+      {
+        "name": "incrementRefInstanceField",
+        "parameters": [
+          {
+            "name": "value",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 87,
+        "safe": false
+      },
+      {
+        "name": "produceOutValue",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 119,
+        "safe": false
+      },
+      {
+        "name": "produceOutStaticField",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 137,
+        "safe": false
+      },
+      {
+        "name": "produceOutInstanceField",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 154,
+        "safe": false
+      },
+      {
+        "name": "swapDigits",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 183,
+        "safe": false
+      },
+      {
+        "name": "_initialize",
+        "parameters": [],
+        "returntype": "Void",
+        "offset": 312,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

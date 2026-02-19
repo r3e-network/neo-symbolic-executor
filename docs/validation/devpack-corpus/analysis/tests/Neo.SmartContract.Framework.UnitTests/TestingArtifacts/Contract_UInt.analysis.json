@@ -1,0 +1,256 @@
+{
+  "contract": "Contract_UInt",
+  "timestamp": "2026-02-19T04:56:41.655181+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 8,
+    "medium": 7,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dangerous_call_flags": "high",
+      "dos": "medium",
+      "overflow": "high",
+      "unchecked_return": "medium"
+    },
+    "weighted_score": 390,
+    "confidence_weighted_score": 271,
+    "detector_average_confidence": {
+      "access_control": 0.85,
+      "dangerous_call_flags": 0.85,
+      "dos": 0.6,
+      "overflow": 0.665,
+      "unchecked_return": 0.7
+    }
+  },
+  "total": 15,
+  "findings": [
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 112,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 112,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 311,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 357,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 396,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 442,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 913,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "overflow",
+      "title": "Unchecked Arithmetic Operation",
+      "severity": "high",
+      "description": "Operation SUB may overflow or underflow without runtime guard.",
+      "offset": 959,
+      "recommendation": "Validate arithmetic bounds or assert invariants before state updates.",
+      "confidence": 0.665,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.800->0.665.",
+      "tags": [
+        "SWC-101",
+        "integer-overflow"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:base58CheckEncode' is not validated before continuing.",
+      "offset": 112,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": 840,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.565,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.700->0.565.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": 1438,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.565,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.700->0.565.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": 1547,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.565,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=4, avg_complexity=5.75, peak_complexity=6, uncertainty=0.539, penalty=0.135, confidence 0.700->0.565.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=15 with loop back-edges detected.",
+      "offset": 1615,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=15 with loop back-edges detected.",
+      "offset": 1636,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=15 with loop back-edges detected.",
+      "offset": 1657,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.635,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=1, avg_complexity=5.00, peak_complexity=5, uncertainty=0.260, penalty=0.065, confidence 0.700->0.635.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

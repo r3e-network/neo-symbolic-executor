@@ -1,0 +1,132 @@
+{
+  "contract": "Contract_NEP17",
+  "timestamp": "2026-02-19T04:56:35.488267+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 3,
+    "medium": 3,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "admin_centralization": "medium",
+      "dangerous_call_flags": "high",
+      "dynamic_call_target": "high",
+      "gas_exhaustion": "medium",
+      "unchecked_return": "medium"
+    },
+    "weighted_score": 150,
+    "confidence_weighted_score": 104,
+    "detector_average_confidence": {
+      "admin_centralization": 0.7,
+      "dangerous_call_flags": 0.702,
+      "dynamic_call_target": 0.752,
+      "gas_exhaustion": 0.552,
+      "unchecked_return": 0.552
+    }
+  },
+  "total": 6,
+  "findings": [
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 439,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.702,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.850->0.702.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 471,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.702,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.850->0.702.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dynamic_call_target",
+      "title": "Dynamic External Contract Target",
+      "severity": "high",
+      "description": "System.Contract.Call receives a non-concrete contract hash at runtime.",
+      "offset": 471,
+      "recommendation": "Validate contract hashes against explicit allowlists before performing external calls.",
+      "confidence": 0.752,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.900->0.752.",
+      "tags": [
+        "external-call",
+        "dynamic-dispatch"
+      ]
+    },
+    {
+      "detector": "admin_centralization",
+      "title": "Single Admin Control",
+      "severity": "medium",
+      "description": "Critical operations are gated by a single witness check.",
+      "offset": 364,
+      "recommendation": "Use multisig governance and optional timelock for sensitive methods.",
+      "confidence": 0.7,
+      "confidence_reason": "Static confidence baseline 0.700; no execution-path uncertainty context.",
+      "tags": [
+        "governance",
+        "centralization"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'Contract.Call:onNEP17Payment' is not validated before continuing.",
+      "offset": 471,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 66630 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.552,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=5, avg_complexity=5.00, peak_complexity=5, uncertainty=0.594, penalty=0.148, confidence 0.700->0.552.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

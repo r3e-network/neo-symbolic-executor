@@ -1,0 +1,46 @@
+{
+  "name": "Contract_NameofUnboundGeneric",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "Dictionary",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "describeNested",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 35,
+        "safe": false
+      },
+      {
+        "name": "List",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 78,
+        "safe": false
+      },
+      {
+        "name": "describeNestedMembers",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 113,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

@@ -1,0 +1,601 @@
+{
+  "contract": "SampleLootNFT",
+  "timestamp": "2026-02-19T04:56:30.558894+00:00",
+  "summary": {
+    "critical": 3,
+    "high": 15,
+    "medium": 21,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "critical",
+    "detector_max_severity": {
+      "access_control": "high",
+      "dangerous_call_flags": "high",
+      "dos": "medium",
+      "gas_exhaustion": "medium",
+      "randomness": "medium",
+      "reentrancy": "critical",
+      "unchecked_return": "medium",
+      "upgradeability": "critical"
+    },
+    "weighted_score": 1110,
+    "confidence_weighted_score": 885,
+    "detector_average_confidence": {
+      "access_control": 0.836,
+      "dangerous_call_flags": 0.812,
+      "dos": 0.691,
+      "gas_exhaustion": 0.614,
+      "randomness": 0.614,
+      "reentrancy": 0.814,
+      "unchecked_return": 0.662,
+      "upgradeability": 0.85
+    }
+  },
+  "total": 39,
+  "findings": [
+    {
+      "detector": "reentrancy",
+      "title": "Potential Reentrancy",
+      "severity": "critical",
+      "description": "External call executes before storage write. If the callee re-enters, contract state may be manipulated before completion. Risk amplifiers detected: external calls use dynamic or over-privileged call flags; execution reaches deep internal call-chain depth before state effects.",
+      "offset": 926,
+      "recommendation": "Apply checks-effects-interactions ordering and explicit reentrancy lock for methods performing external calls.",
+      "confidence": 0.814,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.900->0.814.",
+      "tags": [
+        "SWC-107",
+        "reentrancy",
+        "amplified-risk"
+      ]
+    },
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "critical",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 1111,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "upgradeability",
+      "title": "Insecure Upgradeability Path",
+      "severity": "critical",
+      "description": "Contract exposes upgrade/destroy behavior without strong authorization checks.",
+      "offset": 1119,
+      "recommendation": "Protect update/destroy methods using strict witness checks and preferably multisig governance.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "upgradeability",
+        "authorization"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 439,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 439,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 926,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 926,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1115,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1115,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1119,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1119,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1126,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1126,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "access_control",
+      "title": "Missing Access Control",
+      "severity": "high",
+      "description": "Sensitive operations execute without Runtime.CheckWitness or equivalent guard.",
+      "offset": 1512,
+      "recommendation": "Enforce authorization for state-changing and privileged methods.",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "authorization"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1512,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.85,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.850; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1706,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1742,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "dangerous_call_flags",
+      "title": "Over-Privileged External Call Flags",
+      "severity": "high",
+      "description": "External call uses CallFlags.All (0x0F), enabling full callee capabilities.",
+      "offset": 1860,
+      "recommendation": "Reduce call flags to the minimum required permissions (least privilege).",
+      "confidence": 0.764,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.850->0.764.",
+      "tags": [
+        "external-call",
+        "least-privilege",
+        "call-flags"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:deserialize' is not validated before continuing.",
+      "offset": 439,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:serialize' is not validated before continuing.",
+      "offset": 926,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:update' is not validated before continuing.",
+      "offset": 1115,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:destroy' is not validated before continuing.",
+      "offset": 1119,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:itoa' is not validated before continuing.",
+      "offset": 1126,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1401,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1418,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1435,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1452,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1469,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1486,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=61 with loop back-edges detected.",
+      "offset": 1503,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:itoa' is not validated before continuing.",
+      "offset": 1512,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:itoa' is not validated before continuing.",
+      "offset": 1706,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": 1709,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:itoa' is not validated before continuing.",
+      "offset": 1742,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "randomness",
+      "title": "On-chain Randomness Reliance",
+      "severity": "medium",
+      "description": "Contract uses runtime randomness primitive directly.",
+      "offset": 1792,
+      "recommendation": "Harden with anti-manipulation logic and delayed settlement where possible.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "randomness"
+      ]
+    },
+    {
+      "detector": "unchecked_return",
+      "title": "Unchecked External Call Return Value",
+      "severity": "medium",
+      "description": "Result of external call 'CALLT:itoa' is not validated before continuing.",
+      "offset": 1860,
+      "recommendation": "Check return values and revert/abort on failure.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "external-call",
+        "error-handling"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=17 with loop back-edges detected.",
+      "offset": 1910,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=128 with loop back-edges detected.",
+      "offset": -1,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "gas_exhaustion",
+      "title": "High GAS Consumption Path",
+      "severity": "medium",
+      "description": "Execution path consumes approximately 65719 gas units.",
+      "offset": -1,
+      "recommendation": "Reduce expensive syscalls/loops and split heavy workflows.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "gas",
+        "dos"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

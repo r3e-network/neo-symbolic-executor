@@ -1,0 +1,31 @@
+{
+  "name": "Contract_CheckWitness",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "checkWitnessAnalysis",
+        "parameters": [
+          {
+            "name": "u",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 0,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "Version": "3.9.1",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

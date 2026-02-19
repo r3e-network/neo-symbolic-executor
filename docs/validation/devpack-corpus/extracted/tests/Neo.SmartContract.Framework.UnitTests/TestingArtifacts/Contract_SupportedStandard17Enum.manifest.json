@@ -1,0 +1,125 @@
+{
+  "name": "Contract_SupportedStandard17Enum",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [
+    "NEP-17"
+  ],
+  "abi": {
+    "methods": [
+      {
+        "name": "symbol",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 479,
+        "safe": true
+      },
+      {
+        "name": "decimals",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 496,
+        "safe": true
+      },
+      {
+        "name": "totalSupply",
+        "parameters": [],
+        "returntype": "Integer",
+        "offset": 6,
+        "safe": true
+      },
+      {
+        "name": "balanceOf",
+        "parameters": [
+          {
+            "name": "owner",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 26,
+        "safe": true
+      },
+      {
+        "name": "transfer",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "Hash160"
+          },
+          {
+            "name": "to",
+            "type": "Hash160"
+          },
+          {
+            "name": "amount",
+            "type": "Integer"
+          },
+          {
+            "name": "data",
+            "type": "Any"
+          }
+        ],
+        "returntype": "Boolean",
+        "offset": 204,
+        "safe": false
+      },
+      {
+        "name": "onNEP17Payment",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "Hash160"
+          },
+          {
+            "name": "amount",
+            "type": "Integer"
+          },
+          {
+            "name": "data",
+            "type": "Any"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 513,
+        "safe": false
+      }
+    ],
+    "events": [
+      {
+        "name": "Transfer",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "Hash160"
+          },
+          {
+            "name": "to",
+            "type": "Hash160"
+          },
+          {
+            "name": "amount",
+            "type": "Integer"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "contract": "*",
+      "methods": "*"
+    }
+  ],
+  "trusts": [],
+  "extra": {
+    "Author": "<Your Name Or Company Here>",
+    "Description": "<Description Here>",
+    "Email": "<Your Public Email Here>",
+    "Version": "<Version String Here>",
+    "Sourcecode": "https://github.com/neo-project/neo-devpack-dotnet/tree/master/src/Neo.SmartContract.Template",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

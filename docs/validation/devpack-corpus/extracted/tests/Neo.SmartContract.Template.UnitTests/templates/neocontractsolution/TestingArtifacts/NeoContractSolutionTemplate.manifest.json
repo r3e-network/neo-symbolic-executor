@@ -1,0 +1,110 @@
+{
+  "name": "Contract",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "getOwner",
+        "parameters": [],
+        "returntype": "Hash160",
+        "offset": 0,
+        "safe": true
+      },
+      {
+        "name": "setOwner",
+        "parameters": [
+          {
+            "name": "newOwner",
+            "type": "Hash160"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 30,
+        "safe": false
+      },
+      {
+        "name": "verify",
+        "parameters": [],
+        "returntype": "Boolean",
+        "offset": 136,
+        "safe": true
+      },
+      {
+        "name": "myMethod",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 139,
+        "safe": false
+      },
+      {
+        "name": "_deploy",
+        "parameters": [
+          {
+            "name": "data",
+            "type": "Any"
+          },
+          {
+            "name": "update",
+            "type": "Boolean"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 152,
+        "safe": false
+      },
+      {
+        "name": "update",
+        "parameters": [
+          {
+            "name": "nefFile",
+            "type": "ByteArray"
+          },
+          {
+            "name": "manifest",
+            "type": "String"
+          },
+          {
+            "name": "data",
+            "type": "Any"
+          }
+        ],
+        "returntype": "Void",
+        "offset": 267,
+        "safe": false
+      }
+    ],
+    "events": [
+      {
+        "name": "SetOwner",
+        "parameters": [
+          {
+            "name": "previousOwner",
+            "type": "Hash160"
+          },
+          {
+            "name": "newOwner",
+            "type": "Hash160"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "contract": "*",
+      "methods": "*"
+    }
+  ],
+  "trusts": [],
+  "extra": {
+    "Author": "<Your Name Or Company Here>",
+    "Description": "<Description Here>",
+    "Version": "<Version String Here>",
+    "Sourcecode": "https://github.com/neo-project/neo-devpack-dotnet",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}

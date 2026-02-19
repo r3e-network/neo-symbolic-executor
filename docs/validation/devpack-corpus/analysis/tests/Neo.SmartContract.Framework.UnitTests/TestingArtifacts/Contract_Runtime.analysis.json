@@ -1,0 +1,110 @@
+{
+  "contract": "Contract_Runtime",
+  "timestamp": "2026-02-19T04:56:40.636791+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 3,
+    "low": 1,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",
+    "detector_max_severity": {
+      "dos": "medium",
+      "randomness": "high",
+      "timestamp": "low"
+    },
+    "weighted_score": 73,
+    "confidence_weighted_score": 49,
+    "detector_average_confidence": {
+      "dos": 0.614,
+      "randomness": 0.7,
+      "timestamp": 0.7
+    }
+  },
+  "total": 5,
+  "findings": [
+    {
+      "detector": "randomness",
+      "title": "Predictable Randomness",
+      "severity": "high",
+      "description": "Timestamp-derived value appears to influence randomness.",
+      "offset": 6,
+      "recommendation": "Use commit-reveal or verifiable randomness source.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "randomness",
+        "timestamp"
+      ]
+    },
+    {
+      "detector": "randomness",
+      "title": "On-chain Randomness Reliance",
+      "severity": "medium",
+      "description": "Contract uses runtime randomness primitive directly.",
+      "offset": 12,
+      "recommendation": "Harden with anti-manipulation logic and delayed settlement where possible.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "randomness"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=50 with loop back-edges detected.",
+      "offset": 210,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "dos",
+      "title": "Potential Unbounded Loop",
+      "severity": "medium",
+      "description": "Execution path depth=48 with loop back-edges detected.",
+      "offset": 341,
+      "recommendation": "Add bounded iteration checks and short-circuit exit conditions.",
+      "confidence": 0.614,
+      "confidence_reason": "Path uncertainty calibration applied: constraints=2, avg_complexity=5.00, peak_complexity=5, uncertainty=0.344, penalty=0.086, confidence 0.700->0.614.",
+      "tags": [
+        "dos",
+        "loop"
+      ]
+    },
+    {
+      "detector": "timestamp",
+      "title": "Timestamp Dependence",
+      "severity": "low",
+      "description": "Runtime.GetTime observed at 1 location(s).",
+      "offset": 6,
+      "recommendation": "Do not rely on timestamp for critical authorization or randomness logic.",
+      "confidence": 0.7,
+      "confidence_reason": "Path uncertainty calibration retained baseline confidence 0.700; no symbolic constraints were observed.",
+      "tags": [
+        "timestamp"
+      ]
+    }
+  ],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

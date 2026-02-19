@@ -1,0 +1,74 @@
+{
+  "name": "Contract_RefForeachSpan",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "incrementAll",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          },
+          {
+            "name": "third",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "incrementArrayValues",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          },
+          {
+            "name": "third",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 175,
+        "safe": false
+      },
+      {
+        "name": "segmentDouble",
+        "parameters": [
+          {
+            "name": "first",
+            "type": "Integer"
+          },
+          {
+            "name": "second",
+            "type": "Integer"
+          }
+        ],
+        "returntype": "Integer",
+        "offset": 435,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "nef": {
+      "optimization": "Basic"
+    }
+  }
+}

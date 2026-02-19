@@ -1,0 +1,33 @@
+{
+  "contract": "Contract_TypeConvert",
+  "timestamp": "2026-02-19T04:56:38.664255+00:00",
+  "summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+  },
+  "risk_profile": {
+    "overall_max_severity": "info",
+    "detector_max_severity": {},
+    "weighted_score": 0,
+    "confidence_weighted_score": 0,
+    "detector_average_confidence": {}
+  },
+  "total": 0,
+  "findings": [],
+  "gate_evaluation": {
+    "passed": true,
+    "violations": [],
+    "policies": {
+      "fail_on_total_findings": null,
+      "fail_on_max_severity": null,
+      "fail_on_weighted_score": null,
+      "fail_on_confidence_weighted_score": null,
+      "min_confidence": {},
+      "fail_on_severity_count": {},
+      "fail_on_detector_severity": {}
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "Contract_Types_ECPoint",
+  "groups": [],
+  "features": {},
+  "supportedstandards": [],
+  "abi": {
+    "methods": [
+      {
+        "name": "isValid",
+        "parameters": [
+          {
+            "name": "point",
+            "type": "PublicKey"
+          }
+        ],
+        "returntype": "Boolean",
+        "offset": 0,
+        "safe": false
+      },
+      {
+        "name": "ecpoint2String",
+        "parameters": [],
+        "returntype": "String",
+        "offset": 14,
+        "safe": false
+      },
+      {
+        "name": "ecpointReturn",
+        "parameters": [],
+        "returntype": "PublicKey",
+        "offset": 50,
+        "safe": false
+      },
+      {
+        "name": "ecpoint2ByteArray",
+        "parameters": [],
+        "returntype": "Any",
+        "offset": 86,
+        "safe": false
+      }
+    ],
+    "events": []
+  },
+  "permissions": [],
+  "trusts": [],
+  "extra": {
+    "Version": "3.9.1",
+    "nef": {
+      "optimization": "All"
+    }
+  }
+}
