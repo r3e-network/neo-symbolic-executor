@@ -406,7 +406,8 @@ class SymbolicEngine:
             cond = state.pop()
             self._mark_checked_external_call(state, cond)
             self._mark_enforced_witness(state, cond)
-            if cond.concrete is not None and not cond.concrete:
+            is_null = cond.name == "null" and cond.concrete is None
+            if is_null or (cond.concrete is not None and not cond.concrete):
                 state.halted = True
                 state.error = f"assert failed at 0x{instruction.offset:04X}"
                 return [state]
@@ -434,7 +435,8 @@ class SymbolicEngine:
             cond = state.pop()
             self._mark_checked_external_call(state, cond)
             self._mark_enforced_witness(state, cond)
-            if cond.concrete is not None and not cond.concrete:
+            is_null = cond.name == "null" and cond.concrete is None
+            if is_null or (cond.concrete is not None and not cond.concrete):
                 rendered_message = self._coerce_string(message) or "<dynamic-message>"
                 state.halted = True
                 state.error = f"ASSERTMSG failed at 0x{instruction.offset:04X}: {rendered_message}"
@@ -558,7 +560,10 @@ class SymbolicEngine:
 
         if opcode == OpCode.NOT:
             val = state.pop()
-            if val.is_concrete():
+            is_null = val.name == "null" and val.concrete is None
+            if is_null:
+                state.push(SymbolicValue(concrete=True))
+            elif val.is_concrete():
                 state.push(SymbolicValue(concrete=not val.concrete))
             else:
                 state.push(SymbolicValue(name=f"not_{instruction.offset}"))
@@ -567,7 +572,10 @@ class SymbolicEngine:
 
         if opcode == OpCode.NZ:
             val = state.pop()
-            if val.is_concrete():
+            is_null = val.name == "null" and val.concrete is None
+            if is_null:
+                state.push(SymbolicValue(concrete=False))
+            elif val.is_concrete():
                 state.push(SymbolicValue(concrete=bool(val.concrete)))
             else:
                 state.push(SymbolicValue(name=f"nz_{instruction.offset}"))
@@ -634,7 +642,11 @@ class SymbolicEngine:
         if opcode == OpCode.BOOLAND:
             b = state.pop()
             a = state.pop()
-            if a.is_concrete() and b.is_concrete():
+            a_null = a.name == "null" and a.concrete is None
+            b_null = b.name == "null" and b.concrete is None
+            if a_null or b_null:
+                state.push(SymbolicValue(concrete=False))
+            elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=bool(a.concrete) and bool(b.concrete)))
             else:
                 state.push(SymbolicValue(name=f"booland_{instruction.offset}"))
@@ -644,7 +656,21 @@ class SymbolicEngine:
         if opcode == OpCode.BOOLOR:
             b = state.pop()
             a = state.pop()
-            if a.is_concrete() and b.is_concrete():
+            a_null = a.name == "null" and a.concrete is None
+            b_null = b.name == "null" and b.concrete is None
+            if a_null and b_null:
+                state.push(SymbolicValue(concrete=False))
+            elif a_null:
+                if b.is_concrete():
+                    state.push(SymbolicValue(concrete=bool(b.concrete)))
+                else:
+                    state.push(SymbolicValue(name=f"boolor_{instruction.offset}"))
+            elif b_null:
+                if a.is_concrete():
+                    state.push(SymbolicValue(concrete=bool(a.concrete)))
+                else:
+                    state.push(SymbolicValue(name=f"boolor_{instruction.offset}"))
+            elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=bool(a.concrete) or bool(b.concrete)))
             else:
                 state.push(SymbolicValue(name=f"boolor_{instruction.offset}"))

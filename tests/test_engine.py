@@ -1124,3 +1124,57 @@ def test_jmpne_null_vs_concrete_takes_jump():
     states = _make_engine(script).run()
     assert len(states) == 1
     assert states[0].stack[0].concrete == 2
+
+
+def test_assert_fails_on_null():
+    script = bytes([OpCode.PUSHNULL, OpCode.ASSERT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "assert failed" in states[0].error
+
+
+def test_assertmsg_fails_on_null():
+    msg = b"null_cond"
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSHDATA1, len(msg)]) + msg + bytes([
+        OpCode.ASSERTMSG, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "ASSERTMSG failed" in states[0].error
+
+
+def test_not_null_returns_true():
+    script = bytes([OpCode.PUSHNULL, OpCode.NOT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is True
+
+
+def test_nz_null_returns_false():
+    script = bytes([OpCode.PUSHNULL, OpCode.NZ, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is False
+
+
+def test_booland_null_returns_false():
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSH1, OpCode.BOOLAND, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is False
+
+
+def test_boolor_null_null_returns_false():
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSHNULL, OpCode.BOOLOR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is False
+
+
+def test_boolor_null_with_truthy_returns_true():
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSH1, OpCode.BOOLOR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is True
