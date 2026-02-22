@@ -1067,3 +1067,18 @@ def test_notequal_null_value_returns_true():
     states = _make_engine(script).run()
     assert len(states) == 1
     assert states[0].stack[0].concrete is True
+
+
+def test_equal_null_vs_symbolic_returns_symbolic():
+    script = bytes([
+        OpCode.INITSLOT, 0x00, 0x01,
+        OpCode.PUSHNULL,
+        OpCode.LDARG0,
+        OpCode.EQUAL,
+        OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    sv = states[0].stack[-1]
+    assert sv.name is not None and sv.name.startswith("eq_")
+    assert sv.concrete is None

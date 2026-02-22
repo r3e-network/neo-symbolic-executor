@@ -511,8 +511,12 @@ class SymbolicEngine:
             a = state.pop()
             a_null = a.name == "null" and a.concrete is None
             b_null = b.name == "null" and b.concrete is None
-            if a_null or b_null:
-                state.push(SymbolicValue(concrete=a_null == b_null))
+            if a_null and b_null:
+                state.push(SymbolicValue(concrete=True))
+            elif a_null and b.is_concrete():
+                state.push(SymbolicValue(concrete=False))
+            elif b_null and a.is_concrete():
+                state.push(SymbolicValue(concrete=False))
             elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=a.concrete == b.concrete))
             else:
@@ -525,8 +529,12 @@ class SymbolicEngine:
             a = state.pop()
             a_null = a.name == "null" and a.concrete is None
             b_null = b.name == "null" and b.concrete is None
-            if a_null or b_null:
-                state.push(SymbolicValue(concrete=a_null != b_null))
+            if a_null and b_null:
+                state.push(SymbolicValue(concrete=False))
+            elif a_null and b.is_concrete():
+                state.push(SymbolicValue(concrete=True))
+            elif b_null and a.is_concrete():
+                state.push(SymbolicValue(concrete=True))
             elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=a.concrete != b.concrete))
             else:
