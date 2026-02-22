@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
+from ..nef.parser import CALL_FLAGS_ALL
 from .base import BaseDetector, Finding, Severity
 
 

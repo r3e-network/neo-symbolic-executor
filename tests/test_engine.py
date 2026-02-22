@@ -17,7 +17,7 @@ def test_push_and_add():
     script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.ADD, OpCode.RET])
     eng = _make_engine(script)
     states = eng.run()
-    assert len(states) >= 1
+    assert len(states) == 1
     assert len(states[0].stack) == 1
 
 
@@ -33,8 +33,8 @@ def test_conditional_branch():
     ])
     eng = _make_engine(script)
     states = eng.run()
-    # Should explore both branches
-    assert len(states) >= 1
+    # PUSH1 is truthy → concrete branch takes jump, fallthrough is dead
+    assert len(states) == 1
 
 
 def test_slot_operations():
@@ -47,7 +47,7 @@ def test_slot_operations():
     ])
     eng = _make_engine(script)
     states = eng.run()
-    assert len(states) >= 1
+    assert len(states) == 1
     assert len(states[0].stack) == 1
 
 
@@ -858,8 +858,8 @@ def test_unknown_opcode_tracked():
     script = bytes([OpCode.PUSH1, OpCode.CONVERT, 0x21, OpCode.RET])
     eng = _make_engine(script)
     states = eng.run()
-    assert len(states) >= 1
-    assert any(len(s.unknown_opcodes) > 0 for s in states)
+    assert len(states) == 1
+    assert len(states[0].unknown_opcodes) > 0
 
 
 def test_div_and_mod():
@@ -926,3 +926,57 @@ def test_within():
     script = bytes([OpCode.PUSH3, OpCode.PUSH2, OpCode.PUSH5, OpCode.WITHIN, OpCode.RET])
     states = _make_engine(script).run()
     assert states[0].stack[0].concrete is True
+
+
+def test_div_by_zero_halts():
+    script = bytes([OpCode.PUSH8, OpCode.PUSH0, OpCode.DIV, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "division by zero" in states[0].error
+
+
+def test_mod_by_zero_halts():
+    script = bytes([OpCode.PUSH8, OpCode.PUSH0, OpCode.MOD, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "modulo by zero" in states[0].error
+
+
+def test_mod_negative_truncated_semantics():
+    # NeoVM: -7 % 3 == -1 (truncated toward zero), NOT Python's 2 (floored)
+    script = bytes([
+        OpCode.PUSHINT8, 0xF9,  # -7 signed
+        OpCode.PUSH3,
+        OpCode.MOD,
+        OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete == -1
+
+
+def test_shl_negative_shift_halts():
+    script = bytes([OpCode.PUSH1, OpCode.PUSHM1, OpCode.SHL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "invalid shift" in states[0].error
+
+
+def test_pick_out_of_bounds_halts():
+    # Stack has 1 item, PICK(5) is out of range
+    script = bytes([OpCode.PUSH1, OpCode.PUSH5, OpCode.PICK, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "PICK index" in states[0].error
+
+
+def test_roll_out_of_bounds_halts():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH5, OpCode.ROLL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "ROLL index" in states[0].error

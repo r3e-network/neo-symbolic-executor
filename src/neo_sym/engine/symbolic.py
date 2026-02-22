@@ -279,6 +279,10 @@ class SymbolicEngine:
             right = state.pop()
             left = state.pop()
             result = self._compute_arithmetic(opcode, left, right)
+            if result.get("halt"):
+                state.halted = True
+                state.error = f"{result['halt']} at 0x{instruction.offset:04X}"
+                return [state]
             state.arithmetic_ops.append(
                 ArithmeticOp(
                     opcode=opcode.name,
@@ -641,6 +645,10 @@ class SymbolicEngine:
             shift = state.pop()
             val = state.pop()
             if isinstance(val.concrete, int) and isinstance(shift.concrete, int):
+                if shift.concrete < 0 or shift.concrete > 256:
+                    state.halted = True
+                    state.error = f"invalid shift {shift.concrete} at 0x{instruction.offset:04X}"
+                    return [state]
                 result = val.concrete << shift.concrete if opcode == OpCode.SHL else val.concrete >> shift.concrete
                 state.push(SymbolicValue(concrete=result))
             else:
@@ -734,6 +742,10 @@ class SymbolicEngine:
         if opcode == OpCode.REVERSEN:
             n_val = state.pop()
             n = n_val.concrete if isinstance(n_val.concrete, int) else 0
+            if n < 0 or n > len(state.stack):
+                state.halted = True
+                state.error = f"REVERSEN count {n} invalid at 0x{instruction.offset:04X}"
+                return [state]
             items = [state.pop() for _ in range(n)]
             for item in items:
                 state.push(item)
@@ -746,7 +758,9 @@ class SymbolicEngine:
             if 0 <= n < len(state.stack):
                 state.push(state.stack[-(n + 1)].clone())
             else:
-                state.push(SymbolicValue(name=f"pick_{instruction.offset}"))
+                state.halted = True
+                state.error = f"PICK index {n} out of range at 0x{instruction.offset:04X}"
+                return [state]
             state.pc = instruction.offset + instruction.size
             return [state]
 
@@ -757,7 +771,9 @@ class SymbolicEngine:
                 item = state.stack.pop(-(n + 1))
                 state.push(item)
             else:
-                state.push(SymbolicValue(name=f"roll_{instruction.offset}"))
+                state.halted = True
+                state.error = f"ROLL index {n} out of range at 0x{instruction.offset:04X}"
+                return [state]
             state.pc = instruction.offset + instruction.size
             return [state]
 
@@ -880,8 +896,6 @@ class SymbolicEngine:
             return instruction.offset + instruction.size
         if len(instruction.operand) == 1:
             rel = _to_signed_i8(instruction.operand[0])
-        elif len(instruction.operand) == 4:
-            rel = int.from_bytes(instruction.operand, "little", signed=True)
         else:
             rel = int.from_bytes(instruction.operand, "little", signed=True)
         return instruction.offset + rel
@@ -1072,13 +1086,16 @@ class SymbolicEngine:
                 concrete = left.concrete * right.concrete
             elif opcode == OpCode.DIV:
                 if right.concrete == 0:
-                    return {"value": SymbolicValue(name=f"div_by_zero_{left.name or 'lhs'}"), "overflow": True}
+                    return {"value": SymbolicValue(name="div_by_zero"), "overflow": True, "halt": "division by zero"}
                 # NeoVM truncates toward zero (Python's int division truncates toward -inf).
-                concrete = int(left.concrete / right.concrete) if (left.concrete ^ right.concrete) < 0 and left.concrete % right.concrete != 0 else left.concrete // right.concrete
+                q = int(left.concrete / right.concrete) if (left.concrete ^ right.concrete) < 0 and left.concrete % right.concrete != 0 else left.concrete // right.concrete
+                concrete = q
             elif opcode == OpCode.MOD:
                 if right.concrete == 0:
-                    return {"value": SymbolicValue(name=f"mod_by_zero_{left.name or 'lhs'}"), "overflow": True}
-                concrete = left.concrete % right.concrete
+                    return {"value": SymbolicValue(name="mod_by_zero"), "overflow": True, "halt": "modulo by zero"}
+                # NeoVM truncated modulo: result sign matches dividend (not Python's floored mod).
+                q = int(left.concrete / right.concrete) if (left.concrete ^ right.concrete) < 0 and left.concrete % right.concrete != 0 else left.concrete // right.concrete
+                concrete = left.concrete - q * right.concrete
             else:
                 concrete = left.concrete * right.concrete
             overflow = concrete >= max_magnitude or concrete < -max_magnitude

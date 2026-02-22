@@ -37,6 +37,7 @@ class StorageCollisionDetector(BaseDetector):
                             description=f"Storage keys at offsets {off1} and {off2} overlap by prefix.",
                             recommendation="Use fixed-length namespace prefixes per storage domain.",
                             confidence=pair_confidence,
+                            state=source_state,
                             tags=("storage", "collision"),
                         )
                     )
