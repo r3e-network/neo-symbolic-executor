@@ -1185,3 +1185,226 @@ def test_boolor_null_with_truthy_returns_true():
     states = _make_engine(script).run()
     assert len(states) == 1
     assert states[0].stack[0].concrete is True
+
+
+def test_pushint32():
+    script = bytes([OpCode.PUSHINT32]) + (0x12345678).to_bytes(4, "little", signed=True) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 0x12345678
+
+
+def test_pushint64():
+    val = -1234567890123
+    script = bytes([OpCode.PUSHINT64]) + val.to_bytes(8, "little", signed=True) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == val
+
+
+def test_pushint128():
+    val = 2**100
+    script = bytes([OpCode.PUSHINT128]) + val.to_bytes(16, "little", signed=True) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == val
+
+
+def test_pushint256():
+    val = -(2**200)
+    script = bytes([OpCode.PUSHINT256]) + val.to_bytes(32, "little", signed=True) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == val
+
+
+def test_pushdata2():
+    payload = b"A" * 300
+    length = len(payload).to_bytes(2, "little")
+    script = bytes([OpCode.PUSHDATA2]) + length + payload + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == payload
+
+
+def test_starg_stores_to_argument_slot():
+    script = bytes([
+        OpCode.INITSLOT, 0x00, 0x02,  # 0 locals, 2 args
+        OpCode.PUSH5,
+        OpCode.STARG0,
+        OpCode.LDARG0,
+        OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 5
+
+
+def test_starg_indexed():
+    script = bytes([
+        OpCode.INITSLOT, 0x00, 0x03,
+        OpCode.PUSH7,
+        OpCode.STARG, 0x02,
+        OpCode.LDARG, 0x02,
+        OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 7
+
+
+def test_call_l_long_offset():
+    # CALL_L +7 => jump to PUSH1, RET back to PUSH0, RET
+    script = bytes([OpCode.CALL_L]) + (7).to_bytes(4, "little", signed=True) + bytes([
+        OpCode.PUSH0, OpCode.RET, OpCode.PUSH1, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [1, 0]
+
+
+def test_pushdata4():
+    payload = b"B" * 500
+    length = len(payload).to_bytes(4, "little")
+    script = bytes([OpCode.PUSHDATA4]) + length + payload + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == payload
+
+
+def test_tuck():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.TUCK, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [2, 1, 2]
+
+
+def test_reverse4():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.PUSH3, OpCode.PUSH4, OpCode.REVERSE4, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [4, 3, 2, 1]
+
+
+def test_reversen():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.PUSH3, OpCode.PUSH3, OpCode.REVERSEN, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [3, 2, 1]
+
+
+def test_clear():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.CLEAR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states[0].stack) == 0
+
+
+def test_depth():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.DEPTH, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[-1].concrete == 2
+
+
+def test_size_bytes():
+    payload = b"hello"
+    script = bytes([OpCode.PUSHDATA1, len(payload)]) + payload + bytes([OpCode.SIZE, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[-1].concrete == 5
+
+
+def test_sign():
+    script = bytes([OpCode.PUSH5, OpCode.SIGN, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 1
+
+    script = bytes([OpCode.PUSHM1, OpCode.SIGN, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == -1
+
+
+def test_invert():
+    script = bytes([OpCode.PUSH0, OpCode.INVERT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == -1
+
+
+def test_syscall_storage_put():
+    syscall_id = SYSCALLS_BY_NAME["System.Storage.Put"].syscall_id
+    key = b"mykey"
+    val = b"myval"
+    script = b"".join([
+        bytes([OpCode.PUSHDATA1, len(val)]), val,      # value (popped 3rd)
+        bytes([OpCode.PUSHDATA1, len(key)]), key,      # key (popped 2nd)
+        bytes([OpCode.PUSH0]),                          # context (popped 1st)
+        bytes([OpCode.SYSCALL]), struct.pack("<I", syscall_id),
+        bytes([OpCode.RET]),
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert len(states[0].storage_ops) == 1
+    assert states[0].storage_ops[0].op_type == "put"
+    assert states[0].storage_ops[0].key.concrete == key
+
+
+def test_syscall_storage_get():
+    syscall_id = SYSCALLS_BY_NAME["System.Storage.Get"].syscall_id
+    key = b"k"
+    script = b"".join([
+        bytes([OpCode.PUSHDATA1, len(key)]), key,      # key (popped 2nd)
+        bytes([OpCode.PUSH0]),                          # context (popped 1st)
+        bytes([OpCode.SYSCALL]), struct.pack("<I", syscall_id),
+        bytes([OpCode.RET]),
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert len(states[0].storage_ops) == 1
+    assert states[0].storage_ops[0].op_type == "get"
+    assert states[0].stack[-1].name.startswith("storage_read_")
+
+
+def test_syscall_storage_delete():
+    syscall_id = SYSCALLS_BY_NAME["System.Storage.Delete"].syscall_id
+    key = b"d"
+    script = b"".join([
+        bytes([OpCode.PUSHDATA1, len(key)]), key,
+        bytes([OpCode.PUSH0]),
+        bytes([OpCode.SYSCALL]), struct.pack("<I", syscall_id),
+        bytes([OpCode.RET]),
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert len(states[0].storage_ops) == 1
+    assert states[0].storage_ops[0].op_type == "delete"
+
+
+def test_syscall_gettime():
+    syscall_id = SYSCALLS_BY_NAME["System.Runtime.GetTime"].syscall_id
+    script = bytes([OpCode.SYSCALL]) + struct.pack("<I", syscall_id) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].time_accesses == [0]
+    assert states[0].stack[-1].name == "timestamp"
+
+
+def test_syscall_getrandom():
+    syscall_id = SYSCALLS_BY_NAME["System.Runtime.GetRandom"].syscall_id
+    script = bytes([OpCode.SYSCALL]) + struct.pack("<I", syscall_id) + bytes([OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].randomness_accesses == [0]
+    assert states[0].stack[-1].name == "randomness"
+
+
+def test_syscall_notify():
+    syscall_id = SYSCALLS_BY_NAME["System.Runtime.Notify"].syscall_id
+    event = b"Transfer"
+    script = b"".join([
+        bytes([OpCode.PUSH0]),                              # state/args
+        bytes([OpCode.PUSHDATA1, len(event)]), event,       # event name
+        bytes([OpCode.SYSCALL]), struct.pack("<I", syscall_id),
+        bytes([OpCode.RET]),
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert "Transfer" in states[0].events_emitted
+
+
+def test_syscall_log():
+    syscall_id = SYSCALLS_BY_NAME["System.Runtime.Log"].syscall_id
+    msg = b"debug"
+    script = b"".join([
+        bytes([OpCode.PUSHDATA1, len(msg)]), msg,
+        bytes([OpCode.SYSCALL]), struct.pack("<I", syscall_id),
+        bytes([OpCode.RET]),
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert len(states[0].stack) == 0
