@@ -14,7 +14,7 @@ class UncheckedReturnDetector(BaseDetector):
         findings: list[Finding] = []
         for state in states:
             for call in state.external_calls:
-                if call.return_checked:
+                if call.return_checked or not call.has_return_value:
                     continue
                 findings.append(
                     self.finding(

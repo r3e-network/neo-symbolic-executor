@@ -1082,3 +1082,45 @@ def test_equal_null_vs_symbolic_returns_symbolic():
     sv = states[0].stack[-1]
     assert sv.name is not None and sv.name.startswith("eq_")
     assert sv.concrete is None
+
+
+def test_jmpif_null_is_falsy_single_path():
+    # PUSHNULL, JMPIF +4 → null is falsy, should NOT jump → single path with PUSH0
+    script = bytes([
+        OpCode.PUSHNULL, OpCode.JMPIF, 0x04, OpCode.PUSH0, OpCode.RET, OpCode.PUSH1, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete == 0
+
+
+def test_jmpifnot_null_jumps_single_path():
+    # PUSHNULL, JMPIFNOT +4 → null is falsy, should jump → single path with PUSH1
+    script = bytes([
+        OpCode.PUSHNULL, OpCode.JMPIFNOT, 0x04, OpCode.PUSH0, OpCode.RET, OpCode.PUSH1, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete == 1
+
+
+def test_jmpeq_null_null_takes_jump():
+    # PUSHNULL, PUSHNULL, JMPEQ +4 → null==null is True → jump to PUSH2
+    script = bytes([
+        OpCode.PUSHNULL, OpCode.PUSHNULL, OpCode.JMPEQ, 0x04,
+        OpCode.PUSH0, OpCode.RET, OpCode.PUSH2, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete == 2
+
+
+def test_jmpne_null_vs_concrete_takes_jump():
+    # PUSHNULL, PUSH1, JMPNE +4 → null!=1 is True → jump to PUSH2
+    script = bytes([
+        OpCode.PUSHNULL, OpCode.PUSH1, OpCode.JMPNE, 0x04,
+        OpCode.PUSH0, OpCode.RET, OpCode.PUSH2, OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete == 2

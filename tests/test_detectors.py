@@ -1,15 +1,15 @@
 """Tests for security detectors."""
 import struct
 
-from neo_sym.engine.state import ExecutionState, SymbolicValue, StorageOp, ExternalCall
-from neo_sym.engine.symbolic import SymbolicEngine
+import z3
 from neo_sym.detectors import ALL_DETECTORS
 from neo_sym.detectors.base import Severity
-from neo_sym.nef.parser import MethodToken, NefFile, disassemble
+from neo_sym.engine.state import ExecutionState, ExternalCall, StorageOp, SymbolicValue
+from neo_sym.engine.symbolic import SymbolicEngine
+from neo_sym.nef.manifest import ContractEvent, ContractMethod, Manifest
 from neo_sym.nef.opcodes import OpCode
+from neo_sym.nef.parser import MethodToken, NefFile, disassemble
 from neo_sym.nef.syscalls import SYSCALLS_BY_NAME
-from neo_sym.nef.manifest import Manifest, ContractMethod, ContractEvent
-import z3
 
 
 def _apply_high_uncertainty_constraints(state: ExecutionState, prefix: str) -> None:
@@ -226,3 +226,12 @@ def test_dangerous_call_flags_detected_from_engine_states():
 
     assert len(findings) == 1
     assert findings[0].severity == Severity.HIGH
+
+
+def test_unchecked_return_skips_void_callt():
+    state = ExecutionState()
+    state.external_calls.append(
+        ExternalCall(contract_hash=b"\x22" * 20, method="CALLT:destroy", offset=0, has_return_value=False)
+    )
+    findings = ALL_DETECTORS["unchecked_return"]().detect([state])
+    assert not findings

@@ -310,9 +310,10 @@ class SymbolicEngine:
             jump_if_not = opcode in (OpCode.JMPIFNOT, OpCode.JMPIFNOT_L)
             self._mark_checked_external_call(state, cond)
 
-            if cond.concrete is not None:
+            is_null = cond.name == "null" and cond.concrete is None
+            if cond.concrete is not None or is_null:
                 self._mark_enforced_witness(state, cond)
-                truthy = bool(cond.concrete)
+                truthy = False if is_null else bool(cond.concrete)
                 if jump_if_not:
                     truthy = not truthy
                 state.pc = target if truthy else fallthrough
@@ -359,7 +360,20 @@ class SymbolicEngine:
             self._mark_enforced_witness(state, right)
             target = self._jump_target(instruction)
             fallthrough = instruction.offset + instruction.size
-            comparison = self._evaluate_comparison(opcode, left.concrete, right.concrete)
+            l_null = left.name == "null" and left.concrete is None
+            r_null = right.name == "null" and right.concrete is None
+            if (l_null or r_null) and opcode in (
+                OpCode.JMPEQ, OpCode.JMPEQ_L, OpCode.JMPNE, OpCode.JMPNE_L,
+            ):
+                is_eq = opcode in (OpCode.JMPEQ, OpCode.JMPEQ_L)
+                if l_null and r_null:
+                    comparison = is_eq
+                elif (l_null and right.is_concrete()) or (r_null and left.is_concrete()):
+                    comparison = not is_eq
+                else:
+                    comparison = None
+            else:
+                comparison = self._evaluate_comparison(opcode, left.concrete, right.concrete)
 
             if comparison is not None:
                 state.pc = target if comparison else fallthrough
@@ -835,6 +849,7 @@ class SymbolicEngine:
                 offset=instruction.offset,
                 call_flags=token.call_flags,
                 call_flags_dynamic=False,
+                has_return_value=token.has_return_value,
             )
         )
         if token.has_return_value:

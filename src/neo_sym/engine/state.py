@@ -37,6 +37,7 @@ class ExternalCall:
     method_dynamic: bool = False
     call_flags: int | None = None
     call_flags_dynamic: bool = False
+    has_return_value: bool = True
 
 
 @dataclass(slots=True)
