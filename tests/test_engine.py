@@ -1,11 +1,11 @@
 """Tests for symbolic execution engine."""
 import struct
-import z3
-from neo_sym.nef.opcodes import OpCode
-from neo_sym.nef.parser import MethodToken, disassemble, NefFile
-from neo_sym.nef.syscalls import SYSCALLS_BY_NAME
+
+from neo_sym.engine.state import ExecutionState, ExternalCall, SymbolicValue
 from neo_sym.engine.symbolic import SymbolicEngine
-from neo_sym.engine.state import SymbolicValue, ExecutionState, ExternalCall
+from neo_sym.nef.opcodes import OpCode
+from neo_sym.nef.parser import MethodToken, NefFile, disassemble
+from neo_sym.nef.syscalls import SYSCALLS_BY_NAME
 
 
 def _make_engine(script: bytes) -> SymbolicEngine:
@@ -763,3 +763,166 @@ def test_jmpeq_marks_matching_external_call_checked():
     assert len(states) == 1
     assert len(states[0].external_calls) == 1
     assert states[0].external_calls[0].return_checked is True
+
+
+def test_assertmsg_halts_on_false_condition():
+    msg = b"bad"
+    script = bytes([OpCode.PUSHF, OpCode.PUSHDATA1, len(msg)]) + msg + bytes([
+        OpCode.ASSERTMSG, OpCode.RET,
+    ])
+    eng = _make_engine(script)
+    states = eng.run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "ASSERTMSG failed" in states[0].error
+    assert "bad" in states[0].error
+
+
+def test_assertmsg_passes_on_true_condition():
+    msg = b"ok"
+    script = bytes([OpCode.PUSHT, OpCode.PUSHDATA1, len(msg)]) + msg + bytes([
+        OpCode.ASSERTMSG, OpCode.PUSH1, OpCode.RET,
+    ])
+    eng = _make_engine(script)
+    states = eng.run()
+    assert len(states) == 1
+    assert states[0].error is None
+    assert states[0].stack[0].concrete == 1
+
+
+def test_swap_over_nip_opcodes():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.SWAP, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [2, 1]
+
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.OVER, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [1, 2, 1]
+
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.NIP, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [2]
+
+
+def test_comparison_opcodes():
+    # LT: 1 < 2 == True
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.LT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete is True
+
+    # GT: 1 > 2 == False
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.GT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete is False
+
+
+def test_unary_opcodes():
+    # NEGATE: -3
+    script = bytes([OpCode.PUSH3, OpCode.NEGATE, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == -3
+
+    # ABS: |-1| = 1
+    script = bytes([OpCode.PUSHM1, OpCode.ABS, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 1
+
+    # INC: 5+1 = 6
+    script = bytes([OpCode.PUSH5, OpCode.INC, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 6
+
+    # DEC: 5-1 = 4
+    script = bytes([OpCode.PUSH5, OpCode.DEC, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 4
+
+
+def test_stack_overflow_halts_execution():
+    # Push values in a tight loop to exceed MAX_STACK
+    eng = _make_engine(bytes([OpCode.PUSH1, OpCode.RET]))
+    eng.MAX_STACK = 4
+    from neo_sym.engine.state import ExecutionState
+    state = ExecutionState(pc=0)
+    state.stack = [SymbolicValue(concrete=i) for i in range(5)]
+    # Simulate: engine checks after instruction execution
+    script = bytes([OpCode.PUSH1] * 6 + [OpCode.RET])
+    eng2 = _make_engine(script)
+    eng2.MAX_STACK = 4
+    states = eng2.run()
+    assert any(s.halted and "stack overflow" in (s.error or "") for s in states)
+
+
+def test_unknown_opcode_tracked():
+    # CONVERT (0xDB) is not handled by the engine — should be tracked
+    script = bytes([OpCode.PUSH1, OpCode.CONVERT, 0x21, OpCode.RET])
+    eng = _make_engine(script)
+    states = eng.run()
+    assert len(states) >= 1
+    assert any(len(s.unknown_opcodes) > 0 for s in states)
+
+
+def test_div_and_mod():
+    script = bytes([OpCode.PUSH8, OpCode.PUSH3, OpCode.DIV, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 2
+
+    script = bytes([OpCode.PUSH8, OpCode.PUSH3, OpCode.MOD, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 2
+
+
+def test_bitwise_and_or_xor():
+    # 0x0F & 0x03 == 0x03
+    script = bytes([OpCode.PUSHINT8, 0x0F, OpCode.PUSH3, OpCode.AND, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 3
+
+    # 0x01 | 0x02 == 0x03
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.OR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 3
+
+    # 0x03 ^ 0x01 == 0x02
+    script = bytes([OpCode.PUSH3, OpCode.PUSH1, OpCode.XOR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 2
+
+
+def test_shl_shr():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH3, OpCode.SHL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 8
+
+    script = bytes([OpCode.PUSH8, OpCode.PUSH2, OpCode.SHR, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 2
+
+
+def test_min_max():
+    script = bytes([OpCode.PUSH3, OpCode.PUSH5, OpCode.MIN, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 3
+
+    script = bytes([OpCode.PUSH3, OpCode.PUSH5, OpCode.MAX, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete == 5
+
+
+def test_rot_reverse3():
+    # ROT: [a, b, c] -> [b, c, a]
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.PUSH3, OpCode.ROT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [2, 3, 1]
+
+    # REVERSE3: [a, b, c] -> [c, b, a]
+    script = bytes([OpCode.PUSH1, OpCode.PUSH2, OpCode.PUSH3, OpCode.REVERSE3, OpCode.RET])
+    states = _make_engine(script).run()
+    assert [v.concrete for v in states[0].stack] == [3, 2, 1]
+
+
+def test_within():
+    # 3 WITHIN [2, 5) == True
+    script = bytes([OpCode.PUSH3, OpCode.PUSH2, OpCode.PUSH5, OpCode.WITHIN, OpCode.RET])
+    states = _make_engine(script).run()
+    assert states[0].stack[0].concrete is True

@@ -15,7 +15,7 @@ class SymbolicValue:
     def is_concrete(self) -> bool:
         return self.concrete is not None
 
-    def clone(self) -> "SymbolicValue":
+    def clone(self) -> SymbolicValue:
         return SymbolicValue(expr=self.expr, concrete=self.concrete, name=self.name, taints=set(self.taints))
 
 
@@ -87,9 +87,11 @@ class ExecutionState:
     exception_offsets: list[int] = field(default_factory=list)
     try_stack: list[TryFrame] = field(default_factory=list)
 
+    unknown_opcodes: list[int] = field(default_factory=list)
+    unknown_syscalls: list[tuple[int, str]] = field(default_factory=list)
     reentrancy_guard: bool = False
 
-    def clone(self) -> "ExecutionState":
+    def clone(self) -> ExecutionState:
         cloned_storage_ops = [
             StorageOp(
                 op_type=op.op_type,
@@ -157,6 +159,8 @@ class ExecutionState:
                 )
                 for frame in self.try_stack
             ],
+            unknown_opcodes=list(self.unknown_opcodes),
+            unknown_syscalls=list(self.unknown_syscalls),
             reentrancy_guard=self.reentrancy_guard,
         )
 

@@ -203,6 +203,7 @@ class OpCode(IntEnum):
     ISTYPE = 0xD9
     CONVERT = 0xDB
     ABORTMSG = 0xE0
+    ASSERTMSG = 0xE1
 
 
 # Fixed operand byte lengths (excluding opcode byte).

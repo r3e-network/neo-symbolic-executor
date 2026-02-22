@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
+from ..nef.parser import CALL_FLAGS_ALL
 from .base import BaseDetector, Finding, Severity
-
-_CALL_FLAGS_ALL = 0x0F
 
 
 class DangerousCallFlagsDetector(BaseDetector):
@@ -35,7 +34,7 @@ class DangerousCallFlagsDetector(BaseDetector):
                     )
                     continue
 
-                if isinstance(call.call_flags, int) and (call.call_flags & _CALL_FLAGS_ALL) == _CALL_FLAGS_ALL:
+                if isinstance(call.call_flags, int) and (call.call_flags & CALL_FLAGS_ALL) == CALL_FLAGS_ALL:
                     findings.append(
                         self.finding(
                             title="Over-Privileged External Call Flags",

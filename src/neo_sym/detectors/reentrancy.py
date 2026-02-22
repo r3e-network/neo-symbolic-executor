@@ -10,7 +10,6 @@ class ReentrancyDetector(BaseDetector):
     name = "reentrancy"
     description = "Detects external-call-before-state-update patterns"
     default_confidence = 0.9
-    _CALL_FLAGS_ALL = 0x0F
 
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
@@ -19,10 +18,12 @@ class ReentrancyDetector(BaseDetector):
                 continue
 
             first_call = min(state.external_calls, key=lambda c: c.offset if c.offset >= 0 else 10**9)
+            if first_call.offset < 0:
+                continue
             writes_after_call = [
                 op
                 for op in state.storage_ops
-                if op.op_type == "put" and op.offset >= 0 and (first_call.offset < 0 or op.offset > first_call.offset)
+                if op.op_type == "put" and op.offset >= 0 and op.offset > first_call.offset
             ]
             if not writes_after_call:
                 continue
@@ -45,7 +46,7 @@ class ReentrancyDetector(BaseDetector):
                 amplification_signals.append("external call targets are dynamically selected at runtime")
             if any(
                 call.call_flags_dynamic
-                or (isinstance(call.call_flags, int) and (call.call_flags & self._CALL_FLAGS_ALL) == self._CALL_FLAGS_ALL)
+                or (isinstance(call.call_flags, int) and (call.call_flags & CALL_FLAGS_ALL) == CALL_FLAGS_ALL)
                 for call in pre_write_calls
             ):
                 amplification_signals.append("external calls use dynamic or over-privileged call flags")

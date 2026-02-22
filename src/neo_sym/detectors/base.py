@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
@@ -16,6 +17,15 @@ class Severity(str, Enum):
     MEDIUM = "medium"
     LOW = "low"
     INFO = "info"
+
+
+SEVERITY_RANK: dict[Severity, int] = {
+    Severity.CRITICAL: 0,
+    Severity.HIGH: 1,
+    Severity.MEDIUM: 2,
+    Severity.LOW: 3,
+    Severity.INFO: 4,
+}
 
 
 @dataclass(slots=True, frozen=True)
@@ -214,13 +224,6 @@ class BaseDetector(ABC):
 
     @staticmethod
     def dedupe_findings(findings: list[Finding]) -> list[Finding]:
-        severity_rank: dict[Severity, int] = {
-            Severity.INFO: 0,
-            Severity.LOW: 1,
-            Severity.MEDIUM: 2,
-            Severity.HIGH: 3,
-            Severity.CRITICAL: 4,
-        }
         unique_by_key: dict[tuple[str, str, int], Finding] = {}
         for finding in findings:
             key = (finding.detector, finding.title, finding.offset)
@@ -229,11 +232,12 @@ class BaseDetector(ABC):
                 unique_by_key[key] = finding
                 continue
 
-            existing_rank = severity_rank[existing.severity]
-            incoming_rank = severity_rank[finding.severity]
+            # Lower SEVERITY_RANK value = more severe
+            existing_rank = SEVERITY_RANK[existing.severity]
+            incoming_rank = SEVERITY_RANK[finding.severity]
 
             chosen = existing
-            if incoming_rank > existing_rank:
+            if incoming_rank < existing_rank:
                 chosen = finding
             elif incoming_rank == existing_rank and finding.confidence > existing.confidence:
                 chosen = finding

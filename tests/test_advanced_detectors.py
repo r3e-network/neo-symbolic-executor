@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import z3
-
 from neo_sym.detectors import ALL_DETECTORS
 from neo_sym.detectors.base import Severity
-from neo_sym.engine.state import ArithmeticOp, ExecutionState, ExternalCall, StorageOp, SymbolicValue
+from neo_sym.engine.state import (
+    ArithmeticOp,
+    ExecutionState,
+    ExternalCall,
+    StorageOp,
+    SymbolicValue,
+)
 from neo_sym.nef.manifest import ContractMethod, Manifest
 
 
@@ -406,4 +411,83 @@ def test_dangerous_call_flags_detector_ignores_restricted_flags():
         )
     )
     findings = ALL_DETECTORS["dangerous_call_flags"]().detect([state])
+    assert not findings
+
+
+def test_admin_centralization_flags_single_enforced_witness():
+    state = ExecutionState()
+    state.witness_checks_enforced = [10]
+    state.storage_ops.append(StorageOp("put", SymbolicValue(concrete=b"k"), offset=20))
+    findings = ALL_DETECTORS["admin_centralization"]().detect([state])
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.MEDIUM
+    assert "Single Admin" in findings[0].title
+
+
+def test_admin_centralization_ignores_multi_witness():
+    state = ExecutionState()
+    state.witness_checks_enforced = [10, 20]
+    state.storage_ops.append(StorageOp("put", SymbolicValue(concrete=b"k"), offset=30))
+    findings = ALL_DETECTORS["admin_centralization"]().detect([state])
+    assert not findings
+
+
+def test_admin_centralization_ignores_no_privileged_actions():
+    state = ExecutionState()
+    state.witness_checks_enforced = [10]
+    findings = ALL_DETECTORS["admin_centralization"]().detect([state])
+    assert not findings
+
+
+def test_manifest_permissions_flags_wildcard():
+    from neo_sym.nef.manifest import ContractPermission
+
+    manifest = Manifest(permissions=[ContractPermission(contract="*", methods=["*"])])
+    findings = ALL_DETECTORS["manifest_permissions"]().detect([], manifest)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.MEDIUM
+
+
+def test_manifest_permissions_ignores_restricted():
+    from neo_sym.nef.manifest import ContractPermission
+
+    manifest = Manifest(permissions=[ContractPermission(contract="0xabcd", methods=["transfer"])])
+    findings = ALL_DETECTORS["manifest_permissions"]().detect([], manifest)
+    assert not findings
+
+
+def test_manifest_permissions_no_manifest():
+    findings = ALL_DETECTORS["manifest_permissions"]().detect([])
+    assert not findings
+
+
+def test_unknown_instructions_flags_unmodelled_opcode():
+    state = ExecutionState()
+    state.unknown_opcodes = [42]
+    findings = ALL_DETECTORS["unknown_instructions"]().detect([state])
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.INFO
+    assert "Opcode" in findings[0].title
+
+
+def test_unknown_instructions_flags_unmodelled_syscall():
+    state = ExecutionState()
+    state.unknown_syscalls = [(50, "System.Crypto.Verify")]
+    findings = ALL_DETECTORS["unknown_instructions"]().detect([state])
+    assert len(findings) == 1
+    assert "Syscall" in findings[0].title
+    assert "System.Crypto.Verify" in findings[0].title
+
+
+def test_unknown_instructions_dedupes_across_states():
+    s1 = ExecutionState()
+    s1.unknown_opcodes = [42]
+    s2 = ExecutionState()
+    s2.unknown_opcodes = [42]
+    findings = ALL_DETECTORS["unknown_instructions"]().detect([s1, s2])
+    assert len(findings) == 1
+
+
+def test_unknown_instructions_empty_when_clean():
+    findings = ALL_DETECTORS["unknown_instructions"]().detect([ExecutionState()])
     assert not findings

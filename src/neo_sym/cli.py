@@ -1,22 +1,27 @@
 """CLI entry point for neo-sym."""
+
 from __future__ import annotations
+
 import json
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import click
 from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .nef.parser import parse_nef
-from .nef.manifest import parse_manifest
-from .engine.symbolic import SymbolicEngine
 from .detectors import ALL_DETECTORS, Severity
+from .detectors.base import SEVERITY_RANK
+from .engine.symbolic import SymbolicEngine
+from .nef.manifest import parse_manifest
+from .nef.parser import parse_nef
 from .report.generator import ReportGenerator
 
 console = Console()
+
+_SEVERITY_RANK_BY_NAME: dict[str, int] = {s.value: r for s, r in SEVERITY_RANK.items()}
 
 
 def _parse_min_confidence_specs(specs: Iterable[str]) -> dict[str, float]:
@@ -31,32 +36,19 @@ def _parse_min_confidence_specs(specs: Iterable[str]) -> dict[str, float]:
         severity_name = severity_text.strip().lower()
         if severity_name not in valid_severities:
             allowed = ", ".join(sorted(valid_severities))
-            raise click.BadParameter(
-                f"Invalid severity '{severity_name}' in --min-confidence. Allowed: {allowed}."
-            )
+            raise click.BadParameter(f"Invalid severity '{severity_name}' in --min-confidence. Allowed: {allowed}.")
         try:
             floor = float(floor_text.strip())
         except ValueError as exc:
-            raise click.BadParameter(
-                f"Invalid confidence floor '{floor_text}' in --min-confidence."
-            ) from exc
+            raise click.BadParameter(f"Invalid confidence floor '{floor_text}' in --min-confidence.") from exc
         if floor < 0.0 or floor > 1.0:
-            raise click.BadParameter(
-                f"Confidence floor for severity '{severity_name}' must be between 0 and 1."
-            )
+            raise click.BadParameter(f"Confidence floor for severity '{severity_name}' must be between 0 and 1.")
         floors[severity_name] = floor
     return floors
 
 
 def _severity_rank_value(severity_name: str) -> int:
-    order = {
-        Severity.CRITICAL.value: 0,
-        Severity.HIGH.value: 1,
-        Severity.MEDIUM.value: 2,
-        Severity.LOW.value: 3,
-        Severity.INFO.value: 4,
-    }
-    return order.get(severity_name.lower(), 99)
+    return _SEVERITY_RANK_BY_NAME.get(severity_name.lower(), 99)
 
 
 def _parse_detector_severity_specs(specs: Iterable[str]) -> dict[str, str]:
@@ -65,8 +57,7 @@ def _parse_detector_severity_specs(specs: Iterable[str]) -> dict[str, str]:
     for raw_spec in specs:
         if "=" not in raw_spec:
             raise click.BadParameter(
-                f"Invalid --fail-on-detector-severity value '{raw_spec}'. "
-                "Expected format '<detector>=<severity>'."
+                f"Invalid --fail-on-detector-severity value '{raw_spec}'. Expected format '<detector>=<severity>'."
             )
         detector_text, severity_text = raw_spec.split("=", 1)
         detector_name = detector_text.strip()
@@ -74,14 +65,12 @@ def _parse_detector_severity_specs(specs: Iterable[str]) -> dict[str, str]:
         if detector_name not in ALL_DETECTORS:
             allowed_detectors = ", ".join(sorted(ALL_DETECTORS.keys()))
             raise click.BadParameter(
-                f"Invalid detector '{detector_name}' in --fail-on-detector-severity. "
-                f"Allowed: {allowed_detectors}."
+                f"Invalid detector '{detector_name}' in --fail-on-detector-severity. Allowed: {allowed_detectors}."
             )
         if severity_name not in valid_severities:
             allowed_severities = ", ".join(sorted(valid_severities))
             raise click.BadParameter(
-                f"Invalid severity '{severity_name}' in --fail-on-detector-severity. "
-                f"Allowed: {allowed_severities}."
+                f"Invalid severity '{severity_name}' in --fail-on-detector-severity. Allowed: {allowed_severities}."
             )
         policies[detector_name] = severity_name
     return policies
@@ -93,27 +82,21 @@ def _parse_severity_count_specs(specs: Iterable[str]) -> dict[str, int]:
     for raw_spec in specs:
         if "=" not in raw_spec:
             raise click.BadParameter(
-                f"Invalid --fail-on-severity-count value '{raw_spec}'. "
-                "Expected format '<severity>=<count>'."
+                f"Invalid --fail-on-severity-count value '{raw_spec}'. Expected format '<severity>=<count>'."
             )
         severity_text, count_text = raw_spec.split("=", 1)
         severity_name = severity_text.strip().lower()
         if severity_name not in valid_severities:
             allowed_severities = ", ".join(sorted(valid_severities))
             raise click.BadParameter(
-                f"Invalid severity '{severity_name}' in --fail-on-severity-count. "
-                f"Allowed: {allowed_severities}."
+                f"Invalid severity '{severity_name}' in --fail-on-severity-count. Allowed: {allowed_severities}."
             )
         try:
             count_threshold = int(count_text.strip())
         except ValueError as exc:
-            raise click.BadParameter(
-                f"Invalid count threshold '{count_text}' in --fail-on-severity-count."
-            ) from exc
+            raise click.BadParameter(f"Invalid count threshold '{count_text}' in --fail-on-severity-count.") from exc
         if count_threshold < 1:
-            raise click.BadParameter(
-                f"Count threshold for severity '{severity_name}' must be >= 1."
-            )
+            raise click.BadParameter(f"Count threshold for severity '{severity_name}' must be >= 1.")
         policies[severity_name] = count_threshold
     return policies
 
@@ -139,26 +122,16 @@ def _collect_gate_violations(
     detector_max_severity = risk_profile.get("detector_max_severity", {})
 
     if fail_on_total_findings is not None and total_findings >= fail_on_total_findings:
-        violations.append(
-            f"Total findings gate failed: {total_findings} >= threshold {fail_on_total_findings}."
-        )
+        violations.append(f"Total findings gate failed: {total_findings} >= threshold {fail_on_total_findings}.")
 
-    if (
-        fail_on_max_severity is not None
-        and _severity_rank_value(overall_max_severity) <= _severity_rank_value(fail_on_max_severity)
+    if fail_on_max_severity is not None and _severity_rank_value(overall_max_severity) <= _severity_rank_value(
+        fail_on_max_severity
     ):
-        violations.append(
-            f"Max severity gate failed: {overall_max_severity} >= threshold {fail_on_max_severity}."
-        )
+        violations.append(f"Max severity gate failed: {overall_max_severity} >= threshold {fail_on_max_severity}.")
 
     if fail_on_weighted_score is not None and weighted_score >= fail_on_weighted_score:
-        violations.append(
-            f"Weighted score gate failed: {weighted_score} >= threshold {fail_on_weighted_score}."
-        )
-    if (
-        fail_on_confidence_weighted_score is not None
-        and confidence_weighted_score >= fail_on_confidence_weighted_score
-    ):
+        violations.append(f"Weighted score gate failed: {weighted_score} >= threshold {fail_on_weighted_score}.")
+    if fail_on_confidence_weighted_score is not None and confidence_weighted_score >= fail_on_confidence_weighted_score:
         violations.append(
             "Confidence-weighted score gate failed: "
             f"{confidence_weighted_score} >= threshold {fail_on_confidence_weighted_score}."
@@ -166,15 +139,12 @@ def _collect_gate_violations(
 
     for severity_name, floor in sorted(min_confidence_floors.items()):
         below_floor = [
-            finding
-            for finding in findings
-            if finding.severity.value == severity_name and finding.confidence < floor
+            finding for finding in findings if finding.severity.value == severity_name and finding.confidence < floor
         ]
         if not below_floor:
             continue
         sample = ", ".join(
-            f"{finding.detector}:{finding.title}@{finding.confidence:.3f}"
-            for finding in below_floor[:3]
+            f"{finding.detector}:{finding.title}@{finding.confidence:.3f}" for finding in below_floor[:3]
         )
         suffix = "..." if len(below_floor) > 3 else ""
         violations.append(
@@ -186,8 +156,7 @@ def _collect_gate_violations(
         matching_count = sum(1 for finding in findings if finding.severity.value == severity_name)
         if matching_count >= threshold_count:
             violations.append(
-                f"Severity count gate failed for '{severity_name}': "
-                f"{matching_count} >= threshold {threshold_count}."
+                f"Severity count gate failed for '{severity_name}': {matching_count} >= threshold {threshold_count}."
             )
 
     for detector_name, threshold_severity in sorted(detector_severity_policies.items()):
@@ -265,10 +234,7 @@ def main() -> None:
     "--fail-on-max-severity",
     type=click.Choice([severity.value for severity in Severity], case_sensitive=False),
     default=None,
-    help=(
-        "Exit with code 3 if overall max severity is greater than or equal to this "
-        "severity threshold."
-    ),
+    help=("Exit with code 3 if overall max severity is greater than or equal to this severity threshold."),
 )
 @click.option(
     "--fail-on-weighted-score",
@@ -280,45 +246,42 @@ def main() -> None:
     "--fail-on-confidence-weighted-score",
     type=int,
     default=None,
-    help=(
-        "Exit with code 3 if confidence-weighted risk score is greater than or equal "
-        "to this threshold."
-    ),
+    help=("Exit with code 3 if confidence-weighted risk score is greater than or equal to this threshold."),
 )
 @click.option(
     "--min-confidence",
     "min_confidence_specs",
     multiple=True,
-    help=(
-        "Minimum confidence floor in the form <severity>=<0..1> (e.g. high=0.80). "
-        "Can be repeated."
-    ),
+    help=("Minimum confidence floor in the form <severity>=<0..1> (e.g. high=0.80). Can be repeated."),
 )
 @click.option(
     "--fail-on-severity-count",
     "severity_count_specs",
     multiple=True,
-    help=(
-        "Fail gate in the form <severity>=<count> (e.g. high=2). "
-        "Can be repeated."
-    ),
+    help=("Fail gate in the form <severity>=<count> (e.g. high=2). Can be repeated."),
 )
 @click.option(
     "--fail-on-detector-severity",
     "detector_severity_specs",
     multiple=True,
-    help=(
-        "Fail gate in the form <detector>=<severity> (e.g. reentrancy=high). "
-        "Can be repeated."
-    ),
+    help=("Fail gate in the form <detector>=<severity> (e.g. reentrancy=high). Can be repeated."),
 )
-def analyze(nef_file: str, manifest: str | None, output: str | None,
-            fmt: str, detectors: str | None, max_paths: int, max_depth: int,
-            fail_on_total_findings: int | None,
-            fail_on_max_severity: str | None,
-            fail_on_weighted_score: int | None, fail_on_confidence_weighted_score: int | None,
-            min_confidence_specs: tuple[str, ...], severity_count_specs: tuple[str, ...],
-            detector_severity_specs: tuple[str, ...]) -> None:
+def analyze(
+    nef_file: str,
+    manifest: str | None,
+    output: str | None,
+    fmt: str,
+    detectors: str | None,
+    max_paths: int,
+    max_depth: int,
+    fail_on_total_findings: int | None,
+    fail_on_max_severity: str | None,
+    fail_on_weighted_score: int | None,
+    fail_on_confidence_weighted_score: int | None,
+    min_confidence_specs: tuple[str, ...],
+    severity_count_specs: tuple[str, ...],
+    detector_severity_specs: tuple[str, ...],
+) -> None:
     """Analyze a NEF contract file for security issues."""
     min_confidence_floors = _parse_min_confidence_specs(min_confidence_specs)
     severity_count_policies = _parse_severity_count_specs(severity_count_specs)
@@ -331,7 +294,7 @@ def analyze(nef_file: str, manifest: str | None, output: str | None,
     nef_data = Path(nef_file).read_bytes()
     try:
         nef = parse_nef(nef_data)
-    except Exception as e:
+    except ValueError as e:
         console.print(f"[red]Failed to parse NEF: {e}[/]")
         sys.exit(1)
 
@@ -403,14 +366,18 @@ def analyze(nef_file: str, manifest: str | None, output: str | None,
     table.add_column("Title")
     table.add_column("Offset")
     sev_colors = {"critical": "red", "high": "bright_red", "medium": "yellow", "low": "blue", "info": "white"}
-    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     for f in sorted(
         deduped,
-        key=lambda x: (severity_order[x.severity.value], x.offset if x.offset >= 0 else 1_000_000, x.title),
+        key=lambda x: (
+            _SEVERITY_RANK_BY_NAME.get(x.severity.value, 99),
+            x.offset if x.offset >= 0 else 1_000_000,
+            x.title,
+        ),
     ):
         table.add_row(
             f"[{sev_colors[f.severity.value]}]{f.severity.value.upper()}[/]",
-            f.detector, f.title,
+            f.detector,
+            f.title,
             f"0x{f.offset:04X}" if f.offset >= 0 else "-",
         )
     if deduped:

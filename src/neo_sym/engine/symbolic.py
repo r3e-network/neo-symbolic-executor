@@ -7,7 +7,14 @@ from ..nef.manifest import Manifest
 from ..nef.opcodes import OpCode
 from ..nef.parser import Instruction, NefFile
 from ..nef.syscalls import SYSCALLS_BY_ID, SyscallInfo
-from .state import ArithmeticOp, ExecutionState, ExternalCall, StorageOp, SymbolicValue, TryFrame
+from .state import (
+    ArithmeticOp,
+    ExecutionState,
+    ExternalCall,
+    StorageOp,
+    SymbolicValue,
+    TryFrame,
+)
 
 
 def _to_signed_i8(value: int) -> int:
@@ -29,6 +36,7 @@ class SymbolicEngine:
 
     MAX_PATHS = 256
     MAX_DEPTH = 128
+    MAX_STACK = 2048
     WORD_BITS = 256
 
     def __init__(self, nef: NefFile, manifest: Manifest | None = None) -> None:
@@ -81,6 +89,9 @@ class SymbolicEngine:
                 continue
 
             for next_state in next_states:
+                if len(next_state.stack) > self.MAX_STACK:
+                    next_state.halted = True
+                    next_state.error = f"stack overflow ({len(next_state.stack)} > {self.MAX_STACK})"
                 if next_state.halted:
                     final_states.append(next_state)
                 elif len(queue) + len(final_states) >= self.MAX_PATHS:
@@ -264,7 +275,7 @@ class SymbolicEngine:
             state.pc = instruction.offset + instruction.size
             return [state]
 
-        if opcode in (OpCode.ADD, OpCode.SUB, OpCode.MUL):
+        if opcode in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD):
             right = state.pop()
             left = state.pop()
             result = self._compute_arithmetic(opcode, left, right)
@@ -305,12 +316,9 @@ class SymbolicEngine:
                     state.loops_detected.append(instruction.offset)
                 return [state]
 
+            self._mark_enforced_witness(state, cond)
             taken = state.clone()
             not_taken = state.clone()
-            self._mark_checked_external_call(taken, cond)
-            self._mark_checked_external_call(not_taken, cond)
-            self._mark_enforced_witness(taken, cond)
-            self._mark_enforced_witness(not_taken, cond)
             taken.constraints.append(("branch", instruction.offset, True))
             not_taken.constraints.append(("branch", instruction.offset, False))
             if not jump_if_not:
@@ -357,14 +365,6 @@ class SymbolicEngine:
 
             taken = state.clone()
             not_taken = state.clone()
-            self._mark_checked_external_call(taken, left)
-            self._mark_checked_external_call(taken, right)
-            self._mark_checked_external_call(not_taken, left)
-            self._mark_checked_external_call(not_taken, right)
-            self._mark_enforced_witness(taken, left)
-            self._mark_enforced_witness(taken, right)
-            self._mark_enforced_witness(not_taken, left)
-            self._mark_enforced_witness(not_taken, right)
             taken.constraints.append(("cmp_branch", opcode.name, instruction.offset, True))
             not_taken.constraints.append(("cmp_branch", opcode.name, instruction.offset, False))
             taken.pc = target
@@ -411,6 +411,19 @@ class SymbolicEngine:
             state.try_stack.clear()
             return [state]
 
+        if opcode == OpCode.ASSERTMSG:
+            message = state.pop()
+            cond = state.pop()
+            self._mark_checked_external_call(state, cond)
+            self._mark_enforced_witness(state, cond)
+            if cond.concrete is False or cond.concrete == 0:
+                rendered_message = self._coerce_string(message) or "<dynamic-message>"
+                state.halted = True
+                state.error = f"ASSERTMSG failed at 0x{instruction.offset:04X}: {rendered_message}"
+                return [state]
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
         if opcode == OpCode.THROW:
             state.exception_offsets.append(instruction.offset)
             return self._raise_exception(state, throw_offset=instruction.offset)
@@ -449,7 +462,315 @@ class SymbolicEngine:
                 state.halted = True
             return [state]
 
-        # Unknown opcode behavior in this lightweight executor: advance.
+        if opcode == OpCode.PUSHNULL:
+            state.push(SymbolicValue(concrete=None, name="null"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.PUSHA:
+            rel = int.from_bytes(instruction.operand, "little", signed=True) if instruction.operand else 0
+            state.push(SymbolicValue(concrete=instruction.offset + rel))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.SWAP:
+            b = state.pop()
+            a = state.pop()
+            state.push(b)
+            state.push(a)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.OVER:
+            b = state.pop()
+            a = state.pop()
+            state.push(a)
+            state.push(b)
+            state.push(a.clone())
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.NIP:
+            top = state.pop()
+            state.pop()  # discard second
+            state.push(top)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.CLEAR:
+            state.stack.clear()
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.EQUAL, OpCode.NUMEQUAL):
+            b = state.pop()
+            a = state.pop()
+            if a.is_concrete() and b.is_concrete():
+                state.push(SymbolicValue(concrete=a.concrete == b.concrete))
+            else:
+                state.push(SymbolicValue(name=f"eq_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.NOTEQUAL, OpCode.NUMNOTEQUAL):
+            b = state.pop()
+            a = state.pop()
+            if a.is_concrete() and b.is_concrete():
+                state.push(SymbolicValue(concrete=a.concrete != b.concrete))
+            else:
+                state.push(SymbolicValue(name=f"neq_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.NOT:
+            val = state.pop()
+            if val.is_concrete():
+                state.push(SymbolicValue(concrete=not val.concrete))
+            else:
+                state.push(SymbolicValue(name=f"not_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.NZ:
+            val = state.pop()
+            if val.is_concrete():
+                state.push(SymbolicValue(concrete=val.concrete != 0))
+            else:
+                state.push(SymbolicValue(name=f"nz_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.LT, OpCode.GT, OpCode.LE, OpCode.GE):
+            b = state.pop()
+            a = state.pop()
+            if isinstance(a.concrete, int) and isinstance(b.concrete, int):
+                result = {OpCode.LT: a.concrete < b.concrete, OpCode.GT: a.concrete > b.concrete,
+                          OpCode.LE: a.concrete <= b.concrete, OpCode.GE: a.concrete >= b.concrete}[opcode]
+                state.push(SymbolicValue(concrete=result))
+            else:
+                state.push(SymbolicValue(name=f"cmp_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.SIGN:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=(1 if val.concrete > 0 else (-1 if val.concrete < 0 else 0))))
+            else:
+                state.push(SymbolicValue(name=f"sign_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.NEGATE:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=-val.concrete))
+            else:
+                state.push(SymbolicValue(name=f"neg_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.ABS:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=abs(val.concrete)))
+            else:
+                state.push(SymbolicValue(name=f"abs_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.INC:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=val.concrete + 1))
+            else:
+                state.push(SymbolicValue(name=f"inc_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.DEC:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=val.concrete - 1))
+            else:
+                state.push(SymbolicValue(name=f"dec_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.BOOLAND:
+            b = state.pop()
+            a = state.pop()
+            if a.is_concrete() and b.is_concrete():
+                state.push(SymbolicValue(concrete=bool(a.concrete) and bool(b.concrete)))
+            else:
+                state.push(SymbolicValue(name=f"booland_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.BOOLOR:
+            b = state.pop()
+            a = state.pop()
+            if a.is_concrete() and b.is_concrete():
+                state.push(SymbolicValue(concrete=bool(a.concrete) or bool(b.concrete)))
+            else:
+                state.push(SymbolicValue(name=f"boolor_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.DEPTH:
+            state.push(SymbolicValue(concrete=len(state.stack)))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.ISNULL:
+            val = state.pop()
+            state.push(SymbolicValue(concrete=val.concrete is None))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.SIZE:
+            val = state.pop()
+            if isinstance(val.concrete, (bytes, str)):
+                state.push(SymbolicValue(concrete=len(val.concrete)))
+            else:
+                state.push(SymbolicValue(name=f"size_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.SHL, OpCode.SHR):
+            shift = state.pop()
+            val = state.pop()
+            if isinstance(val.concrete, int) and isinstance(shift.concrete, int):
+                result = val.concrete << shift.concrete if opcode == OpCode.SHL else val.concrete >> shift.concrete
+                state.push(SymbolicValue(concrete=result))
+            else:
+                state.push(SymbolicValue(name=f"{opcode.name.lower()}_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.AND, OpCode.OR, OpCode.XOR):
+            b = state.pop()
+            a = state.pop()
+            if isinstance(a.concrete, int) and isinstance(b.concrete, int):
+                result = {OpCode.AND: a.concrete & b.concrete, OpCode.OR: a.concrete | b.concrete,
+                          OpCode.XOR: a.concrete ^ b.concrete}[opcode]
+                state.push(SymbolicValue(concrete=result))
+            else:
+                state.push(SymbolicValue(name=f"{opcode.name.lower()}_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.INVERT:
+            val = state.pop()
+            if isinstance(val.concrete, int):
+                state.push(SymbolicValue(concrete=~val.concrete))
+            else:
+                state.push(SymbolicValue(name=f"invert_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode in (OpCode.MIN, OpCode.MAX):
+            b = state.pop()
+            a = state.pop()
+            if isinstance(a.concrete, int) and isinstance(b.concrete, int):
+                state.push(SymbolicValue(concrete=min(a.concrete, b.concrete) if opcode == OpCode.MIN else max(a.concrete, b.concrete)))
+            else:
+                state.push(SymbolicValue(name=f"{opcode.name.lower()}_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.WITHIN:
+            b = state.pop()
+            a = state.pop()
+            x = state.pop()
+            if isinstance(x.concrete, int) and isinstance(a.concrete, int) and isinstance(b.concrete, int):
+                state.push(SymbolicValue(concrete=a.concrete <= x.concrete < b.concrete))
+            else:
+                state.push(SymbolicValue(name=f"within_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.ROT:
+            c = state.pop()
+            b = state.pop()
+            a = state.pop()
+            state.push(b)
+            state.push(c)
+            state.push(a)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.TUCK:
+            b = state.pop()
+            a = state.pop()
+            state.push(b.clone())
+            state.push(a)
+            state.push(b)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.REVERSE3:
+            c = state.pop()
+            b = state.pop()
+            a = state.pop()
+            state.push(c)
+            state.push(b)
+            state.push(a)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.REVERSE4:
+            d = state.pop()
+            c = state.pop()
+            b = state.pop()
+            a = state.pop()
+            state.push(d)
+            state.push(c)
+            state.push(b)
+            state.push(a)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.REVERSEN:
+            n_val = state.pop()
+            n = n_val.concrete if isinstance(n_val.concrete, int) else 0
+            items = [state.pop() for _ in range(n)]
+            for item in items:
+                state.push(item)
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.PICK:
+            n_val = state.pop()
+            n = n_val.concrete if isinstance(n_val.concrete, int) else 0
+            if 0 <= n < len(state.stack):
+                state.push(state.stack[-(n + 1)].clone())
+            else:
+                state.push(SymbolicValue(name=f"pick_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.ROLL:
+            n_val = state.pop()
+            n = n_val.concrete if isinstance(n_val.concrete, int) else 0
+            if 0 <= n < len(state.stack):
+                item = state.stack.pop(-(n + 1))
+                state.push(item)
+            else:
+                state.push(SymbolicValue(name=f"roll_{instruction.offset}"))
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        if opcode == OpCode.XDROP:
+            n_val = state.pop()
+            n = n_val.concrete if isinstance(n_val.concrete, int) else 0
+            if 0 <= n < len(state.stack):
+                del state.stack[-(n + 1)]
+            state.pc = instruction.offset + instruction.size
+            return [state]
+
+        # Unknown opcode: track and advance.
+        state.unknown_opcodes.append(instruction.offset)
         state.pc = instruction.offset + instruction.size
         return [state]
 
@@ -547,7 +868,8 @@ class SymbolicEngine:
             if state.stack:
                 _ = state.pop()
         else:
-            # Unknown or unmodelled syscall: preserve stack shape with symbolic result.
+            # Unknown or unmodelled syscall: track and preserve stack shape with symbolic result.
+            state.unknown_syscalls.append((instruction.offset, name))
             state.push(SymbolicValue(name=name))
 
         state.pc = instruction.offset + instruction.size
@@ -561,7 +883,7 @@ class SymbolicEngine:
         elif len(instruction.operand) == 4:
             rel = int.from_bytes(instruction.operand, "little", signed=True)
         else:
-            rel = int.from_bytes(instruction.operand[:1], "little", signed=False)
+            rel = int.from_bytes(instruction.operand, "little", signed=True)
         return instruction.offset + rel
 
     def _handle_try(self, state: ExecutionState, instruction: Instruction) -> list[ExecutionState]:
@@ -735,19 +1057,31 @@ class SymbolicEngine:
             state.witness_checks_enforced.append(witness_offset)
 
     def _compute_arithmetic(self, opcode: OpCode, left: SymbolicValue, right: SymbolicValue) -> dict[str, Any]:
-        mod = 1 << self.WORD_BITS
+        # NeoVM uses arbitrary-precision BigInteger; overflow is only possible
+        # when the result exceeds the VM's 32-byte integer limit (±2^255).
+        max_magnitude = 1 << (self.WORD_BITS - 1)
         overflow = False
         concrete: int | None = None
 
         if isinstance(left.concrete, int) and isinstance(right.concrete, int):
             if opcode == OpCode.ADD:
-                raw = left.concrete + right.concrete
+                concrete = left.concrete + right.concrete
             elif opcode == OpCode.SUB:
-                raw = left.concrete - right.concrete
+                concrete = left.concrete - right.concrete
+            elif opcode == OpCode.MUL:
+                concrete = left.concrete * right.concrete
+            elif opcode == OpCode.DIV:
+                if right.concrete == 0:
+                    return {"value": SymbolicValue(name=f"div_by_zero_{left.name or 'lhs'}"), "overflow": True}
+                # NeoVM truncates toward zero (Python's int division truncates toward -inf).
+                concrete = int(left.concrete / right.concrete) if (left.concrete ^ right.concrete) < 0 and left.concrete % right.concrete != 0 else left.concrete // right.concrete
+            elif opcode == OpCode.MOD:
+                if right.concrete == 0:
+                    return {"value": SymbolicValue(name=f"mod_by_zero_{left.name or 'lhs'}"), "overflow": True}
+                concrete = left.concrete % right.concrete
             else:
-                raw = left.concrete * right.concrete
-            overflow = raw < 0 or raw >= mod
-            concrete = raw % mod
+                concrete = left.concrete * right.concrete
+            overflow = concrete >= max_magnitude or concrete < -max_magnitude
 
         return {
             "value": SymbolicValue(

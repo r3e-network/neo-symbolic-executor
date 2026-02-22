@@ -68,10 +68,15 @@ def parse_manifest(raw_json: str) -> Manifest:
     if not isinstance(payload, dict):
         raise ValueError("Manifest root must be an object")
 
+    raw_name = payload.get("name")
     manifest = Manifest(
-        name=str(payload.get("name", "unknown")),
-        supported_standards=[str(s) for s in payload.get("supportedstandards", [])],
-        trusts=[str(t) for t in payload.get("trusts", [])],
+        name=str(raw_name) if isinstance(raw_name, str) else "unknown",
+        supported_standards=[str(s) for s in payload.get("supportedstandards", [])]
+        if isinstance(payload.get("supportedstandards", []), list)
+        else [],
+        trusts=[str(t) for t in payload.get("trusts", [])]
+        if isinstance(payload.get("trusts", []), list)
+        else [],
         groups=list(payload.get("groups", [])),
         extra=dict(payload.get("extra", {})) if isinstance(payload.get("extra", {}), dict) else {},
     )
@@ -84,7 +89,7 @@ def parse_manifest(raw_json: str) -> Manifest:
             manifest.abi_methods.append(
                 ContractMethod(
                     name=str(method.get("name", "")),
-                    offset=int(method.get("offset", 0)),
+                    offset=int(method.get("offset", 0)) if isinstance(method.get("offset", 0), (int, float)) else 0,
                     parameters=_parse_parameters(list(method.get("parameters", []))),
                     return_type=str(method["returntype"]) if "returntype" in method else None,
                     safe=bool(method.get("safe", False)),

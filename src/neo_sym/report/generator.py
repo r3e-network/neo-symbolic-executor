@@ -1,8 +1,10 @@
 """Report generator - JSON and Markdown output."""
 from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
-from ..detectors.base import Finding, Severity
+
+from ..detectors.base import SEVERITY_RANK, Finding, Severity
 
 
 class ReportGenerator:
@@ -11,20 +13,13 @@ class ReportGenerator:
 
     @staticmethod
     def _severity_rank(severity: Severity) -> int:
-        order = {
-            Severity.CRITICAL: 0,
-            Severity.HIGH: 1,
-            Severity.MEDIUM: 2,
-            Severity.LOW: 3,
-            Severity.INFO: 4,
-        }
-        return order.get(severity, 99)
+        return SEVERITY_RANK.get(severity, 99)
 
     def _sorted_findings(self, findings: list[Finding]) -> list[Finding]:
         return sorted(
             findings,
             key=lambda finding: (
-                self._severity_rank(finding.severity),
+                SEVERITY_RANK.get(finding.severity, 99),
                 finding.offset if finding.offset >= 0 else 1_000_000,
                 finding.detector,
                 finding.title,
@@ -121,7 +116,7 @@ class ReportGenerator:
             f"# Security Audit Report: {self.contract_name}",
             f"\nGenerated: {d['timestamp']}\n",
             "## Summary\n",
-            f"| Severity | Count |\n|----------|-------|",
+            "| Severity | Count |\n|----------|-------|",
         ]
         for sev in Severity:
             lines.append(f"| {sev.value.capitalize()} | {d['summary'][sev.value]} |")
@@ -139,20 +134,19 @@ class ReportGenerator:
                 lines.append(f"| {detector} | {severity.capitalize()} |")
             lines.append("")
         lines.append("## Findings\n")
-        ordered_findings = self._sorted_findings(findings)
-        for i, f in enumerate(ordered_findings, 1):
-            lines.append(f"### {i}. {f.title}")
-            lines.append(f"\n- **Severity:** {f.severity.value.capitalize()}")
-            lines.append(f"- **Detector:** {f.detector}")
-            if f.offset >= 0:
-                lines.append(f"- **Offset:** 0x{f.offset:04X}")
-            lines.append(f"- **Confidence:** {f.confidence:.3f}")
-            if f.confidence_reason:
-                lines.append(f"- **Confidence Rationale:** {f.confidence_reason}")
-            lines.append(f"- **Description:** {f.description}")
-            if f.recommendation:
-                lines.append(f"- **Recommendation:** {f.recommendation}")
-            if f.tags:
-                lines.append(f"- **Tags:** {', '.join(f.tags)}")
+        for i, f in enumerate(d["findings"], 1):
+            lines.append(f"### {i}. {f['title']}")
+            lines.append(f"\n- **Severity:** {f['severity'].capitalize()}")
+            lines.append(f"- **Detector:** {f['detector']}")
+            if f["offset"] >= 0:
+                lines.append(f"- **Offset:** 0x{f['offset']:04X}")
+            lines.append(f"- **Confidence:** {f['confidence']:.3f}")
+            if f["confidence_reason"]:
+                lines.append(f"- **Confidence Rationale:** {f['confidence_reason']}")
+            lines.append(f"- **Description:** {f['description']}")
+            if f["recommendation"]:
+                lines.append(f"- **Recommendation:** {f['recommendation']}")
+            if f["tags"]:
+                lines.append(f"- **Tags:** {', '.join(f['tags'])}")
             lines.append("")
         return "\n".join(lines)

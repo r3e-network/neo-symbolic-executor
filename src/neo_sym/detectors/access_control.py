@@ -14,8 +14,11 @@ class AccessControlDetector(BaseDetector):
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
         for state in states:
-            sensitive_offsets = [op.offset for op in state.storage_ops if op.op_type == "put"]
-            sensitive_offsets.extend(call.offset for call in state.external_calls if call.method)
+            sensitive_offsets = [op.offset for op in state.storage_ops if op.op_type in ("put", "delete")]
+            sensitive_offsets.extend(
+                call.offset for call in state.external_calls
+                if call.method and not call.method.startswith("Contract.Call:")
+            )
             if not sensitive_offsets:
                 continue
             known_sensitive_offsets = [off for off in sensitive_offsets if off >= 0]

@@ -40,7 +40,7 @@ class UpgradeabilityDetector(BaseDetector):
             is_sensitive_entry = state.entry_offset in sensitive_entries
             if not (has_upgrade_call or is_sensitive_entry):
                 continue
-            if state.witness_checks:
+            if state.witness_checks_enforced:
                 continue
 
             findings.append(

@@ -1,17 +1,16 @@
 """NEF parser and NeoVM disassembler."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import hashlib
+from dataclasses import dataclass, field
 
 from .opcodes import FIXED_OPERAND_SIZES, PREFIX_OPERAND_SIZES, OpCode
-
 
 NEF3_MAGIC = 0x3346454E
 MAX_SOURCE_LENGTH = 256
 MAX_METHOD_TOKENS = 128
 MAX_METHOD_NAME_LENGTH = 32
-MAX_SCRIPT_LENGTH = 65_535 * 2
+MAX_SCRIPT_LENGTH = 512 * 1024  # 512 KiB per Neo N3 spec
 CALL_FLAGS_ALL = 0x0F
 
 
@@ -101,7 +100,7 @@ class _BufferReader:
 
 
 def _read_fixed_string(data: bytes) -> str:
-    return data.split(b"\x00", 1)[0].decode("utf-8", errors="ignore")
+    return data.split(b"\x00", 1)[0].decode("utf-8", errors="replace")
 
 
 def compute_nef_checksum(data_without_checksum: bytes) -> int:

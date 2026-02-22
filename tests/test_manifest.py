@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from neo_sym.nef.manifest import parse_manifest
 
 
@@ -48,3 +47,20 @@ def test_parse_manifest_with_abi_details():
 def test_parse_manifest_invalid_json():
     with pytest.raises(ValueError):
         parse_manifest("{invalid-json}")
+
+
+def test_parse_manifest_null_name():
+    m = parse_manifest(json.dumps({"name": None}))
+    assert m.name == "unknown"
+
+
+def test_parse_manifest_non_list_standards():
+    m = parse_manifest(json.dumps({"supportedstandards": "NEP-17"}))
+    assert m.supported_standards == []
+
+
+def test_parse_manifest_non_integer_offset():
+    m = parse_manifest(json.dumps({
+        "abi": {"methods": [{"name": "foo", "offset": "bad"}]},
+    }))
+    assert m.abi_methods[0].offset == 0

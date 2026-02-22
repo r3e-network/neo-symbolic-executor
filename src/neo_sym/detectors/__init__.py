@@ -1,20 +1,22 @@
 """Security detectors module."""
-from .base import BaseDetector, Finding, Severity
-from .reentrancy import ReentrancyDetector
-from .overflow import OverflowDetector
+
 from .access_control import AccessControlDetector
-from .unchecked_return import UncheckedReturnDetector
+from .admin_centralization import AdminCentralizationDetector
+from .base import SEVERITY_RANK, BaseDetector, Finding, Severity
+from .dangerous_call_flags import DangerousCallFlagsDetector
 from .dos import DoSDetector
-from .storage import StorageCollisionDetector
-from .timestamp import TimestampDetector
-from .randomness import RandomnessDetector
+from .dynamic_call_target import DynamicCallTargetDetector
 from .gas_exhaustion import GasExhaustionDetector
 from .nep17 import NEP17Detector
-from .admin_centralization import AdminCentralizationDetector
-from .upgradeability import UpgradeabilityDetector
+from .overflow import OverflowDetector
 from .permissions import ManifestPermissionDetector
-from .dynamic_call_target import DynamicCallTargetDetector
-from .dangerous_call_flags import DangerousCallFlagsDetector
+from .randomness import RandomnessDetector
+from .reentrancy import ReentrancyDetector
+from .storage import StorageCollisionDetector
+from .timestamp import TimestampDetector
+from .unchecked_return import UncheckedReturnDetector
+from .unknown_instructions import UnknownInstructionsDetector
+from .upgradeability import UpgradeabilityDetector
 
 ALL_DETECTORS: dict[str, type[BaseDetector]] = {
     "reentrancy": ReentrancyDetector,
@@ -32,6 +34,7 @@ ALL_DETECTORS: dict[str, type[BaseDetector]] = {
     "manifest_permissions": ManifestPermissionDetector,
     "dynamic_call_target": DynamicCallTargetDetector,
     "dangerous_call_flags": DangerousCallFlagsDetector,
+    "unknown_instructions": UnknownInstructionsDetector,
 }
 
-__all__ = ["ALL_DETECTORS", "BaseDetector", "Finding", "Severity"]
+__all__ = ["ALL_DETECTORS", "SEVERITY_RANK", "BaseDetector", "Finding", "Severity"]
