@@ -10,6 +10,18 @@ class StorageCollisionDetector(BaseDetector):
     name = "storage_collision"
     description = "Detects potential storage key prefix collisions"
 
+    @staticmethod
+    def _to_bytes(k: bytes | str | int) -> bytes:
+        if isinstance(k, bytes):
+            return k
+        if isinstance(k, str):
+            return k.encode("utf-8")
+        # NeoVM BigInteger: little-endian signed, minimal length
+        if k == 0:
+            return b"\x00"
+        length = (k.bit_length() + 8) // 8
+        return k.to_bytes(length, "little", signed=True)
+
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
         all_keys: list[tuple[int, bytes | str | int, ExecutionState]] = []
@@ -19,7 +31,7 @@ class StorageCollisionDetector(BaseDetector):
                     all_keys.append((op.offset, op.key.concrete, state))
 
         concrete_keys = [
-            (off, k if isinstance(k, bytes) else str(k).encode("utf-8"), state)
+            (off, self._to_bytes(k), state)
             for off, k, state in all_keys
         ]
         for i, (off1, k1, source_state) in enumerate(concrete_keys):

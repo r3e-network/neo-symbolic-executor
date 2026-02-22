@@ -304,6 +304,20 @@ def test_storage_collision_confidence_downgraded_for_symbolic_path_uncertainty()
     assert uncertain_finding.confidence < baseline_finding.confidence
 
 
+def test_storage_collision_int_key_uses_neovm_encoding():
+    """Bug #32: int keys must use NeoVM little-endian signed encoding, not ASCII."""
+    detector = ALL_DETECTORS["storage_collision"]()
+    # int key 1 → b"\x01" in NeoVM, NOT b"1" (0x31)
+    s1 = ExecutionState(storage_ops=[StorageOp("put", SymbolicValue(concrete=1), offset=10)])
+    s2 = ExecutionState(storage_ops=[StorageOp("put", SymbolicValue(concrete=b"\x01\x02"), offset=20)])
+    findings = detector.detect([s1, s2])
+    # b"\x01" is prefix of b"\x01\x02" → should detect collision
+    assert len(findings) == 1
+
+    # Verify old bug: ASCII b"1" (0x31) is NOT prefix of b"\x01\x02"
+    assert not b"1".startswith(b"\x01")
+
+
 def test_dynamic_call_target_detector_flags_dynamic_contract_hash():
     state = ExecutionState()
     state.external_calls.append(
