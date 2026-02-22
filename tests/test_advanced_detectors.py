@@ -456,6 +456,14 @@ def test_manifest_permissions_ignores_restricted():
     assert not findings
 
 
+def test_manifest_permissions_empty_methods_not_flagged():
+    from neo_sym.nef.manifest import ContractPermission
+
+    manifest = Manifest(permissions=[ContractPermission(contract="*", methods=[])])
+    findings = ALL_DETECTORS["manifest_permissions"]().detect([], manifest)
+    assert not findings
+
+
 def test_manifest_permissions_no_manifest():
     findings = ALL_DETECTORS["manifest_permissions"]().detect([])
     assert not findings

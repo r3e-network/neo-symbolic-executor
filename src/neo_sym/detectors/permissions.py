@@ -15,7 +15,7 @@ class ManifestPermissionDetector(BaseDetector):
             return []
         findings: list[Finding] = []
         for perm in manifest.permissions:
-            if perm.contract == "*" and ("*" in perm.methods or not perm.methods):
+            if perm.contract == "*" and "*" in perm.methods:
                 findings.append(
                     self.finding(
                         title="Overly Broad Manifest Permissions",
