@@ -988,3 +988,82 @@ def test_xdrop_out_of_bounds_halts():
     assert len(states) == 1
     assert states[0].halted is True
     assert "XDROP index" in states[0].error
+
+
+def test_isnull_on_pushnull_returns_true():
+    script = bytes([OpCode.PUSHNULL, OpCode.ISNULL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[-1].concrete is True
+
+
+def test_isnull_on_concrete_value_returns_false():
+    script = bytes([OpCode.PUSH1, OpCode.ISNULL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[-1].concrete is False
+
+
+def test_isnull_on_symbolic_value_returns_symbolic():
+    script = bytes([
+        OpCode.INITSLOT, 0x00, 0x01,
+        OpCode.LDARG0,
+        OpCode.ISNULL,
+        OpCode.RET,
+    ])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    sv = states[0].stack[-1]
+    assert sv.name is not None and sv.name.startswith("isnull_")
+    assert sv.concrete is None
+
+
+def test_assert_fails_on_empty_bytes():
+    script = bytes([OpCode.PUSHDATA1, 0x00, OpCode.ASSERT, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "assert failed" in states[0].error
+
+
+def test_callt_void_method_does_not_push():
+    script = bytes([OpCode.CALLT, 0x00, 0x00, OpCode.RET])
+    nef = NefFile(
+        script=script,
+        instructions=disassemble(script),
+        tokens=[
+            MethodToken(
+                hash=b"\x22" * 20,
+                method="destroy",
+                parameters_count=0,
+                has_return_value=False,
+                call_flags=0x0F,
+            )
+        ],
+    )
+    eng = SymbolicEngine(nef)
+    states = eng.run()
+    assert len(states) == 1
+    assert len(states[0].stack) == 0
+    assert len(states[0].external_calls) == 1
+
+
+def test_nz_empty_bytes_is_falsy():
+    script = bytes([OpCode.PUSHDATA1, 0x00, OpCode.NZ, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is False
+
+
+def test_equal_null_null_returns_true():
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSHNULL, OpCode.EQUAL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is True
+
+
+def test_notequal_null_value_returns_true():
+    script = bytes([OpCode.PUSHNULL, OpCode.PUSH1, OpCode.NOTEQUAL, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].stack[0].concrete is True

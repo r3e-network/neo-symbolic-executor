@@ -392,7 +392,7 @@ class SymbolicEngine:
             cond = state.pop()
             self._mark_checked_external_call(state, cond)
             self._mark_enforced_witness(state, cond)
-            if cond.concrete is False or cond.concrete == 0:
+            if cond.concrete is not None and not cond.concrete:
                 state.halted = True
                 state.error = f"assert failed at 0x{instruction.offset:04X}"
                 return [state]
@@ -420,7 +420,7 @@ class SymbolicEngine:
             cond = state.pop()
             self._mark_checked_external_call(state, cond)
             self._mark_enforced_witness(state, cond)
-            if cond.concrete is False or cond.concrete == 0:
+            if cond.concrete is not None and not cond.concrete:
                 rendered_message = self._coerce_string(message) or "<dynamic-message>"
                 state.halted = True
                 state.error = f"ASSERTMSG failed at 0x{instruction.offset:04X}: {rendered_message}"
@@ -509,7 +509,11 @@ class SymbolicEngine:
         if opcode in (OpCode.EQUAL, OpCode.NUMEQUAL):
             b = state.pop()
             a = state.pop()
-            if a.is_concrete() and b.is_concrete():
+            a_null = a.name == "null" and a.concrete is None
+            b_null = b.name == "null" and b.concrete is None
+            if a_null or b_null:
+                state.push(SymbolicValue(concrete=a_null == b_null))
+            elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=a.concrete == b.concrete))
             else:
                 state.push(SymbolicValue(name=f"eq_{instruction.offset}"))
@@ -519,7 +523,11 @@ class SymbolicEngine:
         if opcode in (OpCode.NOTEQUAL, OpCode.NUMNOTEQUAL):
             b = state.pop()
             a = state.pop()
-            if a.is_concrete() and b.is_concrete():
+            a_null = a.name == "null" and a.concrete is None
+            b_null = b.name == "null" and b.concrete is None
+            if a_null or b_null:
+                state.push(SymbolicValue(concrete=a_null != b_null))
+            elif a.is_concrete() and b.is_concrete():
                 state.push(SymbolicValue(concrete=a.concrete != b.concrete))
             else:
                 state.push(SymbolicValue(name=f"neq_{instruction.offset}"))
@@ -538,7 +546,7 @@ class SymbolicEngine:
         if opcode == OpCode.NZ:
             val = state.pop()
             if val.is_concrete():
-                state.push(SymbolicValue(concrete=val.concrete != 0))
+                state.push(SymbolicValue(concrete=bool(val.concrete)))
             else:
                 state.push(SymbolicValue(name=f"nz_{instruction.offset}"))
             state.pc = instruction.offset + instruction.size
@@ -628,7 +636,12 @@ class SymbolicEngine:
 
         if opcode == OpCode.ISNULL:
             val = state.pop()
-            state.push(SymbolicValue(concrete=val.concrete is None))
+            if val.name == "null" and val.concrete is None:
+                state.push(SymbolicValue(concrete=True))
+            elif val.concrete is not None:
+                state.push(SymbolicValue(concrete=False))
+            else:
+                state.push(SymbolicValue(name=f"isnull_{instruction.offset}"))
             state.pc = instruction.offset + instruction.size
             return [state]
 
@@ -816,7 +829,8 @@ class SymbolicEngine:
                 call_flags_dynamic=False,
             )
         )
-        state.push(SymbolicValue(name=f"ext_ret_{instruction.offset}", concrete=True))
+        if token.has_return_value:
+            state.push(SymbolicValue(name=f"ext_ret_{instruction.offset}", concrete=True))
         state.pc = instruction.offset + instruction.size
         return [state]
 
@@ -1100,8 +1114,6 @@ class SymbolicEngine:
                 # NeoVM truncated modulo: result sign matches dividend (not Python's floored mod).
                 q = int(left.concrete / right.concrete) if (left.concrete ^ right.concrete) < 0 and left.concrete % right.concrete != 0 else left.concrete // right.concrete
                 concrete = left.concrete - q * right.concrete
-            else:
-                concrete = left.concrete * right.concrete
             overflow = concrete >= max_magnitude or concrete < -max_magnitude
 
         return {
