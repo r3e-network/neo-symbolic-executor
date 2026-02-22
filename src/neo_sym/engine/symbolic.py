@@ -782,6 +782,10 @@ class SymbolicEngine:
             n = n_val.concrete if isinstance(n_val.concrete, int) else 0
             if 0 <= n < len(state.stack):
                 del state.stack[-(n + 1)]
+            else:
+                state.halted = True
+                state.error = f"XDROP index {n} out of range at 0x{instruction.offset:04X}"
+                return [state]
             state.pc = instruction.offset + instruction.size
             return [state]
 

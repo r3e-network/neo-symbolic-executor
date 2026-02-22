@@ -980,3 +980,11 @@ def test_roll_out_of_bounds_halts():
     assert len(states) == 1
     assert states[0].halted is True
     assert "ROLL index" in states[0].error
+
+
+def test_xdrop_out_of_bounds_halts():
+    script = bytes([OpCode.PUSH1, OpCode.PUSH5, OpCode.XDROP, OpCode.RET])
+    states = _make_engine(script).run()
+    assert len(states) == 1
+    assert states[0].halted is True
+    assert "XDROP index" in states[0].error
