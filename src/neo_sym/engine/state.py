@@ -112,6 +112,7 @@ class ExecutionState:
                 method_dynamic=call.method_dynamic,
                 call_flags=call.call_flags,
                 call_flags_dynamic=call.call_flags_dynamic,
+                has_return_value=call.has_return_value,
             )
             for call in self.external_calls
         ]

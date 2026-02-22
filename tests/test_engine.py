@@ -676,6 +676,13 @@ def test_execution_state_clone_isolated_external_calls():
     assert original.external_calls[0].return_checked is False
 
 
+def test_execution_state_clone_preserves_has_return_value():
+    original = ExecutionState()
+    original.external_calls = [ExternalCall(contract_hash=None, method="void", offset=0, has_return_value=False)]
+    clone = original.clone()
+    assert clone.external_calls[0].has_return_value is False
+
+
 def test_assert_marks_matching_external_call_not_last():
     script = bytes([OpCode.ASSERT, OpCode.RET])
     nef = NefFile(script=script, instructions=disassemble(script))
