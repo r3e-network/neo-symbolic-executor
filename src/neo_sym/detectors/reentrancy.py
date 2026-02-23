@@ -1,6 +1,8 @@
 """Reentrancy detector."""
 from __future__ import annotations
 
+__all__ = ["ReentrancyDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from ..nef.parser import CALL_FLAGS_ALL
@@ -18,7 +20,7 @@ class ReentrancyDetector(BaseDetector):
             if not state.external_calls:
                 continue
 
-            first_call = min(state.external_calls, key=lambda c: c.offset if c.offset >= 0 else 10**9)
+            first_call = min(state.external_calls, key=lambda c: c.offset if c.offset >= 0 else float("inf"))
             if first_call.offset < 0:
                 continue
             writes_after_call = [

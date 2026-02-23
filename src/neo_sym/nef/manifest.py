@@ -5,14 +5,16 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+__all__ = ["ContractEvent", "ContractMethod", "ContractPermission", "Manifest", "MethodParameter", "parse_manifest"]
 
-@dataclass(slots=True)
+
+@dataclass(slots=True, frozen=True)
 class MethodParameter:
     name: str
     type: str = "Any"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ContractMethod:
     name: str
     offset: int = 0
@@ -21,13 +23,13 @@ class ContractMethod:
     safe: bool = False
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ContractEvent:
     name: str
     parameters: list[MethodParameter] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ContractPermission:
     contract: str = "*"
     methods: list[str] = field(default_factory=list)
@@ -45,6 +47,7 @@ class Manifest:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def method_by_name(self, method_name: str) -> ContractMethod | None:
+        """Look up an ABI method by name, returning *None* if not found."""
         for method in self.abi_methods:
             if method.name == method_name:
                 return method
@@ -52,10 +55,7 @@ class Manifest:
 
 
 def _parse_parameters(items: list[dict[str, Any]]) -> list[MethodParameter]:
-    parameters: list[MethodParameter] = []
-    for item in items:
-        parameters.append(MethodParameter(name=str(item.get("name", "")), type=str(item.get("type", "Any"))))
-    return parameters
+    return [MethodParameter(name=str(item.get("name", "")), type=str(item.get("type", "Any"))) for item in items]
 
 
 def parse_manifest(raw_json: str) -> Manifest:
@@ -69,16 +69,15 @@ def parse_manifest(raw_json: str) -> Manifest:
         raise ValueError("Manifest root must be an object")
 
     raw_name = payload.get("name")
+    raw_standards = payload.get("supportedstandards", [])
+    raw_trusts = payload.get("trusts", [])
+    raw_extra = payload.get("extra", {})
     manifest = Manifest(
         name=str(raw_name) if isinstance(raw_name, str) else "unknown",
-        supported_standards=[str(s) for s in payload.get("supportedstandards", [])]
-        if isinstance(payload.get("supportedstandards", []), list)
-        else [],
-        trusts=[str(t) for t in payload.get("trusts", [])]
-        if isinstance(payload.get("trusts", []), list)
-        else [],
+        supported_standards=[str(s) for s in raw_standards] if isinstance(raw_standards, list) else [],
+        trusts=[str(t) for t in raw_trusts] if isinstance(raw_trusts, list) else [],
         groups=list(payload.get("groups", [])),
-        extra=dict(payload.get("extra", {})) if isinstance(payload.get("extra", {}), dict) else {},
+        extra=raw_extra if isinstance(raw_extra, dict) else {},
     )
 
     abi = payload.get("abi", {})
@@ -86,10 +85,11 @@ def parse_manifest(raw_json: str) -> Manifest:
         for method in abi.get("methods", []):
             if not isinstance(method, dict):
                 continue
+            raw_offset = method.get("offset", 0)
             manifest.abi_methods.append(
                 ContractMethod(
                     name=str(method.get("name", "")),
-                    offset=int(method.get("offset", 0)) if isinstance(method.get("offset", 0), (int, float)) else 0,
+                    offset=int(raw_offset) if isinstance(raw_offset, (int, float)) else 0,
                     parameters=_parse_parameters(list(method.get("parameters", []))),
                     return_type=str(method["returntype"]) if "returntype" in method else None,
                     safe=bool(method.get("safe", False)),

@@ -1,6 +1,8 @@
 """Dangerous external call flags detector."""
 from __future__ import annotations
 
+__all__ = ["DangerousCallFlagsDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from ..nef.parser import CALL_FLAGS_ALL

@@ -1,6 +1,8 @@
 """Upgradeability and destroy-path hardening detector."""
 from __future__ import annotations
 
+__all__ = ["UpgradeabilityDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -47,7 +49,7 @@ class UpgradeabilityDetector(BaseDetector):
                 self.finding(
                     title="Insecure Upgradeability Path",
                     severity=Severity.CRITICAL if has_upgrade_call else Severity.HIGH,
-                    offset=state.entry_offset if state.entry_offset >= 0 else -1,
+                    offset=state.entry_offset,
                     description=(
                         "Contract exposes upgrade/destroy behavior without strong authorization checks."
                     ),

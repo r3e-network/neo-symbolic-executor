@@ -1,6 +1,8 @@
 """DoS detector - unbounded loops and excessive storage operations."""
 from __future__ import annotations
 
+__all__ = ["DoSDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -10,19 +12,25 @@ class DoSDetector(BaseDetector):
     name = "dos"
     description = "Detects potential denial-of-service vectors"
     _RECURSION_DEPTH_THRESHOLD = 8
+    _MAX_DEPTH_THRESHOLD = 96
+    _EXCESSIVE_WRITES_THRESHOLD = 32
 
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
         for state in states:
-            if state.depth > 96 or state.loops_detected:
+            has_loops = bool(state.loops_detected)
+            if state.depth > self._MAX_DEPTH_THRESHOLD or has_loops:
+                desc = f"Execution path depth={state.depth}"
+                if has_loops:
+                    desc += " with loop back-edges detected."
+                else:
+                    desc += " exceeds depth threshold."
                 findings.append(
                     self.finding(
                         title="Potential Unbounded Loop",
                         severity=Severity.MEDIUM,
-                        offset=state.loops_detected[0] if state.loops_detected else -1,
-                        description=(
-                            f"Execution path depth={state.depth} with loop back-edges detected."
-                        ),
+                        offset=self.first_positive_offset(state.loops_detected),
+                        description=desc,
                         recommendation="Add bounded iteration checks and short-circuit exit conditions.",
                         state=state,
                         tags=("dos", "loop"),
@@ -45,7 +53,7 @@ class DoSDetector(BaseDetector):
                 )
 
             storage_writes = sum(1 for op in state.storage_ops if op.op_type == "put")
-            if storage_writes > 32:
+            if storage_writes > self._EXCESSIVE_WRITES_THRESHOLD:
                 findings.append(
                     self.finding(
                         title="Excessive Storage Writes",

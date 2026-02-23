@@ -1,5 +1,7 @@
 """NEF and manifest parsing package."""
 
+from __future__ import annotations
+
 from .manifest import (
     ContractEvent,
     ContractMethod,
@@ -13,18 +15,18 @@ from .parser import Instruction, MethodToken, NefFile, compute_nef_checksum, dis
 from .syscalls import KNOWN_SYSCALLS, SYSCALLS_BY_ID, SYSCALLS_BY_NAME, SyscallInfo, compute_syscall_id
 
 __all__ = [
+    "KNOWN_SYSCALLS",
+    "SYSCALLS_BY_ID",
+    "SYSCALLS_BY_NAME",
     "ContractEvent",
     "ContractMethod",
     "ContractPermission",
     "Instruction",
-    "KNOWN_SYSCALLS",
     "Manifest",
-    "MethodToken",
     "MethodParameter",
+    "MethodToken",
     "NefFile",
     "OpCode",
-    "SYSCALLS_BY_ID",
-    "SYSCALLS_BY_NAME",
     "SyscallInfo",
     "compute_nef_checksum",
     "compute_syscall_id",

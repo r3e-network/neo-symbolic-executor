@@ -1,6 +1,8 @@
 """Admin centralization detector."""
 from __future__ import annotations
 
+__all__ = ["AdminCentralizationDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -16,7 +18,7 @@ class AdminCentralizationDetector(BaseDetector):
             enforced = state.witness_checks_enforced
             if len(enforced) != 1:
                 continue
-            has_privileged_actions = any(op.op_type == "put" for op in state.storage_ops) or bool(state.external_calls)
+            has_privileged_actions = any(op.op_type == "put" for op in state.storage_ops) or state.external_calls
             if not has_privileged_actions:
                 continue
             findings.append(

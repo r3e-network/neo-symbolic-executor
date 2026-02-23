@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from enum import IntEnum
 
+__all__ = ["FIXED_OPERAND_SIZES", "PREFIX_OPERAND_SIZES", "OpCode"]
+
 
 class OpCode(IntEnum):
     PUSHINT8 = 0x00

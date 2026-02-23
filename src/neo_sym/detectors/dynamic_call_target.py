@@ -1,6 +1,8 @@
 """Dynamic external call target detector."""
 from __future__ import annotations
 
+__all__ = ["DynamicCallTargetDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity

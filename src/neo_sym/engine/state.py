@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+__all__ = ["ArithmeticOp", "ExecutionState", "ExternalCall", "StorageOp", "SymbolicValue", "TryFrame"]
+
 
 @dataclass(slots=True)
 class SymbolicValue:
@@ -16,7 +18,12 @@ class SymbolicValue:
         return self.concrete is not None
 
     def clone(self) -> SymbolicValue:
-        return SymbolicValue(expr=self.expr, concrete=self.concrete, name=self.name, taints=set(self.taints))
+        return SymbolicValue(
+            expr=self.expr,
+            concrete=self.concrete,
+            name=self.name,
+            taints=set(self.taints),
+        )
 
 
 @dataclass(slots=True)
@@ -25,6 +32,14 @@ class StorageOp:
     key: SymbolicValue
     value: SymbolicValue | None = None
     offset: int = -1
+
+    def clone(self) -> StorageOp:
+        return StorageOp(
+            op_type=self.op_type,
+            key=self.key.clone(),
+            value=self.value.clone() if self.value else None,
+            offset=self.offset,
+        )
 
 
 @dataclass(slots=True)
@@ -39,6 +54,19 @@ class ExternalCall:
     call_flags_dynamic: bool = False
     has_return_value: bool = True
 
+    def clone(self) -> ExternalCall:
+        return ExternalCall(
+            contract_hash=self.contract_hash,
+            method=self.method,
+            offset=self.offset,
+            return_checked=self.return_checked,
+            target_hash_dynamic=self.target_hash_dynamic,
+            method_dynamic=self.method_dynamic,
+            call_flags=self.call_flags,
+            call_flags_dynamic=self.call_flags_dynamic,
+            has_return_value=self.has_return_value,
+        )
+
 
 @dataclass(slots=True)
 class ArithmeticOp:
@@ -49,6 +77,16 @@ class ArithmeticOp:
     overflow_possible: bool = False
     checked: bool = False
 
+    def clone(self) -> ArithmeticOp:
+        return ArithmeticOp(
+            opcode=self.opcode,
+            offset=self.offset,
+            left=self.left.clone(),
+            right=self.right.clone(),
+            overflow_possible=self.overflow_possible,
+            checked=self.checked,
+        )
+
 
 @dataclass(slots=True)
 class TryFrame:
@@ -56,6 +94,14 @@ class TryFrame:
     finally_offset: int | None
     continuation_offset: int | None = None
     pending_exception: str | None = None
+
+    def clone(self) -> TryFrame:
+        return TryFrame(
+            catch_offset=self.catch_offset,
+            finally_offset=self.finally_offset,
+            continuation_offset=self.continuation_offset,
+            pending_exception=self.pending_exception,
+        )
 
 
 @dataclass(slots=True)
@@ -93,40 +139,6 @@ class ExecutionState:
     reentrancy_guard: bool = False
 
     def clone(self) -> ExecutionState:
-        cloned_storage_ops = [
-            StorageOp(
-                op_type=op.op_type,
-                key=op.key.clone(),
-                value=op.value.clone() if op.value is not None else None,
-                offset=op.offset,
-            )
-            for op in self.storage_ops
-        ]
-        cloned_external_calls = [
-            ExternalCall(
-                contract_hash=bytes(call.contract_hash) if call.contract_hash is not None else None,
-                method=call.method,
-                offset=call.offset,
-                return_checked=call.return_checked,
-                target_hash_dynamic=call.target_hash_dynamic,
-                method_dynamic=call.method_dynamic,
-                call_flags=call.call_flags,
-                call_flags_dynamic=call.call_flags_dynamic,
-                has_return_value=call.has_return_value,
-            )
-            for call in self.external_calls
-        ]
-        cloned_arithmetic_ops = [
-            ArithmeticOp(
-                opcode=op.opcode,
-                offset=op.offset,
-                left=op.left.clone(),
-                right=op.right.clone(),
-                overflow_possible=op.overflow_possible,
-                checked=op.checked,
-            )
-            for op in self.arithmetic_ops
-        ]
         return ExecutionState(
             pc=self.pc,
             entry_offset=self.entry_offset,
@@ -142,25 +154,17 @@ class ExecutionState:
             visited_offsets=set(self.visited_offsets),
             call_stack=list(self.call_stack),
             max_call_stack_depth=self.max_call_stack_depth,
-            storage_ops=cloned_storage_ops,
-            external_calls=cloned_external_calls,
+            storage_ops=[op.clone() for op in self.storage_ops],
+            external_calls=[call.clone() for call in self.external_calls],
             witness_checks=list(self.witness_checks),
             witness_checks_enforced=list(self.witness_checks_enforced),
             time_accesses=list(self.time_accesses),
             randomness_accesses=list(self.randomness_accesses),
-            arithmetic_ops=cloned_arithmetic_ops,
+            arithmetic_ops=[op.clone() for op in self.arithmetic_ops],
             loops_detected=list(self.loops_detected),
             events_emitted=list(self.events_emitted),
             exception_offsets=list(self.exception_offsets),
-            try_stack=[
-                TryFrame(
-                    catch_offset=frame.catch_offset,
-                    finally_offset=frame.finally_offset,
-                    continuation_offset=frame.continuation_offset,
-                    pending_exception=frame.pending_exception,
-                )
-                for frame in self.try_stack
-            ],
+            try_stack=[frame.clone() for frame in self.try_stack],
             unknown_opcodes=list(self.unknown_opcodes),
             unknown_syscalls=list(self.unknown_syscalls),
             reentrancy_guard=self.reentrancy_guard,

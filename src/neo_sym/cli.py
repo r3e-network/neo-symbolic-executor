@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -13,7 +14,7 @@ from rich.table import Table
 
 from . import __version__
 from .detectors import ALL_DETECTORS, Severity
-from .detectors.base import SEVERITY_RANK
+from .detectors.base import SEVERITY_RANK, BaseDetector, Finding
 from .engine.symbolic import SymbolicEngine
 from .nef.manifest import parse_manifest
 from .nef.parser import parse_nef
@@ -22,29 +23,57 @@ from .report.generator import ReportGenerator
 console = Console()
 
 _SEVERITY_RANK_BY_NAME: dict[str, int] = {s.value: r for s, r in SEVERITY_RANK.items()}
+_SEVERITY_COLORS: dict[str, str] = {
+    "critical": "red",
+    "high": "bright_red",
+    "medium": "yellow",
+    "low": "blue",
+    "info": "white",
+}
 
 
-def _parse_min_confidence_specs(specs: Iterable[str]) -> dict[str, float]:
-    floors: dict[str, float] = {}
-    valid_severities = {severity.value for severity in Severity}
+def _parse_key_value_specs(
+    specs: Iterable[str],
+    *,
+    option_name: str,
+    valid_keys: set[str],
+    key_label: str,
+    parse_value: Callable[[str, str], Any],
+    lowercase_key: bool = True,
+) -> dict[str, Any]:
+    """Generic key=value spec parser used by all --fail-on / --min-confidence options."""
+    result: dict[str, Any] = {}
     for raw_spec in specs:
         if "=" not in raw_spec:
             raise click.BadParameter(
-                f"Invalid --min-confidence value '{raw_spec}'. Expected format '<severity>=<0..1>'."
+                f"Invalid {option_name} value '{raw_spec}'. Expected format '<{key_label}>=<value>'."
             )
-        severity_text, floor_text = raw_spec.split("=", 1)
-        severity_name = severity_text.strip().lower()
-        if severity_name not in valid_severities:
-            allowed = ", ".join(sorted(valid_severities))
-            raise click.BadParameter(f"Invalid severity '{severity_name}' in --min-confidence. Allowed: {allowed}.")
+        key_text, value_text = raw_spec.split("=", 1)
+        key = key_text.strip().lower() if lowercase_key else key_text.strip()
+        if key not in valid_keys:
+            allowed = ", ".join(sorted(valid_keys))
+            raise click.BadParameter(f"Invalid {key_label} '{key}' in {option_name}. Allowed: {allowed}.")
+        result[key] = parse_value(value_text.strip(), key)
+    return result
+
+
+def _parse_min_confidence_specs(specs: Iterable[str]) -> dict[str, float]:
+    def _parse(raw: str, key: str) -> float:
         try:
-            floor = float(floor_text.strip())
+            val = float(raw)
         except ValueError as exc:
-            raise click.BadParameter(f"Invalid confidence floor '{floor_text}' in --min-confidence.") from exc
-        if floor < 0.0 or floor > 1.0:
-            raise click.BadParameter(f"Confidence floor for severity '{severity_name}' must be between 0 and 1.")
-        floors[severity_name] = floor
-    return floors
+            raise click.BadParameter(f"Invalid confidence floor '{raw}' in --min-confidence.") from exc
+        if val < 0.0 or val > 1.0:
+            raise click.BadParameter(f"Confidence floor for severity '{key}' must be between 0 and 1.")
+        return val
+
+    return _parse_key_value_specs(
+        specs,
+        option_name="--min-confidence",
+        valid_keys={s.value for s in Severity},
+        key_label="severity",
+        parse_value=_parse,
+    )
 
 
 def _severity_rank_value(severity_name: str) -> int:
@@ -52,59 +81,48 @@ def _severity_rank_value(severity_name: str) -> int:
 
 
 def _parse_detector_severity_specs(specs: Iterable[str]) -> dict[str, str]:
-    policies: dict[str, str] = {}
-    valid_severities = {severity.value for severity in Severity}
-    for raw_spec in specs:
-        if "=" not in raw_spec:
-            raise click.BadParameter(
-                f"Invalid --fail-on-detector-severity value '{raw_spec}'. Expected format '<detector>=<severity>'."
-            )
-        detector_text, severity_text = raw_spec.split("=", 1)
-        detector_name = detector_text.strip()
-        severity_name = severity_text.strip().lower()
-        if detector_name not in ALL_DETECTORS:
-            allowed_detectors = ", ".join(sorted(ALL_DETECTORS.keys()))
-            raise click.BadParameter(
-                f"Invalid detector '{detector_name}' in --fail-on-detector-severity. Allowed: {allowed_detectors}."
-            )
-        if severity_name not in valid_severities:
-            allowed_severities = ", ".join(sorted(valid_severities))
-            raise click.BadParameter(
-                f"Invalid severity '{severity_name}' in --fail-on-detector-severity. Allowed: {allowed_severities}."
-            )
-        policies[detector_name] = severity_name
-    return policies
+    valid_severities = {s.value for s in Severity}
+
+    def _parse(raw: str, _key: str) -> str:
+        val = raw.lower()
+        if val not in valid_severities:
+            allowed = ", ".join(sorted(valid_severities))
+            raise click.BadParameter(f"Invalid severity '{val}' in --fail-on-detector-severity. Allowed: {allowed}.")
+        return val
+
+    return _parse_key_value_specs(
+        specs,
+        option_name="--fail-on-detector-severity",
+        valid_keys=set(ALL_DETECTORS.keys()),
+        key_label="detector",
+        parse_value=_parse,
+        lowercase_key=False,
+    )
 
 
 def _parse_severity_count_specs(specs: Iterable[str]) -> dict[str, int]:
-    policies: dict[str, int] = {}
-    valid_severities = {severity.value for severity in Severity}
-    for raw_spec in specs:
-        if "=" not in raw_spec:
-            raise click.BadParameter(
-                f"Invalid --fail-on-severity-count value '{raw_spec}'. Expected format '<severity>=<count>'."
-            )
-        severity_text, count_text = raw_spec.split("=", 1)
-        severity_name = severity_text.strip().lower()
-        if severity_name not in valid_severities:
-            allowed_severities = ", ".join(sorted(valid_severities))
-            raise click.BadParameter(
-                f"Invalid severity '{severity_name}' in --fail-on-severity-count. Allowed: {allowed_severities}."
-            )
+    def _parse(raw: str, key: str) -> int:
         try:
-            count_threshold = int(count_text.strip())
+            val = int(raw)
         except ValueError as exc:
-            raise click.BadParameter(f"Invalid count threshold '{count_text}' in --fail-on-severity-count.") from exc
-        if count_threshold < 1:
-            raise click.BadParameter(f"Count threshold for severity '{severity_name}' must be >= 1.")
-        policies[severity_name] = count_threshold
-    return policies
+            raise click.BadParameter(f"Invalid count threshold '{raw}' in --fail-on-severity-count.") from exc
+        if val < 1:
+            raise click.BadParameter(f"Count threshold for severity '{key}' must be >= 1.")
+        return val
+
+    return _parse_key_value_specs(
+        specs,
+        option_name="--fail-on-severity-count",
+        valid_keys={s.value for s in Severity},
+        key_label="severity",
+        parse_value=_parse,
+    )
 
 
 def _collect_gate_violations(
     *,
-    findings,
-    risk_profile: dict,
+    findings: list[Finding],
+    risk_profile: dict[str, Any],
     fail_on_max_severity: str | None,
     fail_on_total_findings: int | None,
     fail_on_weighted_score: int | None,
@@ -349,15 +367,7 @@ def analyze(
         findings = det.detect(all_states, mf)
         all_findings.extend(findings)
 
-    # Global dedupe to avoid duplicates across detectors.
-    deduped = []
-    seen: set[tuple[str, str, int]] = set()
-    for finding in all_findings:
-        key = (finding.detector, finding.title, finding.offset)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(finding)
+    deduped = BaseDetector.dedupe_findings(all_findings)
 
     # Display results
     table = Table(title="Security Findings")
@@ -365,7 +375,6 @@ def analyze(
     table.add_column("Detector")
     table.add_column("Title")
     table.add_column("Offset")
-    sev_colors = {"critical": "red", "high": "bright_red", "medium": "yellow", "low": "blue", "info": "white"}
     for f in sorted(
         deduped,
         key=lambda x: (
@@ -375,7 +384,7 @@ def analyze(
         ),
     ):
         table.add_row(
-            f"[{sev_colors[f.severity.value]}]{f.severity.value.upper()}[/]",
+            f"[{_SEVERITY_COLORS[f.severity.value]}]{f.severity.value.upper()}[/]",
             f.detector,
             f.title,
             f"0x{f.offset:04X}" if f.offset >= 0 else "-",

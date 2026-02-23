@@ -1,11 +1,11 @@
 """Load real z3 if available, else provide a lightweight fallback stub."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib.machinery
 import importlib.util
-from pathlib import Path
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -71,7 +71,7 @@ if not _load_real_z3():
         def _wrap(self, value: int) -> int:
             return value & ((1 << self.bits) - 1)
 
-        def _binary(self, op: str, other: Any) -> ExprRef | "BitVecNumRef":
+        def _binary(self, op: str, other: Any) -> ExprRef | BitVecNumRef:
             if isinstance(other, BitVecNumRef) and isinstance(self, BitVecNumRef):
                 if op == "add":
                     return BitVecNumRef(self._wrap(self.value + other.value), self.bits)
@@ -81,13 +81,13 @@ if not _load_real_z3():
                     return BitVecNumRef(self._wrap(self.value * other.value), self.bits)
             return ExprRef(op, (self, other), bits=self.bits)
 
-        def __add__(self, other: Any) -> ExprRef | "BitVecNumRef":
+        def __add__(self, other: Any) -> ExprRef | BitVecNumRef:
             return self._binary("add", other)
 
-        def __sub__(self, other: Any) -> ExprRef | "BitVecNumRef":
+        def __sub__(self, other: Any) -> ExprRef | BitVecNumRef:
             return self._binary("sub", other)
 
-        def __mul__(self, other: Any) -> ExprRef | "BitVecNumRef":
+        def __mul__(self, other: Any) -> ExprRef | BitVecNumRef:
             return self._binary("mul", other)
 
 

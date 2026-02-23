@@ -1,5 +1,7 @@
 """Security detectors module."""
 
+from __future__ import annotations
+
 from .access_control import AccessControlDetector
 from .admin_centralization import AdminCentralizationDetector
 from .base import SEVERITY_RANK, BaseDetector, Finding, Severity
@@ -19,22 +21,44 @@ from .unknown_instructions import UnknownInstructionsDetector
 from .upgradeability import UpgradeabilityDetector
 
 ALL_DETECTORS: dict[str, type[BaseDetector]] = {
-    "reentrancy": ReentrancyDetector,
-    "overflow": OverflowDetector,
     "access_control": AccessControlDetector,
-    "unchecked_return": UncheckedReturnDetector,
+    "admin_centralization": AdminCentralizationDetector,
+    "dangerous_call_flags": DangerousCallFlagsDetector,
     "dos": DoSDetector,
+    "dynamic_call_target": DynamicCallTargetDetector,
+    "gas_exhaustion": GasExhaustionDetector,
+    "manifest_permissions": ManifestPermissionDetector,
+    "nep17": NEP17Detector,
+    "overflow": OverflowDetector,
+    "randomness": RandomnessDetector,
+    "reentrancy": ReentrancyDetector,
     "storage_collision": StorageCollisionDetector,
     "timestamp": TimestampDetector,
-    "randomness": RandomnessDetector,
-    "gas_exhaustion": GasExhaustionDetector,
-    "nep17": NEP17Detector,
-    "admin_centralization": AdminCentralizationDetector,
-    "upgradeability": UpgradeabilityDetector,
-    "manifest_permissions": ManifestPermissionDetector,
-    "dynamic_call_target": DynamicCallTargetDetector,
-    "dangerous_call_flags": DangerousCallFlagsDetector,
+    "unchecked_return": UncheckedReturnDetector,
     "unknown_instructions": UnknownInstructionsDetector,
+    "upgradeability": UpgradeabilityDetector,
 }
 
-__all__ = ["ALL_DETECTORS", "SEVERITY_RANK", "BaseDetector", "Finding", "Severity"]
+__all__ = [
+    "ALL_DETECTORS",
+    "SEVERITY_RANK",
+    "AccessControlDetector",
+    "AdminCentralizationDetector",
+    "BaseDetector",
+    "DangerousCallFlagsDetector",
+    "DoSDetector",
+    "DynamicCallTargetDetector",
+    "Finding",
+    "GasExhaustionDetector",
+    "ManifestPermissionDetector",
+    "NEP17Detector",
+    "OverflowDetector",
+    "RandomnessDetector",
+    "ReentrancyDetector",
+    "Severity",
+    "StorageCollisionDetector",
+    "TimestampDetector",
+    "UncheckedReturnDetector",
+    "UnknownInstructionsDetector",
+    "UpgradeabilityDetector",
+]

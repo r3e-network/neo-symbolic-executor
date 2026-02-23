@@ -1,21 +1,22 @@
 """GAS exhaustion detector."""
 from __future__ import annotations
 
+__all__ = ["GasExhaustionDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
-
-GAS_THRESHOLD = 50_000
 
 
 class GasExhaustionDetector(BaseDetector):
     name = "gas_exhaustion"
     description = "Detects high-gas execution paths"
+    _GAS_THRESHOLD = 50_000
 
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
         for state in states:
-            if state.gas_cost <= GAS_THRESHOLD:
+            if state.gas_cost <= self._GAS_THRESHOLD:
                 continue
             findings.append(
                 self.finding(

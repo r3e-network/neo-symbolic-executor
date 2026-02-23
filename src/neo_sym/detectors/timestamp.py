@@ -1,6 +1,8 @@
 """Timestamp dependence detector."""
 from __future__ import annotations
 
+__all__ = ["TimestampDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -19,7 +21,7 @@ class TimestampDetector(BaseDetector):
                 self.finding(
                     title="Timestamp Dependence",
                     severity=Severity.LOW,
-                    offset=state.time_accesses[0],
+                    offset=self.first_positive_offset(state.time_accesses),
                     description=f"Runtime.GetTime observed at {len(state.time_accesses)} location(s).",
                     recommendation="Do not rely on timestamp for critical authorization or randomness logic.",
                     state=state,

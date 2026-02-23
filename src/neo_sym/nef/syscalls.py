@@ -5,9 +5,11 @@ Syscall IDs use little-endian uint32 of SHA256(name) first 4 bytes.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import struct
+from dataclasses import dataclass
+
+__all__ = ["KNOWN_SYSCALLS", "SYSCALLS_BY_ID", "SYSCALLS_BY_NAME", "SyscallInfo", "compute_syscall_id"]
 
 
 @dataclass(frozen=True, slots=True)

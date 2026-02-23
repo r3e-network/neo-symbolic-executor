@@ -1,6 +1,8 @@
 """Manifest permission detector."""
 from __future__ import annotations
 
+__all__ = ["ManifestPermissionDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity

@@ -1,6 +1,8 @@
 """Access-control detector."""
 from __future__ import annotations
 
+__all__ = ["AccessControlDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -21,8 +23,7 @@ class AccessControlDetector(BaseDetector):
             )
             if not sensitive_offsets:
                 continue
-            known_sensitive_offsets = [off for off in sensitive_offsets if off >= 0]
-            first_sensitive = min(known_sensitive_offsets) if known_sensitive_offsets else -1
+            first_sensitive = self.first_positive_offset(sensitive_offsets)
 
             if not state.witness_checks:
                 findings.append(
@@ -38,13 +39,13 @@ class AccessControlDetector(BaseDetector):
                 )
                 continue
 
-            known_enforced_offsets = [off for off in state.witness_checks_enforced if off >= 0]
-            if not known_enforced_offsets:
+            first_enforced = self.first_positive_offset(state.witness_checks_enforced)
+            if first_enforced < 0:
                 findings.append(
                     self.finding(
                         title="Unenforced Authorization Check",
                         severity=Severity.HIGH,
-                        offset=min(state.witness_checks),
+                        offset=self.first_positive_offset(state.witness_checks),
                         description=(
                             "Runtime.CheckWitness is invoked but its result is not used in control flow "
                             "or assertion before sensitive operations."
@@ -56,7 +57,6 @@ class AccessControlDetector(BaseDetector):
                 )
                 continue
 
-            first_enforced = min(known_enforced_offsets)
             if first_sensitive >= 0 and first_enforced > first_sensitive:
                 findings.append(
                     self.finding(

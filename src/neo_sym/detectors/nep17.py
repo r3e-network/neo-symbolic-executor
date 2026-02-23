@@ -1,18 +1,19 @@
 """NEP-17 compliance detector."""
 from __future__ import annotations
 
+__all__ = ["NEP17Detector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
-
-NEP17_METHODS = {"symbol", "decimals", "totalSupply", "balanceOf", "transfer"}
-NEP17_EVENTS = {"Transfer"}
 
 
 class NEP17Detector(BaseDetector):
     name = "nep17"
     description = "Checks NEP-17 interface completeness"
     default_confidence = 0.95
+    _REQUIRED_METHODS = {"symbol", "decimals", "totalSupply", "balanceOf", "transfer"}
+    _REQUIRED_EVENTS = {"Transfer"}
 
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
         findings: list[Finding] = []
@@ -23,7 +24,7 @@ class NEP17Detector(BaseDetector):
                     severity=Severity.INFO,
                     description="Cannot verify NEP-17 compliance without a manifest.",
                     recommendation="Provide contract manifest when running analysis.",
-                    tags=("standard-compliance",),
+                    tags=("NEP-17",),
                 )
             )
             return findings
@@ -32,7 +33,7 @@ class NEP17Detector(BaseDetector):
             return findings
 
         declared = {m.name for m in manifest.abi_methods}
-        missing = NEP17_METHODS - declared
+        missing = self._REQUIRED_METHODS - declared
         if missing:
             findings.append(
                 self.finding(
@@ -45,7 +46,7 @@ class NEP17Detector(BaseDetector):
             )
 
         events = {e.name for e in manifest.abi_events}
-        if not NEP17_EVENTS.issubset(events):
+        if not self._REQUIRED_EVENTS.issubset(events):
             findings.append(
                 self.finding(
                     title="Missing NEP-17 Transfer Event",

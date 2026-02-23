@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from .opcodes import FIXED_OPERAND_SIZES, PREFIX_OPERAND_SIZES, OpCode
 
+__all__ = ["Instruction", "MethodToken", "NefFile", "compute_nef_checksum", "disassemble", "parse_nef"]
+
 NEF3_MAGIC = 0x3346454E
 MAX_SOURCE_LENGTH = 256
 MAX_METHOD_TOKENS = 128
@@ -14,7 +16,7 @@ MAX_SCRIPT_LENGTH = 512 * 1024  # 512 KiB per Neo N3 spec
 CALL_FLAGS_ALL = 0x0F
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Instruction:
     opcode: OpCode
     offset: int
@@ -22,7 +24,7 @@ class Instruction:
     size: int = 1
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class MethodToken:
     hash: bytes
     method: str
@@ -184,7 +186,7 @@ def _parse_nef3(data: bytes, *, verify_checksum: bool) -> NefFile:
         raise ValueError("Reserved ushort before script must be 0")
 
     script = reader.read_var_bytes(MAX_SCRIPT_LENGTH)
-    if len(script) == 0:
+    if not script:
         raise ValueError("Script cannot be empty")
 
     checksum = reader.read_u32()

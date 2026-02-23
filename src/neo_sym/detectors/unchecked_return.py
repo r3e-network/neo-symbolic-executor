@@ -1,6 +1,8 @@
 """Unchecked external call return detector."""
 from __future__ import annotations
 
+__all__ = ["UncheckedReturnDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity

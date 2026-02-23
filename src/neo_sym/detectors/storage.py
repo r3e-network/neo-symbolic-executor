@@ -1,6 +1,8 @@
 """Storage collision detector - key prefix conflicts."""
 from __future__ import annotations
 
+__all__ = ["StorageCollisionDetector"]
+
 from ..engine.state import ExecutionState
 from ..nef.manifest import Manifest
 from .base import BaseDetector, Finding, Severity
@@ -19,7 +21,7 @@ class StorageCollisionDetector(BaseDetector):
         # NeoVM BigInteger: little-endian signed, minimal length
         if k == 0:
             return b"\x00"
-        length = (k.bit_length() + 8) // 8
+        length = ((~k).bit_length() + 8) // 8 if k < 0 else (k.bit_length() + 8) // 8
         return k.to_bytes(length, "little", signed=True)
 
     def detect(self, states: list[ExecutionState], manifest: Manifest | None = None) -> list[Finding]:
