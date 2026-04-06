@@ -1,0 +1,6 @@
+PUSH1
+PUSH0
+JMPEQ done
+RET
+done:
+RET

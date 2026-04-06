@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neo-symbolic-executor"
+version = "0.1.0"
+description = "A symbolic executor for real NeoVM bytecode, assembly, JSON scripts, and NEF containers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "neo-symbolic-executor contributors" }]
+keywords = ["neo", "neovm", "symbolic-execution", "analysis"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Security",
+]
+
+[project.scripts]
+neo-symbolic-executor = "neo_symbolic_executor.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "ruff>=0.8",
+]
+fuzzing = [
+  "atheris>=2.3.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["neo_symbolic_executor*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.py[cod]"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
