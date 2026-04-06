@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neo-symbolic-executor"
+version = "0.3.0"
+description = "Neo N3 symbolic analysis toolkit with detector-based auditing and a hardened NeoVM symbolic executor."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "neo-symbolic-executor contributors" }]
+dependencies = [
+  "click>=8.1",
+  "rich>=13.0",
+]
+keywords = ["neo", "neovm", "symbolic-execution", "security", "fuzzing"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development :: Testing",
+]
+
+[project.scripts]
+neo-sym = "neo_sym.cli:main"
+neo-symbolic-executor = "neo_symbolic_executor.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "pytest>=8.0",
+  "ruff>=0.8",
+]
+fuzzing = [
+  "atheris>=2.3.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["z3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["neo_sym*", "neo_symbolic_executor*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.py[cod]"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

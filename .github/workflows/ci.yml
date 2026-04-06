@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install --no-cache-dir -e ".[dev]"
+      - name: Ruff check
+        run: python -m ruff check src tests fuzzing examples
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install --no-cache-dir -e ".[dev]"
+
+      - name: Compile
+        run: python -m compileall src tests fuzzing examples
+
+      - name: Test
+        run: python -m pytest
+
+      - name: CLI smoke tests
+        run: |
+          python -m neo_sym.cli --help > /tmp/neo-sym-help.txt
+          python examples/sample_audit.py > /tmp/sample-audit.txt
+          python -m neo_symbolic_executor --json examples/buffer.neoasm > /tmp/buffer.json
+          python -m neo_sym.cli explore --json examples/buffer.neoasm > /tmp/buffer-bridge.json
+          python -m neo_symbolic_executor --json --arg key examples/symbolic_map.neoasm > /tmp/symbolic_map.json
+      - name: Build wheel
+        run: python -m build
+
+  fuzz:
+    name: Fuzz smoke
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install fuzz deps
+        run: python -m pip install --upgrade pip && python -m pip install --no-cache-dir -e ".[fuzzing]"
+      - name: Run short fuzz pass
+        run: python fuzzing/run_all_fuzzers.py --duration 5 --corpus fuzzing/corpus --artifacts-dir /tmp/neo-fuzz-artifacts

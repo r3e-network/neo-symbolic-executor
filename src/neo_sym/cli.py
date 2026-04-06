@@ -234,6 +234,15 @@ def main() -> None:
     """Neo N3 Smart Contract Symbolic Execution Security Analyzer."""
 
 
+@main.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.pass_context
+def explore(ctx: click.Context) -> None:
+    """Delegate script exploration to the hardened NeoVM executor."""
+    from neo_symbolic_executor.__main__ import main as modern_main
+
+    raise click.exceptions.Exit(modern_main(list(ctx.args)))
+
+
 @main.command()
 @click.argument("nef_file", type=click.Path(exists=True))
 @click.option("--manifest", "-m", type=click.Path(exists=True), help="Manifest JSON file")

@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Added the hardened `neo_symbolic_executor` package under `src/neo_symbolic_executor`.
+- Added `neo_sym.cli explore` as a compatibility bridge to the standalone executor.
+- Added fuzzing harnesses, curated seed corpus, executable NeoVM examples, and executor-focused regression tests.
+- Added packaging metadata and CI coverage for the combined detector/analyzer and standalone executor repo layout.
+
 ## [0.3.0] - 2026-02-19
 
 ### Added
