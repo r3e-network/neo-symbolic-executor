@@ -345,6 +345,22 @@ def analyze(
         console.print(f"  Methods: {len(mf.abi_methods)}")
         console.print(f"  Standards: {', '.join(mf.supported_standards) or 'none'}\n")
 
+    # Validate detectors early (before expensive execution)
+    selected = [name.strip() for name in detectors.split(",")] if detectors else list(ALL_DETECTORS.keys())
+    selected = [name for name in selected if name]
+    unknown = [name for name in selected if name not in ALL_DETECTORS]
+    if unknown:
+        console.print(f"[red]Unknown detector(s): {', '.join(unknown)}[/]")
+        sys.exit(2)
+
+    # Validate execution bounds
+    if max_paths < 1 or max_paths > 10000:
+        console.print("[red]--max-paths must be between 1 and 10000.[/]")
+        sys.exit(2)
+    if max_depth < 1 or max_depth > 10000:
+        console.print("[red]--max-depth must be between 1 and 10000.[/]")
+        sys.exit(2)
+
     # Run symbolic execution
     engine = SymbolicEngine(nef, mf)
     engine.MAX_PATHS = max_paths
@@ -363,12 +379,6 @@ def analyze(
     console.print(f"Explored {len(all_states)} execution paths\n")
 
     # Run detectors
-    selected = [name.strip() for name in detectors.split(",")] if detectors else list(ALL_DETECTORS.keys())
-    selected = [name for name in selected if name]
-    unknown = [name for name in selected if name not in ALL_DETECTORS]
-    if unknown:
-        console.print(f"[red]Unknown detector(s): {', '.join(unknown)}[/]")
-        sys.exit(2)
 
     all_findings = []
     for name in selected:

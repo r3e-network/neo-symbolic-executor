@@ -76,7 +76,7 @@ def parse_manifest(raw_json: str) -> Manifest:
         name=str(raw_name) if isinstance(raw_name, str) else "unknown",
         supported_standards=[str(s) for s in raw_standards] if isinstance(raw_standards, list) else [],
         trusts=[str(t) for t in raw_trusts] if isinstance(raw_trusts, list) else [],
-        groups=list(payload.get("groups", [])),
+        groups=list(payload.get("groups") or []),
         extra=raw_extra if isinstance(raw_extra, dict) else {},
     )
 
@@ -89,8 +89,8 @@ def parse_manifest(raw_json: str) -> Manifest:
             manifest.abi_methods.append(
                 ContractMethod(
                     name=str(method.get("name", "")),
-                    offset=int(raw_offset) if isinstance(raw_offset, (int, float)) else 0,
-                    parameters=_parse_parameters(list(method.get("parameters", []))),
+                    offset=int(raw_offset) if isinstance(raw_offset, (int, float)) and raw_offset == raw_offset and abs(raw_offset) < 2**31 else 0,
+                    parameters=_parse_parameters(method.get("parameters", []) if isinstance(method.get("parameters"), list) else []),
                     return_type=str(method["returntype"]) if "returntype" in method else None,
                     safe=bool(method.get("safe", False)),
                 )
@@ -98,10 +98,11 @@ def parse_manifest(raw_json: str) -> Manifest:
         for event in abi.get("events", []):
             if not isinstance(event, dict):
                 continue
+            raw_params = event.get("parameters", [])
             manifest.abi_events.append(
                 ContractEvent(
                     name=str(event.get("name", "")),
-                    parameters=_parse_parameters(list(event.get("parameters", []))),
+                    parameters=_parse_parameters(raw_params if isinstance(raw_params, list) else []),
                 )
             )
 

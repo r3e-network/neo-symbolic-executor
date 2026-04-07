@@ -33,11 +33,11 @@ class ReentrancyDetector(BaseDetector):
             if state.reentrancy_guard:
                 continue
 
-            first_write_offset = min(op.offset for op in writes_after_call)
+            last_write_offset = max(op.offset for op in writes_after_call)
             pre_write_calls = [
                 call
                 for call in state.external_calls
-                if call.offset >= 0 and call.offset < first_write_offset
+                if call.offset >= 0 and call.offset < last_write_offset
             ]
             if not pre_write_calls:
                 pre_write_calls = list(state.external_calls)

@@ -1,6 +1,7 @@
 """Symbolic execution state models."""
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -149,7 +150,7 @@ class ExecutionState:
             stack=[v.clone() for v in self.stack],
             locals={k: v.clone() for k, v in self.locals.items()},
             args={k: v.clone() for k, v in self.args.items()},
-            constraints=list(self.constraints),
+            constraints=copy.deepcopy(self.constraints),
             path=list(self.path),
             visited_offsets=set(self.visited_offsets),
             call_stack=list(self.call_stack),

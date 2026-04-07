@@ -977,9 +977,13 @@ class SymbolicEngine:
             state.pc = continuation
             return [state]
 
-        frame.continuation_offset = continuation
-        frame.pending_exception = None
-        state.try_stack.append(frame)
+        new_frame = TryFrame(
+            catch_offset=frame.catch_offset,
+            finally_offset=frame.finally_offset,
+            continuation_offset=continuation,
+            pending_exception=None,
+        )
+        state.try_stack.append(new_frame)
         state.pc = frame.finally_offset
         return [state]
 
@@ -1021,9 +1025,13 @@ class SymbolicEngine:
                 state.halted = False
                 return [state]
             if frame.finally_offset is not None:
-                frame.pending_exception = exception_message
-                frame.continuation_offset = None
-                state.try_stack.append(frame)
+                new_frame = TryFrame(
+                    catch_offset=frame.catch_offset,
+                    finally_offset=frame.finally_offset,
+                    continuation_offset=None,
+                    pending_exception=exception_message,
+                )
+                state.try_stack.append(new_frame)
                 state.pc = frame.finally_offset
                 state.error = None
                 state.halted = False

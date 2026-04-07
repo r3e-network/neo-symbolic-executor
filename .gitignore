@@ -18,6 +18,7 @@ dist/
 .vscode/
 *.swp
 *.swo
+*.bak
 .DS_Store
 crash-*
 fuzzing/crash-*
