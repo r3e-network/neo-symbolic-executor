@@ -55,7 +55,8 @@ class Manifest:
 
 
 def _parse_parameters(items: list[dict[str, Any]]) -> list[MethodParameter]:
-    return [MethodParameter(name=str(item.get("name", "")), type=str(item.get("type", "Any"))) for item in items]
+    return [MethodParameter(name=str(item.get("name", "")), type=str(item.get("type", "Any")))
+            for item in items if isinstance(item, dict)]
 
 
 def parse_manifest(raw_json: str) -> Manifest:
