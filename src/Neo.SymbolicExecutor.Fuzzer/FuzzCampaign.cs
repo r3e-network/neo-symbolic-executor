@@ -124,8 +124,13 @@ public sealed class FuzzCampaign
         var elapsed = DateTime.UtcNow - _stats.StartedUtc;
         long total = _stats.Total;
         double rate = total / Math.Max(1, elapsed.TotalSeconds);
+        // GC.GetTotalMemory(false) is a cheap snapshot of managed heap. A monotonically growing
+        // value over a long run is a leak signal — surfacing it here lets the operator notice
+        // before the fuzzer OOMs on a multi-day run.
+        long mem = GC.GetTotalMemory(false);
         var sb = new System.Text.StringBuilder();
-        sb.Append($"[{elapsed:hh\\:mm\\:ss}] iters={total:N0} ({rate:F0}/s) crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
+        sb.Append($"[{elapsed:hh\\:mm\\:ss}] iters={total:N0} ({rate:F0}/s) " +
+                  $"mem={mem / (1024 * 1024)}MB crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
         foreach (var t in _opts.Targets.OrderBy(t => t.Name))
         {
             sb.Append($" | {t.Name}={_stats.IterationsFor(t.Name):N0}/{_stats.CrashesFor(t.Name)}");

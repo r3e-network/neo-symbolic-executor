@@ -41,6 +41,11 @@ while [ ! -f "$STOP_FILE" ]; do
   echo "[wrapper] starting campaign at $TS, log=$LOGFILE"
   echo "[wrapper] corpus=$CORPUS workers=$WORKERS"
 
+  # Log retention: keep at most 30 days of per-chunk logs and 60 days of summary files.
+  # Without this the corpus directory grows unbounded over multi-week runs.
+  find "$LOGDIR" -name "run-*.log" -mtime +30 -delete 2>/dev/null || true
+  find "$CORPUS" -maxdepth 1 -name "summary-*.txt" -mtime +60 -delete 2>/dev/null || true
+
   # Run for 24 hours per chunk. The wrapper restarts the campaign daily so the log
   # files don't grow unbounded and so we can checkpoint a daily summary.
   dotnet "$FUZZER_DLL" --hours 24 --workers "$WORKERS" --corpus "$CORPUS" > "$LOGFILE" 2>&1 &

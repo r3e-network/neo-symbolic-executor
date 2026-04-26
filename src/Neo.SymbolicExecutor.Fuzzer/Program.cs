@@ -111,6 +111,7 @@ internal static class Program
             new ReportGeneratorTarget(),
             new ExpressionSimplifierTarget(),
             new RealNefTarget(),
+            new StructureAwareMutationTarget(),
         };
         var byName = allTargets.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 
