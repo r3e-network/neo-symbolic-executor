@@ -217,21 +217,27 @@ public static class Expr
     }
 
     // ---- Bitwise
+    // Audit C# #5: bool↔bool fold via int promotion so the result has consistent sort with
+    // NeoVM's coercion behavior. Without this, AND(true, false) returned a BinaryExpr(Sort.Int)
+    // with non-int operands — a sort-lattice inconsistency.
     public static Expression And(Expression a, Expression b)
     {
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value & bi.Value);
+        if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) & (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "&", a, b);
     }
 
     public static Expression Or(Expression a, Expression b)
     {
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value | bi.Value);
+        if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) | (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "|", a, b);
     }
 
     public static Expression Xor(Expression a, Expression b)
     {
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value ^ bi.Value);
+        if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) ^ (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "^", a, b);
     }
 

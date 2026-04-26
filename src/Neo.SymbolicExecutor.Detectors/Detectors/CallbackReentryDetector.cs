@@ -22,9 +22,15 @@ public sealed class CallbackReentryDetector : BaseDetector
     {
         foreach (var state in context.States)
         {
-            // Find token transfers (treat any external call to method "transfer" as a candidate).
+            // Audit C# #10 fix: tighten "transfer" matching. Userland helpers named "transfer"
+            // shouldn't fire — only external calls to a CONCRETE non-self contract qualify
+            // as a NEP-17/11 transfer that can trigger the recipient's onPayment callback.
+            // Dynamic-target transfers are flagged separately by DynamicCallTargetDetector.
             var transfers = state.Telemetry.ExternalCalls
-                .Where(c => string.Equals(c.Method, "transfer", System.StringComparison.OrdinalIgnoreCase))
+                .Where(c =>
+                    string.Equals(c.Method, "transfer", System.StringComparison.OrdinalIgnoreCase)
+                    && c.TargetHash?.AsConcreteBytes() is byte[] hb
+                    && hb.Length == 20)
                 .ToList();
             if (transfers.Count == 0) continue;
 

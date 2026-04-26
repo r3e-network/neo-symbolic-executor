@@ -153,13 +153,39 @@ public class AdditionalDetectorTests
     [Fact]
     public void CallbackReentry_FlagsTransferBeforePostWriteState()
     {
+        // After audit C# #10 fix, the detector requires a concrete 20-byte target hash
+        // (any external Hash160). Userland helper methods named "transfer" without a
+        // concrete external target no longer fire.
         var s = NewState();
-        s.Telemetry.ExternalCalls.Add(new ExternalCall { Offset = 0x10, Method = "transfer", HasReturnValue = true });
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x10,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
         s.Telemetry.StorageOps.Add(new StorageOp(0x20, StorageOpKind.Put,
             SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
         var f = new CallbackReentryDetector().Analyze(Ctx(s)).ToList();
         f.Should().ContainSingle();
         f[0].Tags.Should().Contain("callback-reentry");
+    }
+
+    [Fact]
+    public void CallbackReentry_DoesNotFireOnUserlandTransferHelper_AuditFinding10()
+    {
+        // No concrete TargetHash → looks like an internal helper, not a NEP-17 transfer.
+        var s = NewState();
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x10,
+            Method = "transfer",
+            TargetHashDynamic = true,
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x20, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
+        new CallbackReentryDetector().Analyze(Ctx(s)).Should().BeEmpty();
     }
 
     [Fact]
