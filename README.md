@@ -1,113 +1,124 @@
 # Neo Symbolic Executor
 
-Neo N3 smart contract symbolic execution and detector-based security analysis toolkit.
+Symbolic execution and security analysis for Neo N3 smart contracts. Designed to ship as a
+Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after compile.
 
-Current version: `0.3.0`
+## Status
 
-## Highlights
+| Component | LOC | Tests |
+|---|---|---|
+| Engine + decoder + types | ~3,500 | 11 smoke + 6 fuzz |
+| NEF + manifest parsers | ~400 | 5 |
+| 21 detectors + framework | ~1,500 | 19 |
+| Reports + gates + CLI | ~600 | 7 |
+| Z3 SMT layer | ~400 | 6 (skipped when libz3 missing) |
+| **Total** | **~6,400** | **64 passing + 5 skipped** |
 
-- NEF parser and disassembler for Neo N3 contracts.
-- Symbolic execution engine for path exploration and state modeling.
-- Security detector suite for reentrancy, overflow, access control, DoS, upgradeability, and related contract risks.
-- CLI risk gates (`--fail-on-*`) for CI enforcement.
-- Hardened NeoVM executor for assembly, raw bytecode, hex, JSON script arrays, and `.nef` containers.
-- First-class fuzzing harnesses for the parser, source loader, decoder, NEF reader, and execution engine.
-- DevPack corpus validation utility at `examples/validate_devpack_corpus.py`.
+## Layout
 
-## Quick Start
-
-1. Install the package in editable mode.
-```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install -e ".[dev]"
 ```
-2. Run a detector-backed contract analysis.
-```bash
-python3 -m neo_sym.cli analyze /path/to/contract.nef --manifest /path/to/contract.manifest.json --format json
-```
-3. Explore a NeoVM script with the hardened executor.
-```bash
-python3 -m neo_symbolic_executor --arg amount examples/branching.neoasm
-```
-4. Reach the same executor from the legacy CLI surface.
-```bash
-python3 -m neo_sym.cli explore --json examples/buffer.neoasm
-```
-5. Run tests.
-```bash
-pytest -q
+neo-symbolic-executor/
+├── Neo.SymbolicExecutor.sln
+├── Directory.Build.props
+├── global.json                 — pin .NET 10
+├── NuGet.Config                — Neo MyGet feed
+├── src/
+│   ├── Neo.SymbolicExecutor/   — engine + decoder + IR + NEF/manifest parsers
+│   ├── Neo.SymbolicExecutor.Detectors/  — 21 detectors + reports + gates
+│   ├── Neo.SymbolicExecutor.Smt/        — Z3-backed translator + backend (optional)
+│   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 69 tests total
+└── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 
-## Full Corpus Validation (Neo DevPack dotnet)
-
-Use this to validate analyzer stability and detector output across all DevPack `TestingArtifacts` contracts.
+## Build
 
 ```bash
-python3 examples/validate_devpack_corpus.py \
-  --project-root /home/neo/git/neo-symbolic-executor \
-  --devpack-root /tmp/neo-devpack-validation-1771475966/neo-devpack-dotnet \
-  --output-root docs/validation/devpack-corpus \
-  --clean
+dotnet build
+dotnet test
 ```
 
-Validation outputs:
-
-- `docs/validation/devpack-corpus/summary.md`
-- `docs/validation/devpack-corpus/summary.json`
-- `docs/validation/devpack-corpus/artifacts.index.json`
-- Extracted corpus under `docs/validation/devpack-corpus/extracted`
-- Per-contract reports under `docs/validation/devpack-corpus/analysis`
-
-## CLI Quality Gates
-
-You can enforce release and CI thresholds with:
-
-- `--fail-on-total-findings`
-- `--fail-on-max-severity`
-- `--fail-on-weighted-score`
-- `--fail-on-confidence-weighted-score`
-- `--min-confidence`
-- `--fail-on-severity-count`
-- `--fail-on-detector-severity`
-
-## Hardened Execution CLI
-
-The additive `neo_symbolic_executor` package is now part of the repo under `src/neo_symbolic_executor`.
-
-- input formats: NeoVM assembly, raw hex, raw binary, JSON script arrays, and `.nef`
-- execution controls: stack, heap, visit, call-depth, item-size, collection-size, and try-depth budgets
-- interop seeding: trigger, network magic, address version, call flags, gas left, time, and script hash
-- output modes: human-readable state report or JSON
-
-Examples:
+## Run
 
 ```bash
-python3 -m neo_symbolic_executor --json examples/buffer.neoasm
-python3 -m neo_symbolic_executor --source-type hex path/to/script.hex
-python3 -m neo_symbolic_executor contract.nef
+# Disassemble
+neo-sym decode contract.nef
+
+# Symbolic exploration without detectors
+neo-sym explore contract.nef
+
+# Full analysis
+neo-sym analyze contract.nef \
+  --manifest contract.manifest.json \
+  --format markdown \
+  --out report.md \
+  --fail-on-max-severity high
+
+# With Z3 SMT layer (optional)
+neo-sym analyze contract.nef --manifest contract.manifest.json --smt --smt-drop-unsat
 ```
 
-## Release Notes
+## CLI exit codes
 
-- Changelog: `CHANGELOG.md`
-- Latest release notes: `docs/releases/v0.3.0.md`
+| Code | Meaning                                  |
+|------|------------------------------------------|
+| 0    | OK / gate passed                         |
+| 1    | Analyzer error (parse failure, etc.)     |
+| 2    | Bad arguments                            |
+| 3    | Gate violation (analysis ok, gate fired) |
 
-## Release Artifacts
+## DevPack integration
 
-- `dist/neo-symbolic-executor-v0.3.0.tar.gz`
-- `dist/neo-symbolic-executor-v0.3.0.sha256`
-- `dist/neo-symbolic-executor-v0.3.0.manifest.json`
+See `devpack-integration/README.md` — provides MSBuild `.props` + `.targets`
+that drop into a Neo DevPack contract project and run `neo-sym analyze` after build.
 
-## Testing And Fuzzing
+## Detectors
 
-```bash
-pytest -q
-```
+21 detectors are wired in `DefaultDetectorSet`:
 
-```bash
-python3 -m compileall src tests fuzzing examples
-```
+- `reentrancy` — checks-effects-interactions with audit-driven amplification scoring
+- `access_control` — missing / unenforced / late authorization, with `manifest.safe` respect
+- `overflow` — symbolic-operand arithmetic + divide-by-zero
+- `unchecked_return` — external call return value not consumed by ASSERT/branch
+- `dynamic_call_target` — runtime-determined target hash and/or method selector
+- `dangerous_call_flags` — CallFlags.All and bit-count >= 3 broad grants
+- `dos` — recursion, iterator scans, excessive writes, capped-loop signals
+- `gas_exhaustion` — paths over a configurable threshold
+- `randomness` — timestamp-derived as HIGH; `Runtime.GetRandom` as INFO
+- `timestamp` — INFO triage signal
+- `storage_collision` — separator-aware prefix overlap detection
+- `upgradeability` — `ContractManagement.Update`/`Destroy` reachability + auth posture
+- `permissions` — manifest wildcards, partial wildcards, `trusts`, group misconfig
+- `admin_centralization` — single-witness privileged ops (LOW)
+- `nep17_compliance` — NEP-17 ABI / events / safe-flag conformance
+- `nep11_compliance` — NEP-11 NFT ABI / events conformance
+- `callback_reentry` — onNEP17Payment / onNEP11Payment recipient-callback re-entry
+- `crypto_verification_bypass` — CheckSig / CheckMultisig result not consumed
+- `replay_attack` — signature-gated state change without an apparent nonce
+- `taint_flow_upgrade` — `Contract.Update` with caller-supplied NEF / manifest
+- `unknown_instructions` — coverage gap surface (INFO)
 
-```bash
-python3 fuzzing/run_all_fuzzers.py --duration 5 --corpus fuzzing/corpus --artifacts-dir /tmp/neo-fuzz-artifacts
-```
+With `--smt`: each finding is validated for path satisfiability; infeasible findings are
+dropped (or downgraded), and SAT findings include a concrete witness reproducer.
+
+## Audit traceability
+
+Every detector and every fix in this codebase carries a reference to the underlying audit
+finding in its XML doc comments. Examples baked in from day one:
+
+- PUSHA target=0 always uses resolved `Target` field (audit CRIT-1)
+- Cross-type primitive equality via canonical bytes (audit HIGH-2)
+- Witness-enforcement marker scoped to the branch that proceeds *because* the witness
+  passed; the unauth branch stays unenforced (audit C8/C9)
+- `System.Contract.CallNative` recorded as `ExternalCall` (audit C5)
+- Reentrancy guard suppression hook + last-write-offset semantics (audit C1)
+- Overflow false-positive cap + `INC`/`DEC`/`SHL`/`POW` tracked (audit overflow.py finding)
+- `manifest.abi_methods.safe` consulted by access_control (audit detector audit #18)
+- Native read-only allowlist (`Ledger`, `StdLib`, `CryptoLib`, etc.) used by reentrancy
+  + access_control (audit detector audit #1, biggest precision win)
+- 5 new detectors covering audit gaps: NEP-11, callback re-entry, replay, crypto bypass,
+  taint-flow upgrade
+
+## License
+
+MIT.

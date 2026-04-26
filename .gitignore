@@ -1,24 +1,19 @@
-__pycache__/
-*.py[cod]
-*.egg
-*.egg-info/
-*.whl
-*.so
-.coverage
-htmlcov/
-.eggs/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.tox/
-.venv/
-build/
-dist/
+# Build output
+bin/
+obj/
+
+# IDE
+.vs/
 .idea/
-.vscode/
-*.swp
-*.swo
-*.bak
+*.user
+*.suo
+*.userprefs
+
+# OS
 .DS_Store
-crash-*
-fuzzing/crash-*
+Thumbs.db
+
+# Test / coverage
+TestResults/
+coverage*.xml
+*.coverage
