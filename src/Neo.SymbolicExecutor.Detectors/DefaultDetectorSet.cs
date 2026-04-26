@@ -4,14 +4,17 @@ using Neo.SymbolicExecutor.Detectors.Detectors;
 namespace Neo.SymbolicExecutor.Detectors;
 
 /// <summary>
-/// Built-in detector list. Subsequent commits add the remaining audit-driven detectors
-/// (NEP-11, callback-reentry, replay, crypto-bypass, taint-flow upgrade, etc.).
+/// Built-in detector list. Detectors are stateless — we cache a single shared instance list
+/// to avoid per-call allocations. Audit C# perf finding (iter 12): the prior `All()` returned
+/// a fresh array of 21 fresh detector instances on every call; with the fuzzer invoking it
+/// from multiple targets per iteration, this drove sustained allocation pressure that
+/// contributed to multi-GB managed-heap growth on 1B+-iteration runs.
 /// </summary>
 public static class DefaultDetectorSet
 {
-    public static IReadOnlyList<IDetector> All() => new IDetector[]
+    private static readonly IReadOnlyList<IDetector> _instances = new IDetector[]
     {
-        // Original 16 (16 of which are audit-driven; storage_collision, dos, gas_exhaustion below).
+        // Original 16 (audit-driven).
         new ReentrancyDetector(),
         new AccessControlDetector(),
         new OverflowDetector(),
@@ -35,4 +38,6 @@ public static class DefaultDetectorSet
         new ReplayAttackDetector(),
         new TaintFlowUpgradeDetector(),
     };
+
+    public static IReadOnlyList<IDetector> All() => _instances;
 }

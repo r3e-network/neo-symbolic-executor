@@ -17,6 +17,13 @@ public sealed class FuzzCampaignOptions
     public TimeSpan StatusInterval { get; init; } = TimeSpan.FromSeconds(10);
     public bool StopOnFirstCrash { get; init; }
     public Action<string>? Log { get; init; }
+
+    /// <summary>
+    /// Self-restart safeguard: when GC.GetTotalMemory crosses this threshold (MB), the campaign
+    /// exits cleanly. The wrapper script restarts the next chunk on a fresh process. 0 disables.
+    /// Default 4 GB which keeps multi-week runs from accumulating into OOM territory.
+    /// </summary>
+    public long MaxMemoryMb { get; init; } = 4096;
 }
 
 /// <summary>
@@ -64,7 +71,7 @@ public sealed class FuzzCampaign
 
     private void WorkerLoop(CancellationToken cancel)
     {
-        while (!cancel.IsCancellationRequested)
+        while (!cancel.IsCancellationRequested && !_memoryCapBreached)
         {
             foreach (var target in _opts.Targets)
             {
@@ -142,19 +149,26 @@ public sealed class FuzzCampaign
         var elapsed = DateTime.UtcNow - _stats.StartedUtc;
         long total = _stats.Total;
         double rate = total / Math.Max(1, elapsed.TotalSeconds);
-        // GC.GetTotalMemory(false) is a cheap snapshot of managed heap. A monotonically growing
-        // value over a long run is a leak signal — surfacing it here lets the operator notice
-        // before the fuzzer OOMs on a multi-day run.
-        long mem = GC.GetTotalMemory(false);
+        long memMb = GC.GetTotalMemory(false) / (1024 * 1024);
         var sb = new System.Text.StringBuilder();
         sb.Append($"[{elapsed:hh\\:mm\\:ss}] iters={total:N0} ({rate:F0}/s) " +
-                  $"mem={mem / (1024 * 1024)}MB crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
+                  $"mem={memMb}MB crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
         foreach (var t in _opts.Targets.OrderBy(t => t.Name))
         {
             sb.Append($" | {t.Name}={_stats.IterationsFor(t.Name):N0}/{_stats.CrashesFor(t.Name)}");
         }
         Log(sb.ToString());
+
+        // Self-restart safeguard: exit cleanly when memory crosses the configured threshold.
+        // The long-run wrapper restarts the next chunk on a fresh process.
+        if (_opts.MaxMemoryMb > 0 && memMb > _opts.MaxMemoryMb)
+        {
+            Log($"[fuzz] memory {memMb}MB exceeds cap {_opts.MaxMemoryMb}MB — exiting for fresh restart");
+            _memoryCapBreached = true;
+        }
     }
+
+    private volatile bool _memoryCapBreached;
 
     private void Log(string s) => (_opts.Log ?? Console.WriteLine)(s);
 }

@@ -51,6 +51,7 @@ internal static class Program
                 StartSeed = opts.StartSeed,
                 StopOnFirstCrash = opts.StopOnFirstCrash,
                 StatusInterval = opts.StatusInterval,
+                MaxMemoryMb = opts.MaxMemoryMb,
                 Log = Console.WriteLine,
             };
             var campaign = new FuzzCampaign(campaignOpts);
@@ -122,6 +123,7 @@ internal static class Program
         string corpus = Path.Combine(Environment.CurrentDirectory, "fuzz-corpus");
         bool stopOnFirst = false;
         TimeSpan statusInterval = TimeSpan.FromSeconds(10);
+        long maxMemoryMb = 4096;
         string? reproduce = null;
         var selected = new List<IFuzzTarget>(allTargets);
 
@@ -172,6 +174,9 @@ internal static class Program
                 case "--status-seconds":
                     statusInterval = TimeSpan.FromSeconds(int.Parse(Next()));
                     break;
+                case "--max-memory-mb":
+                    maxMemoryMb = long.Parse(Next());
+                    break;
                 case "--reproduce":
                     reproduce = Next();
                     break;
@@ -192,6 +197,7 @@ internal static class Program
             Workers = workers,
             StopOnFirstCrash = stopOnFirst,
             StatusInterval = statusInterval,
+            MaxMemoryMb = maxMemoryMb,
             Reproduce = reproduce,
         };
     }
@@ -248,6 +254,7 @@ internal static class Program
         public int Workers { get; init; }
         public bool StopOnFirstCrash { get; init; }
         public TimeSpan StatusInterval { get; init; }
+        public long MaxMemoryMb { get; init; } = 4096;
         public string? Reproduce { get; init; }
     }
 }
