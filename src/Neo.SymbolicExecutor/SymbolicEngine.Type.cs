@@ -66,7 +66,11 @@ public sealed partial class SymbolicEngine
                 v.AsConcreteBytes() is byte[] bs ? SymbolicValue.Int(Expr.BytesToInteger(bs)) : v,
             (StackItemTypeCodes.Integer, Sort.Int) => v,
             (StackItemTypeCodes.ByteString, Sort.Int) =>
-                v.AsConcreteInt() is { } bi ? SymbolicValue.Bytes(Expr.IntegerToBytes(bi)) : v,
+                v.AsConcreteInt() is { } bi
+                    ? SymbolicValue.Bytes(Expr.IntegerToBytes(bi))
+                    // Audit C# #4 fix: for symbolic ints we previously returned the Int unchanged,
+                    // which broke downstream ISTYPE Bytes checks. Wrap so the sort propagates.
+                    : SymbolicValue.Of(new UnaryExpr(Sort.Bytes, "i2b", v.Expression), v.Taints),
             (StackItemTypeCodes.ByteString, Sort.Bytes) => v,
             (StackItemTypeCodes.ByteString, Sort.Bool) =>
                 v.AsConcreteBool() == true ? SymbolicValue.Bytes(new byte[] { 1 }) : SymbolicValue.Bytes(System.Array.Empty<byte>()),

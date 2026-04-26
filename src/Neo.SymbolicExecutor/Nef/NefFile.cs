@@ -144,7 +144,12 @@ public sealed record MethodToken(
             _ => len,
         };
         if (len < 0 || len > 32) throw new FormatException("MethodToken method name too long");
-        var name = Encoding.UTF8.GetString(br.ReadBytes((int)len));
+        // Audit C# #29 fix: BinaryReader.ReadBytes returns short-read buffers on EOF without
+        // throwing. Validate length explicitly so we don't produce a truncated method name.
+        var nameBytes = br.ReadBytes((int)len);
+        if (nameBytes.Length != len)
+            throw new FormatException($"MethodToken name truncated: wanted {len}, got {nameBytes.Length}");
+        var name = Encoding.UTF8.GetString(nameBytes);
         ushort parametersCount = br.ReadUInt16();
         bool hasRet = br.ReadByte() != 0;
         byte callFlags = br.ReadByte();

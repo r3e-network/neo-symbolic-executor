@@ -9,6 +9,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> ConditionalBranch(ExecutionState state, Instruction inst, bool jumpOnTrue)
     {
         var cond = state.Pop();
+        // Audit C# #3 fix: a JMPIF/JMPIFNOT consuming an external-call return value is a valid
+        // way to "check the return". Tag the originating call as ReturnChecked so
+        // UncheckedReturnDetector doesn't false-positive.
+        MarkExternalCallReturnChecked(state, cond);
         var truthy = cond.Truthy();
         if (truthy.HasValue)
         {
@@ -97,6 +101,10 @@ public sealed partial class SymbolicEngine
     {
         var b = state.Pop();
         var a = state.Pop();
+        // Audit C# #3 fix: comparison branches consume both operands as a check; tag any
+        // external-call return values that flow in.
+        MarkExternalCallReturnChecked(state, a);
+        MarkExternalCallReturnChecked(state, b);
         Expression rel = inst.OpCode switch
         {
             NeoVm.OpCode.JMPEQ or NeoVm.OpCode.JMPEQ_L => Expr.Eq(a.Expression, b.Expression),

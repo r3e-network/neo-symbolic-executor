@@ -34,9 +34,17 @@ public sealed class ReplayAttackDetector : BaseDetector
                 o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete);
             if (!hasSensitive) continue;
 
+            // Audit C# #9 fix: only count Storage.Get reads as nonce-presence signals. Writes
+            // alone don't prove the contract checks a previous nonce — an attacker-replay path
+            // would still write a nonce key without first reading it. Cache the decoded UTF-8
+            // string per StorageOp instead of allocating per-hint.
             bool nonceLooking = state.Telemetry.StorageOps.Any(o =>
-                o.Key.AsConcreteBytes() is byte[] kb
-                && NonceHints.Any(h => System.Text.Encoding.UTF8.GetString(kb).Contains(h, System.StringComparison.OrdinalIgnoreCase)));
+            {
+                if (o.Kind != StorageOpKind.Get) return false;
+                if (o.Key.AsConcreteBytes() is not byte[] kb) return false;
+                string keyStr = System.Text.Encoding.UTF8.GetString(kb);
+                return NonceHints.Any(h => keyStr.Contains(h, System.StringComparison.OrdinalIgnoreCase));
+            });
             if (nonceLooking) continue;
 
             int firstSensitive = state.Telemetry.StorageOps

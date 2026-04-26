@@ -72,7 +72,8 @@ internal static class Program
         if (result.BudgetExceeded) Console.WriteLine($"Budget exceeded: {result.BudgetReason}");
         foreach (var s in result.FinalStates)
             Console.WriteLine($"  {s.Status}: {s.TerminationReason ?? "<no reason>"}");
-        return result.AnyFaulted ? 0 : 0;
+        // Audit C# #20: explore is a debug command; success regardless of FAULTED states.
+        return 0;
     }
 
     private static int Analyze(string[] args)
