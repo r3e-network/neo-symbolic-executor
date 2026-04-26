@@ -159,4 +159,31 @@ public class AuditFixesTests
         s.IterationsFor("a").Should().Be(1);
         s.CrashesFor("a").Should().Be(1);
     }
+
+    [Fact]
+    public void Heap_IdNotConsumedOnFactoryThrow_AuditFinding32()
+    {
+        // Audit #32: id was bumped before factory ran, leaving a gap on a throwing factory.
+        var heap = new Heap();
+        var a1 = heap.NewArray();
+        int firstId = a1.Id;
+        // Trigger an exception inside the factory by passing items that exceed collection size.
+        try
+        {
+            heap.Allocate<ArrayObject>(_ => throw new System.InvalidOperationException("test"));
+        }
+        catch (System.InvalidOperationException) { /* expected */ }
+        var a2 = heap.NewArray();
+        a2.Id.Should().Be(firstId + 1, "the throwing allocate must not consume an id");
+    }
+
+    [Fact]
+    public void DefaultDetectorSet_ReturnsSameInstance_AuditPerf()
+    {
+        // Audit C# perf (iter 12): cached detector list saves millions of allocations/sec under
+        // fuzz load. Verify reference equality.
+        var a = Detectors.DefaultDetectorSet.All();
+        var b = Detectors.DefaultDetectorSet.All();
+        a.Should().BeSameAs(b);
+    }
 }

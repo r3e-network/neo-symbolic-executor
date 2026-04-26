@@ -246,30 +246,36 @@ internal sealed class AnalyzeOptions
         int smtBytes = 64;
         bool smtDrop = false;
 
+        // Audit C# #22 fix: int.Parse on overflow throws System.OverflowException with a
+        // generic message. Wrap in a helper that surfaces the option name and bad value.
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
             string Next() => ++i < args.Length
                 ? args[i]
                 : throw new ArgumentException($"missing value for {a}");
+            int ParseInt(string label, string val) =>
+                int.TryParse(val, out int n)
+                    ? n
+                    : throw new ArgumentException($"{label}: expected int32, got '{val}'");
             switch (a)
             {
                 case "--manifest": manifest = Next(); break;
                 case "--format": format = Next(); break;
                 case "--out": outPath = Next(); break;
                 case "--smt": useSmt = true; break;
-                case "--smt-timeout": smtTimeout = int.Parse(Next()); break;
-                case "--smt-bytes-bound": smtBytes = int.Parse(Next()); break;
+                case "--smt-timeout": smtTimeout = ParseInt(a, Next()); break;
+                case "--smt-bytes-bound": smtBytes = ParseInt(a, Next()); break;
                 case "--smt-drop-unsat": smtDrop = true; break;
                 case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
-                case "--fail-on-total-findings": totalCap = int.Parse(Next()); break;
-                case "--fail-on-weighted-score": wsCap = int.Parse(Next()); break;
-                case "--fail-on-confidence-weighted-score": cwsCap = int.Parse(Next()); break;
+                case "--fail-on-total-findings": totalCap = ParseInt(a, Next()); break;
+                case "--fail-on-weighted-score": wsCap = ParseInt(a, Next()); break;
+                case "--fail-on-confidence-weighted-score": cwsCap = ParseInt(a, Next()); break;
                 case "--fail-on-severity-count":
                     {
                         var parts = Next().Split('=', 2);
                         if (parts.Length != 2) throw new ArgumentException("expected sev=count");
-                        sevCounts[ParseSeverity(parts[0])] = int.Parse(parts[1]);
+                        sevCounts[ParseSeverity(parts[0])] = ParseInt(a, parts[1]);
                         break;
                     }
                 case "--fail-on-detector-severity":

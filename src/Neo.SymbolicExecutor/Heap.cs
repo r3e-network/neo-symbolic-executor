@@ -36,9 +36,12 @@ public sealed class Heap
     {
         if (_objects.Count >= MaxObjects)
             throw new AnalysisBudgetException("Heap object limit exceeded");
-        int id = _nextId++;
+        // Audit C# #32 fix: don't bump _nextId until the object is fully constructed and
+        // registered. A throwing factory used to leak a monotonically-skipped id.
+        int id = _nextId;
         var obj = factory(id);
         _objects[id] = obj;
+        _nextId = id + 1;
         return obj;
     }
 
