@@ -28,4 +28,17 @@ public interface IFuzzTarget
     /// <param name="reproInput">When returning false or throwing, set this to the bytes of the
     /// input that triggered the failure (used to write a reproducer artifact).</param>
     bool RunOnce(int seed, out string? reason, out byte[]? reproInput);
+
+    /// <summary>
+    /// Optional direct-input replay: run the target against an explicit byte input rather
+    /// than a seed-driven generator. Used by <see cref="CrashMinimizer"/> to shrink a known
+    /// failing input. Targets without a meaningful direct-input mode can leave this null.
+    /// Implementations should follow the same contract as <see cref="RunOnce"/>: success
+    /// returns true, invariant violations return false, crashes throw.
+    /// </summary>
+    bool RunWithInput(byte[] input, out string? reason) =>
+        throw new System.NotSupportedException($"{Name}: direct-input replay not supported");
+
+    /// <summary>True iff the target supports direct-input replay.</summary>
+    bool SupportsDirectReplay => false;
 }

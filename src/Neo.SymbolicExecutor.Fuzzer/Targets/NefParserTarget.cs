@@ -14,6 +14,7 @@ public sealed class NefParserTarget : IFuzzTarget
         typeof(EndOfStreamException),
         typeof(ArgumentOutOfRangeException),
     };
+    public bool SupportsDirectReplay => true;
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
     {
@@ -22,6 +23,15 @@ public sealed class NefParserTarget : IFuzzTarget
         reproInput = bytes;
         reason = null;
         try { _ = NefFile.Parse(bytes, verifyChecksum: rng.Next(2) == 0); return true; }
+        catch (FormatException) { return true; }
+        catch (EndOfStreamException) { return true; }
+        catch (ArgumentOutOfRangeException) { return true; }
+    }
+
+    public bool RunWithInput(byte[] input, out string? reason)
+    {
+        reason = null;
+        try { _ = NefFile.Parse(input, verifyChecksum: true); return true; }
         catch (FormatException) { return true; }
         catch (EndOfStreamException) { return true; }
         catch (ArgumentOutOfRangeException) { return true; }

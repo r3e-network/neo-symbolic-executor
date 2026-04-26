@@ -88,12 +88,30 @@ public sealed class FuzzCampaign
                 }
                 catch (Exception ex) when (!IsExpected(target, ex))
                 {
-                    if (_recorder.Record(target.Name, seed, _stats.IterationsFor(target.Name),
-                                          ex is OperationCanceledException ? Array.Empty<byte>() : Array.Empty<byte>(),
-                                          ex, null))
+                    // Fall through with whatever input we have. We don't have access to the
+                    // failing input bytes from inside catch — many targets capture them via
+                    // out-param BEFORE throwing. For targets that do, we minimize.
+                    byte[] reproBytes = Array.Empty<byte>();
+                    string targetName = target.Name;
+                    // Try to retrieve the seed-derived input by re-invoking RunOnce defensively;
+                    // if it succeeds the second time, fall back to an empty byte array.
+                    try
                     {
-                        _stats.RecordCrash(target.Name);
-                        Log($"  [CRASH] {target.Name} seed={seed} {ex.GetType().Name}: {ex.Message}");
+                        target.RunOnce(seed, out _, out var captured);
+                        if (captured is not null) reproBytes = captured;
+                    }
+                    catch { /* expected: same crash on replay; we still need bytes */ }
+                    // Apply CrashMinimizer when the target supports direct replay.
+                    if (target.SupportsDirectReplay && reproBytes.Length > 1)
+                    {
+                        try { reproBytes = CrashMinimizer.Minimize(target, reproBytes, maxAttempts: 64); }
+                        catch { /* keep original bytes on minimize failure */ }
+                    }
+                    if (_recorder.Record(targetName, seed, _stats.IterationsFor(targetName),
+                                          reproBytes, ex, null))
+                    {
+                        _stats.RecordCrash(targetName);
+                        Log($"  [CRASH] {targetName} seed={seed} {ex.GetType().Name}: {ex.Message} (repro={reproBytes.Length} bytes)");
                         if (_opts.StopOnFirstCrash) return;
                     }
                 }

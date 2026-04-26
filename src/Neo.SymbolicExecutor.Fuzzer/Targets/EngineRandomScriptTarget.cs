@@ -13,6 +13,7 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
 {
     public string Name => "engine";
     public Type[] ExpectedExceptions => Type.EmptyTypes; // engine.Run should swallow everything
+    public bool SupportsDirectReplay => true;
 
     private readonly ExecutionOptions _engineOptions = new()
     {
@@ -52,6 +53,28 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
         {
             reason = $"step count {result.StepsExecuted} > allowed {maxAllowed} " +
                      $"(MaxSteps={_engineOptions.MaxSteps}, MaxQueuedStates={_engineOptions.MaxQueuedStates})";
+            return false;
+        }
+        return true;
+    }
+
+    public bool RunWithInput(byte[] input, out string? reason)
+    {
+        reason = null;
+        NeoProgram program;
+        try { program = ScriptDecoder.Decode(input); }
+        catch (VmFaultException) { return true; }
+
+        var result = new SymbolicEngine(program, _engineOptions).Run();
+        if (result.FinalStates.Any(s => s.Status == TerminalStatus.Running))
+        {
+            reason = "engine produced a state with status=Running after Run() returned";
+            return false;
+        }
+        long maxAllowed = (long)_engineOptions.MaxSteps * Math.Max(1, _engineOptions.MaxQueuedStates) + 10_000;
+        if (result.StepsExecuted > maxAllowed)
+        {
+            reason = $"step count {result.StepsExecuted} > allowed {maxAllowed}";
             return false;
         }
         return true;
