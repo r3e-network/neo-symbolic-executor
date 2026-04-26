@@ -186,4 +186,205 @@ public class AuditFixesTests
         var b = Detectors.DefaultDetectorSet.All();
         a.Should().BeSameAs(b);
     }
+
+    // ---------- Iteration-2 audit fixes (2026-04-27 detector + engine audit) ----------
+
+    [Fact]
+    public void Dos_IteratorFinding_OffsetIsDeterministic_DetectorAuditH1()
+    {
+        // Audit detector H1: DosDetector used HashSet enumerator order, producing different
+        // finding offsets across runs of identical telemetry.
+        var s1 = MakeStateWithIteratorLoops(0x10, 0x80, 0x20);
+        var s2 = MakeStateWithIteratorLoops(0x80, 0x20, 0x10);  // same set, different insertion order
+        var d = new DosDetector();
+        var f1 = d.Analyze(new AnalysisContext { States = new[] { s1 } }).ToList();
+        var f2 = d.Analyze(new AnalysisContext { States = new[] { s2 } }).ToList();
+        f1.Should().NotBeEmpty();
+        f1[0].Offset.Should().Be(0x10);
+        f1[0].Offset.Should().Be(f2[0].Offset, "deterministic min offset");
+        f1[0].DedupeKey.Should().Be(f2[0].DedupeKey);
+    }
+
+    private static ExecutionState MakeStateWithIteratorLoops(params int[] loops)
+    {
+        var s = new ExecutionState();
+        s.CallStack.Add(new CallFrame(returnPc: -1));
+        foreach (var off in loops) s.Telemetry.IteratorLoops.Add(off);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x100, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(0), false, false));
+        s.Status = TerminalStatus.Halted;
+        return s;
+    }
+
+    [Fact]
+    public void AdminCentralization_OffsetIsDeterministic_DetectorAuditH2()
+    {
+        // Audit detector H2: read first element of WitnessChecksEnforced HashSet → unstable.
+        var s1 = MakeStateWithEnforcedWitnesses(0x100, 0x40, 0x80);
+        var s2 = MakeStateWithEnforcedWitnesses(0x80, 0x100, 0x40);
+        var d = new AdminCentralizationDetector();
+        // Limit to 1 enforced for the detector to fire (it requires Count==1). For the
+        // determinism test we use a separate single-witness assertion.
+        var single1 = MakeStateWithEnforcedWitnesses(0x40);
+        var single2 = MakeStateWithEnforcedWitnesses(0x40);
+        var f1 = d.Analyze(new AnalysisContext { States = new[] { single1 } }).ToList();
+        var f2 = d.Analyze(new AnalysisContext { States = new[] { single2 } }).ToList();
+        f1.Should().ContainSingle();
+        f2.Should().ContainSingle();
+        f1[0].Offset.Should().Be(0x40);
+        f1[0].DedupeKey.Should().Be(f2[0].DedupeKey);
+        // And: the count-≠1 case never fires (existing behavior preserved).
+        d.Analyze(new AnalysisContext { States = new[] { s1 } }).Should().BeEmpty();
+    }
+
+    private static ExecutionState MakeStateWithEnforcedWitnesses(params int[] offsets)
+    {
+        var s = new ExecutionState();
+        s.CallStack.Add(new CallFrame(returnPc: -1));
+        foreach (var off in offsets) s.Telemetry.WitnessChecksEnforced.Add(off);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x200, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(0), false, false));
+        s.Status = TerminalStatus.Halted;
+        return s;
+    }
+
+    [Fact]
+    public void GatePolicy_FailOnInfo_PassesOnEmptyFindings_DetectorAuditH5()
+    {
+        // Audit detector H5: empty findings returned OverallMaxSeverity=Info (sentinel),
+        // which made `FailOnMaxSeverity=Info` falsely fire on a clean run.
+        var risk = RiskProfile.FromFindings(System.Array.Empty<Finding>());
+        var gate = new GatePolicy { FailOnMaxSeverity = Severity.Info }
+            .Evaluate(System.Array.Empty<Finding>(), risk);
+        gate.Passed.Should().BeTrue("zero findings cannot exceed any severity threshold");
+        gate.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Upgradeability_RejectsNon20ByteHash_DetectorAuditH6()
+    {
+        // Audit detector H6: IsContractManagement was missing a length validation, so
+        // adversarial 19/21-byte values from malformed PUSHDATA were silently lookups.
+        var s = new ExecutionState();
+        s.CallStack.Add(new CallFrame(returnPc: -1));
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x10,
+            Method = "update",
+            TargetHash = SymbolicValue.Bytes(new byte[] { 0xff }), // 1 byte — clearly malformed
+        });
+        var ctx = new AnalysisContext { States = new[] { s } };
+        // Detector should not crash and should not fire (no concrete CM target, no null target).
+        new UpgradeabilityDetector().Analyze(ctx).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsType_FaultsOnUndefinedTypeByte_EngineAuditH4()
+    {
+        // Audit engine H4: ISTYPE on undefined / Any byte returned false silently.
+        // Now matches NeoVM and faults.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH0,
+            (byte)NeoVm.OpCode.ISTYPE, 0xFF,   // 0xFF — undefined StackItemType
+            (byte)NeoVm.OpCode.RET,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program).Run();
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+    }
+
+    [Fact]
+    public void IsType_FaultsOnAnyTypeByte_EngineAuditH4()
+    {
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH0,
+            (byte)NeoVm.OpCode.ISTYPE, 0x00,   // Any
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+    }
+
+    [Fact]
+    public void Convert_FaultsOnUnsupportedPair_EngineAuditH1()
+    {
+        // Audit engine H1: CONVERT used to forward the input unchanged for unsupported pairs,
+        // letting Buffer-shaped values flow through ISTYPE Integer checks. Now faults.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSHNULL,
+            (byte)NeoVm.OpCode.CONVERT, 0x21,   // Null → Integer is not a defined conversion
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+    }
+
+    [Fact]
+    public void Initslot_FaultsOnDoubleInit_EngineAuditM1()
+    {
+        // Audit engine M1: INITSLOT could be called twice, growing the slot table silently.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.INITSLOT, 0x01, 0x00,
+            (byte)NeoVm.OpCode.INITSLOT, 0x01, 0x00,    // <— must fault
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+    }
+
+    [Fact]
+    public void Initsslot_FaultsOnDoubleInit_EngineAuditL3()
+    {
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.INITSSLOT, 0x02,
+            (byte)NeoVm.OpCode.INITSSLOT, 0x02,    // <— must fault
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+    }
+
+    [Fact]
+    public void NewArrayT_PrefillsTypeAppropriateDefault_EngineAuditH5()
+    {
+        // Audit engine H5: NEWARRAY_T silently ignored the type byte, so cells were always Null
+        // even when the spec said "fill with Integer.Zero" or "Boolean.False".
+        // Build: PUSH3 ; NEWARRAY_T 0x21 (Integer) ; PUSH0 ; PICKITEM ; ISTYPE 0x21 (Integer) ; RET
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH3,
+            (byte)NeoVm.OpCode.NEWARRAY_T, 0x21,
+            (byte)NeoVm.OpCode.PUSH0,
+            (byte)NeoVm.OpCode.PICKITEM,
+            (byte)NeoVm.OpCode.ISTYPE, 0x21,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+        result.FinalStates.Should().ContainSingle();
+        var s = result.FinalStates[0];
+        s.Status.Should().Be(TerminalStatus.Halted);
+        s.EvaluationStack.Should().ContainSingle();
+        s.EvaluationStack[0].AsConcreteBool().Should().Be(true,
+            "NEWARRAY_T with Integer should prefill cells as Integer(0), so ISTYPE Integer is true");
+    }
+
+    [Fact]
+    public void Eq_NullVsSymbolicBytes_RemainsSymbolic_EngineAuditM4()
+    {
+        // Audit engine M4: Eq used to collapse to BoolConst.False when one side is Null and the
+        // other is symbolic, hiding any contract that branches on a maybe-null argument.
+        var symBytes = Expr.Sym(Sort.Bytes, "arg0");
+        var result = Expr.Eq(symBytes, Expr.Null());
+        result.Should().BeOfType<BinaryExpr>("symbolic operand prevents proving non-null at compile time");
+    }
 }

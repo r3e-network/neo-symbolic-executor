@@ -31,7 +31,10 @@ public sealed class DosDetector : BaseDetector
             if (state.Telemetry.IteratorLoops.Count > 0
                 && state.Telemetry.StorageOps.Count > 0)
             {
-                int firstIter = state.Telemetry.IteratorLoops.GetEnumerator() is var it && it.MoveNext() ? it.Current : 0;
+                // Audit fix: HashSet enumeration order is unspecified across runs and can cause
+                // different finding offsets, dedupe keys, and risk weights from identical telemetry.
+                // Use the deterministic minimum offset instead — same as LoopsDetected below.
+                int firstIter = MinOf(state.Telemetry.IteratorLoops);
                 yield return MakeFinding(
                     title: "Iterator-driven storage scan may consume unbounded gas",
                     description: $"State explores Storage.Find/Iterator.Next at 0x{firstIter:X4}; a malicious "

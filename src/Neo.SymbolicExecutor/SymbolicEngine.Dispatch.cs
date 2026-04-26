@@ -139,7 +139,13 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.INITSSLOT:
                 {
                     int n = inst.Operand.Span[0];
-                    state.StaticFields.Clear();
+                    // Audit fix (engine L3): per NeoVM JumpTable.Slot, INITSSLOT throws if statics
+                    // are already initialized OR if n == 0. The prior implementation cleared and
+                    // refilled, masking double-init bugs.
+                    if (n == 0)
+                        throw new VmFaultException("INITSSLOT requires non-zero static slot count");
+                    if (state.StaticFields.Count > 0)
+                        throw new VmFaultException("INITSSLOT called twice — statics already initialized");
                     for (int i = 0; i < n; i++) state.StaticFields.Add(SymbolicValue.Null());
                     state.Pc = inst.EndOffset; return Single(state);
                 }
@@ -148,6 +154,13 @@ public sealed partial class SymbolicEngine
                     int locals = inst.Operand.Span[0];
                     int args = inst.Operand.Span[1];
                     var frame = state.CurrentFrame;
+                    // Audit fix (engine M1): NeoVM rejects INITSLOT when slots already exist on the
+                    // frame, and rejects (locals==0 && args==0). We previously appended silently,
+                    // letting bytecode produce arbitrarily-large slot tables.
+                    if (locals == 0 && args == 0)
+                        throw new VmFaultException("INITSLOT with zero locals AND zero args");
+                    if (frame.Locals.Count > 0 || frame.Args.Count > 0)
+                        throw new VmFaultException("INITSLOT called twice — slots already initialized on this frame");
                     var popped = new SymbolicValue[args];
                     for (int i = 0; i < args; i++) popped[i] = state.Pop();
                     // NeoVM pops args in order so arg[0] was last pushed; restore positional order.

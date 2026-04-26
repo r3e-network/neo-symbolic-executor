@@ -37,9 +37,15 @@ public sealed partial class SymbolicEngine
             state.Terminate(TerminalStatus.Stopped, "MEMCPY with symbolic operands not yet supported");
             return Single(state);
         }
-        int c = (int)cn, s = (int)si, d = (int)di;
-        if (c < 0 || s < 0 || d < 0 || s + c > srcBytes.Length || d + c > dstBuf.Length)
+        // Audit fix (fuzzer-found): bound the BigInteger operands BEFORE casting to int.
+        // The prior `(int)cn` truncated huge values and `s + c > srcBytes.Length` overflowed
+        // into negative-territory, letting an out-of-range MEMCPY slip past the check and crash
+        // inside Span<T>.CopyTo with ArgumentOutOfRangeException.
+        if (cn < 0 || si < 0 || di < 0
+            || cn > srcBytes.Length || si > srcBytes.Length || di > dstBuf.Length
+            || si + cn > srcBytes.Length || di + cn > dstBuf.Length)
             throw new CatchableVmException("MEMCPY range out of bounds");
+        int c = (int)cn, s = (int)si, d = (int)di;
         for (int i = 0; i < c; i++)
             dstBuf.Cells[d + i] = Expr.Int(srcBytes[s + i]);
 
@@ -80,9 +86,12 @@ public sealed partial class SymbolicEngine
             state.Terminate(TerminalStatus.Stopped, "SUBSTR with symbolic operands not yet supported");
             return Single(state);
         }
-        int idx = (int)i, cnt = (int)c;
-        if (idx < 0 || cnt < 0 || idx + cnt > bytes.Length)
+        // Audit fix (fuzzer-found): bound BigInteger operands BEFORE casting. The prior `(int)i`
+        // truncated huge values and `idx + cnt > bytes.Length` overflowed, surfacing
+        // ArgumentOutOfRangeException out of Run() instead of a clean fault.
+        if (i < 0 || c < 0 || i > bytes.Length || c > bytes.Length || i + c > bytes.Length)
             throw new CatchableVmException("SUBSTR range out of bounds");
+        int idx = (int)i, cnt = (int)c;
         var slice = new byte[cnt];
         bytes.AsSpan(idx, cnt).CopyTo(slice);
         var buf = state.Heap.NewBuffer(slice);
@@ -101,9 +110,10 @@ public sealed partial class SymbolicEngine
             state.Terminate(TerminalStatus.Stopped, "LEFT with symbolic operands not yet supported");
             return Single(state);
         }
-        int cnt = (int)c;
-        if (cnt < 0 || cnt > bytes.Length)
+        // Audit fix (fuzzer-found, sibling of SUBSTR): bound BigInteger before casting to int.
+        if (c < 0 || c > bytes.Length)
             throw new CatchableVmException("LEFT count out of bounds");
+        int cnt = (int)c;
         var buf = state.Heap.NewBuffer(bytes.AsSpan(0, cnt).ToArray());
         state.Push(SymbolicValue.HeapRef(Sort.Buffer, buf.Id));
         state.Pc = inst.EndOffset;
@@ -120,9 +130,10 @@ public sealed partial class SymbolicEngine
             state.Terminate(TerminalStatus.Stopped, "RIGHT with symbolic operands not yet supported");
             return Single(state);
         }
-        int cnt = (int)c;
-        if (cnt < 0 || cnt > bytes.Length)
+        // Audit fix (fuzzer-found, sibling of SUBSTR): bound BigInteger before casting to int.
+        if (c < 0 || c > bytes.Length)
             throw new CatchableVmException("RIGHT count out of bounds");
+        int cnt = (int)c;
         var buf = state.Heap.NewBuffer(bytes.AsSpan(bytes.Length - cnt, cnt).ToArray());
         state.Push(SymbolicValue.HeapRef(Sort.Buffer, buf.Id));
         state.Pc = inst.EndOffset;

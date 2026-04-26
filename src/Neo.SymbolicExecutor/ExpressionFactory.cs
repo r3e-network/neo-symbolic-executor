@@ -259,8 +259,14 @@ public static class Expr
         if (a is NullConst && b is NullConst) return BoolConst.True;
         if ((a is NullConst) != (b is NullConst))
         {
-            // Null compared to non-null primitive is false; null compared to heap is also false.
-            return BoolConst.False;
+            // Audit fix (engine M4): only collapse to false when the non-null side is itself
+            // concrete (a constant or HeapRef). For symbolic operands we cannot prove the value
+            // is non-null at runtime, so emit a symbolic equality and let the path-condition
+            // solver decide. The prior code returned BoolConst.False unconditionally, hiding
+            // any branch that depends on a symbolic-null check.
+            var nonNull = a is NullConst ? b : a;
+            if (nonNull.IsConcrete || nonNull is HeapRef) return BoolConst.False;
+            return new BinaryExpr(Sort.Bool, "==", a, b);
         }
         if (a is HeapRef ah && b is HeapRef bh)
             return Bool(ah.RefSort == bh.RefSort && ah.ObjectId == bh.ObjectId);
@@ -333,6 +339,12 @@ public static class Expr
         var tb = Truthy(b);
         if (ta == false || tb == false) return BoolConst.False;
         if (ta == true && tb == true) return BoolConst.True;
+        // Audit fix (engine M3): when one side is concretely true, BoolAnd reduces to ToBool(other).
+        // Prior code kept a known-true operand inside the BinaryExpr, bloating path conditions and
+        // making the SMT layer enumerate redundant clauses. ToBool collapses the wrapped form when
+        // it can (else returns a tobool node, which is still smaller than `and(true, x)`).
+        if (ta == true) return ToBool(b);
+        if (tb == true) return ToBool(a);
         return new BinaryExpr(Sort.Bool, "and", a, b);
     }
 
@@ -342,6 +354,9 @@ public static class Expr
         var tb = Truthy(b);
         if (ta == true || tb == true) return BoolConst.True;
         if (ta == false && tb == false) return BoolConst.False;
+        // Audit fix (engine M3): when one side is concretely false, BoolOr reduces to ToBool(other).
+        if (ta == false) return ToBool(b);
+        if (tb == false) return ToBool(a);
         return new BinaryExpr(Sort.Bool, "or", a, b);
     }
 

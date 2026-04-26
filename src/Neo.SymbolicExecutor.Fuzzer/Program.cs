@@ -86,13 +86,33 @@ internal static class Program
         var target = opts.Targets[0];
         byte[] input = File.ReadAllBytes(opts.Reproduce!);
         Console.WriteLine($"Reproducing on target '{target.Name}' with {input.Length} bytes...");
-
-        // We don't have direct "run with bytes" — but the fuzz target consumes a seed.
-        // For now, the reproducer inspects the input file and prints its size.
-        // Future: have IFuzzTarget expose RunWithInput(byte[]).
         await Task.Yield();
-        Console.WriteLine("(Direct replay coming soon; the target's seed-driven generator is the canonical entry today.)");
-        return 0;
+
+        if (!target.SupportsDirectReplay)
+        {
+            Console.Error.WriteLine($"Target '{target.Name}' does not support direct-input replay.");
+            Console.Error.WriteLine("Try: --target decoder|nef|engine|engine-cov|engine-determinism — or use --seed instead.");
+            return 2;
+        }
+
+        try
+        {
+            bool ok = target.RunWithInput(input, out var reason);
+            if (ok)
+            {
+                Console.WriteLine($"NO REPRO: target accepted the input cleanly (reason='{reason ?? "<none>"}').");
+                return 0;
+            }
+            Console.WriteLine($"INVARIANT VIOLATION: {reason}");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CRASH: {ex.GetType().FullName}: {ex.Message}");
+            Console.WriteLine();
+            Console.WriteLine(ex.StackTrace);
+            return 1;
+        }
     }
 
     private static CliOpts ParseArgs(string[] args)
@@ -113,6 +133,14 @@ internal static class Program
             new ExpressionSimplifierTarget(),
             new RealNefTarget(),
             new StructureAwareMutationTarget(),
+            // Tier-2: oracle-rich targets — added 2026-04-27 after the first 320M-iter campaign
+            // surfaced zero new crashes, indicating prior oracles were too lenient.
+            new CoverageGuidedEngineTarget(),
+            new DeterminismOracleTarget(),
+            new CloneIsolationOracleTarget(),
+            new PipelineConsistencyTarget(),
+            new ReportRoundTripTarget(),
+            new HeapInvariantTarget(),
         };
         var byName = allTargets.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 
@@ -123,7 +151,10 @@ internal static class Program
         string corpus = Path.Combine(Environment.CurrentDirectory, "fuzz-corpus");
         bool stopOnFirst = false;
         TimeSpan statusInterval = TimeSpan.FromSeconds(10);
-        long maxMemoryMb = 4096;
+        // Audit-driven default: prior 4GB cap let the campaign accumulate ~1.5-1.9GB before the
+        // OOM killer hit a different process or the parent's RSS budget. Restart at 2GB GC-managed
+        // — the wrapper pulls fresh state, and we never see SIGKILL in practice.
+        long maxMemoryMb = 2048;
         string? reproduce = null;
         var selected = new List<IFuzzTarget>(allTargets);
 

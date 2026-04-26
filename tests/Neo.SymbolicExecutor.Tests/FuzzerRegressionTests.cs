@@ -90,6 +90,46 @@ public class FuzzerRegressionTests
     }
 
     [Fact]
+    public void Engine_SubstrLargeOperands_DoNotLeakArgumentOutOfRangeException()
+    {
+        // Bug surfaced 2026-04-27 by engine-seeded target: SUBSTR with two large positive int
+        // operands had `idx + cnt` overflow in the bounds check, letting Span<T>.AsSpan throw
+        // ArgumentOutOfRangeException out of Run(). Fix: bound BigInteger before casting to int.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSHDATA1, 0x02, 0xAA, 0xBB,   // src = 2 bytes
+            (byte)NeoVm.OpCode.PUSHINT32, 0x00, 0x00, 0x00, 0x40,  // index = 2^30
+            (byte)NeoVm.OpCode.PUSHINT32, 0x00, 0x00, 0x00, 0x40,  // count = 2^30 — sum overflows
+            (byte)NeoVm.OpCode.SUBSTR,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program).Run();
+        result.FinalStates.Should().NotBeEmpty();
+        result.FinalStates.All(s => s.Status != TerminalStatus.Running).Should().BeTrue();
+        result.FinalStates.All(s => s.Status == TerminalStatus.Faulted).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Engine_LeftLargeCount_DoesNotLeakArgumentOutOfRangeException()
+    {
+        // Companion to the SUBSTR bug: LEFT with count > Int32.MaxValue used to OverflowException
+        // out of Run() during the (int)c cast. Now bounds-check BigInteger first.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSHDATA1, 0x01, 0xAA,
+            (byte)NeoVm.OpCode.PUSHINT64,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F,   // Int64.MaxValue
+            (byte)NeoVm.OpCode.LEFT,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program).Run();
+        result.FinalStates.Should().NotBeEmpty();
+        result.FinalStates.All(s => s.Status != TerminalStatus.Running).Should().BeTrue();
+    }
+
+    [Fact]
     public void Engine_WorklistCap_BoundsPathExplosion()
     {
         // Bug: deeply-forking symbolic loops filled the worklist with millions of states before

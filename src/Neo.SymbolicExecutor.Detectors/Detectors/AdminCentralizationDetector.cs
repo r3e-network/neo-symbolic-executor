@@ -28,8 +28,12 @@ public sealed class AdminCentralizationDetector : BaseDetector
                 { hasSensitive = true; break; }
             if (!hasSensitive) continue;
 
-            int off = 0;
-            foreach (var v in state.Telemetry.WitnessChecksEnforced) { off = v; break; }
+            // Audit fix: WitnessChecksEnforced is a HashSet — `foreach { break; }` reads an
+            // unspecified element. Same telemetry can produce different finding offsets
+            // (and therefore different DedupeKeys) across runs. Pick the deterministic minimum.
+            int off = int.MaxValue;
+            foreach (var v in state.Telemetry.WitnessChecksEnforced) if (v < off) off = v;
+            if (off == int.MaxValue) off = 0;
             yield return MakeFinding(
                 title: "Privileged operation gated by a single witness",
                 description: $"State performs privileged operations gated by one CheckWitness at 0x{off:X4}. "

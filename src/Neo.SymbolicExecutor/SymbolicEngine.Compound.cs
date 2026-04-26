@@ -35,9 +35,11 @@ public sealed partial class SymbolicEngine
                 return NewSized(state, inst, kind: "struct");
             case NeoVm.OpCode.NEWARRAY_T:
                 {
-                    int typeByte = inst.Operand.Span[0]; // currently we ignore the per-cell type
-                    _ = typeByte;
-                    return NewSized(state, inst, kind: "array");
+                    // Audit fix (engine H5): NeoVM prefills cells with the type's default
+                    // (Boolean.False / Integer.Zero / ByteString.Empty / Null for everything
+                    // else). The prior `_ = typeByte` discarded the operand entirely, leaving
+                    // every cell as Null and breaking downstream ISTYPE/CONVERT branches.
+                    return NewSizedTyped(state, inst, (byte)inst.Operand.Span[0]);
                 }
 
             case NeoVm.OpCode.PACK:    return PackArrayOrStructOrMap(state, inst, mode: PackMode.Array);
@@ -90,6 +92,47 @@ public sealed partial class SymbolicEngine
                 return Single(state);
         }
     }
+
+    private IEnumerable<ExecutionState> NewSizedTyped(ExecutionState state, Instruction inst, byte typeByte)
+    {
+        // Validate the operand byte. NeoVM rejects undefined types with InvalidOperationException.
+        if (!IsValidArrayCellType(typeByte))
+            throw new VmFaultException($"NEWARRAY_T with invalid cell type 0x{typeByte:X2}");
+        var n = state.Pop();
+        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
+        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "NEWARRAY_T requires concrete size (no SMT model)"); return Single(state); }
+        if (sz < 0 || sz > _options.MaxCollectionSize)
+            throw new VmFaultException($"NEWARRAY_T size {sz} out of range");
+        var fill = new List<SymbolicValue>((int)sz.Value);
+        var defaultValue = DefaultForType(typeByte);
+        for (int i = 0; i < sz.Value; i++) fill.Add(defaultValue);
+        var arr = state.Heap.NewArray(fill);
+        state.Push(SymbolicValue.HeapRef(Sort.Array, arr.Id));
+        state.Pc = inst.EndOffset;
+        return Single(state);
+    }
+
+    private static bool IsValidArrayCellType(byte b) => b is
+        StackItemTypeCodes.Any or
+        StackItemTypeCodes.Boolean or
+        StackItemTypeCodes.Integer or
+        StackItemTypeCodes.ByteString or
+        StackItemTypeCodes.Buffer or
+        StackItemTypeCodes.Array or
+        StackItemTypeCodes.Struct or
+        StackItemTypeCodes.Map or
+        StackItemTypeCodes.Pointer or
+        StackItemTypeCodes.InteropInterface;
+
+    private static SymbolicValue DefaultForType(byte typeByte) => typeByte switch
+    {
+        StackItemTypeCodes.Boolean => SymbolicValue.Bool(false),
+        StackItemTypeCodes.Integer => SymbolicValue.Int(0),
+        StackItemTypeCodes.ByteString => SymbolicValue.Bytes(System.Array.Empty<byte>()),
+        // Reference types (Buffer/Array/Struct/Map/Pointer/InteropInterface) and Any: Null is the
+        // NeoVM default for "no concrete object yet".
+        _ => SymbolicValue.Null(),
+    };
 
     private IEnumerable<ExecutionState> NewSized(ExecutionState state, Instruction inst, string kind)
     {

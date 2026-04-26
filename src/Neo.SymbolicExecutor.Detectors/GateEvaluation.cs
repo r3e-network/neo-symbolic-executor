@@ -22,7 +22,11 @@ public sealed class GatePolicy
     {
         var violations = new List<string>();
 
-        if (FailOnMaxSeverity is Severity sev && profile.OverallMaxSeverity >= sev)
+        // Audit fix: a clean run (zero findings) returns OverallMaxSeverity = Info as a sentinel,
+        // which would falsely trip a `FailOnMaxSeverity = Info` gate. Skip the max-severity check
+        // when there are no findings — a no-finding run cannot exceed any severity threshold.
+        if (FailOnMaxSeverity is Severity sev && profile.TotalFindings > 0
+            && profile.OverallMaxSeverity >= sev)
             violations.Add($"max severity {profile.OverallMaxSeverity} >= threshold {sev}");
 
         if (FailOnTotalFindings is int totalCap && profile.TotalFindings >= totalCap)
