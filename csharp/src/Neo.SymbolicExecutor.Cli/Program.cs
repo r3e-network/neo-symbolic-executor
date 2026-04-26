@@ -82,7 +82,22 @@ internal static class Program
         if (opts.ManifestPath is not null)
             manifest = ContractManifest.FromFile(opts.ManifestPath);
 
-        var engine = new SymbolicEngine(program);
+        Smt.ISmtBackend? smtBackend = null;
+        if (opts.UseSmt)
+        {
+            var z3 = new Smt.Z3.Z3Backend(opts.SmtTimeoutMs, opts.SmtBytesBound);
+            if (!z3.IsAvailable)
+            {
+                Console.Error.WriteLine($"warning: --smt requested but Z3 is unavailable: {z3.Version}");
+                Console.Error.WriteLine("  install platform-appropriate libz3 or remove --smt");
+            }
+            else
+            {
+                smtBackend = z3;
+            }
+        }
+        var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
+        var engine = new SymbolicEngine(program, engineOptions);
         var execResult = engine.Run();
 
         var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
@@ -90,6 +105,8 @@ internal static class Program
         {
             States = execResult.FinalStates,
             Manifest = manifest,
+            SmtBackend = smtBackend,
+            DropUnsatFindings = opts.SmtDropUnsat,
         };
         var findings = detectorEngine.Run(ctx);
         var risk = RiskProfile.FromFindings(findings);
@@ -98,7 +115,9 @@ internal static class Program
             StatesExplored: execResult.StatesExplored,
             StepsExecuted: execResult.StepsExecuted,
             BudgetExceeded: execResult.BudgetExceeded,
-            BudgetReason: execResult.BudgetReason);
+            BudgetReason: execResult.BudgetReason,
+            SmtAvailable: smtBackend?.IsAvailable ?? false,
+            SmtEngaged: smtBackend?.IsAvailable ?? false);
         var report = new AnalysisReport(findings, risk, gate, meta);
 
         // Always emit the report before deciding on gate exit code so CI artifacts exist.
@@ -161,6 +180,12 @@ internal static class Program
               --format json|markdown                  Report format (default: markdown).
               --out <path>                            Write report to file (default: stdout).
 
+              # SMT (optional Z3 backend):
+              --smt                                   Engage Z3 for path pruning + finding validation.
+              --smt-timeout <ms>                      Per-query timeout (default 5000).
+              --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
+              --smt-drop-unsat                        Drop findings whose path conditions are UNSAT.
+
               # Gate flags:
               --fail-on-max-severity <sev>            sev in info|low|medium|high|critical
               --fail-on-total-findings <count>
@@ -180,6 +205,10 @@ internal sealed class AnalyzeOptions
     public string Format { get; init; } = "markdown";
     public string? OutputPath { get; init; }
     public required GatePolicy GatePolicy { get; init; }
+    public bool UseSmt { get; init; }
+    public int SmtTimeoutMs { get; init; } = 5000;
+    public int SmtBytesBound { get; init; } = 64;
+    public bool SmtDropUnsat { get; init; }
 
     public static AnalyzeOptions Parse(string[] args)
     {
@@ -195,6 +224,10 @@ internal sealed class AnalyzeOptions
         var sevCounts = new Dictionary<Severity, int>();
         var detSev = new Dictionary<string, Severity>();
         var minConf = new Dictionary<Severity, double>();
+        bool useSmt = false;
+        int smtTimeout = 5000;
+        int smtBytes = 64;
+        bool smtDrop = false;
 
         for (int i = 1; i < args.Length; i++)
         {
@@ -207,6 +240,10 @@ internal sealed class AnalyzeOptions
                 case "--manifest": manifest = Next(); break;
                 case "--format": format = Next(); break;
                 case "--out": outPath = Next(); break;
+                case "--smt": useSmt = true; break;
+                case "--smt-timeout": smtTimeout = int.Parse(Next()); break;
+                case "--smt-bytes-bound": smtBytes = int.Parse(Next()); break;
+                case "--smt-drop-unsat": smtDrop = true; break;
                 case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
                 case "--fail-on-total-findings": totalCap = int.Parse(Next()); break;
                 case "--fail-on-weighted-score": wsCap = int.Parse(Next()); break;
@@ -246,6 +283,10 @@ internal sealed class AnalyzeOptions
             ManifestPath = manifest,
             Format = format,
             OutputPath = outPath,
+            UseSmt = useSmt,
+            SmtTimeoutMs = smtTimeout,
+            SmtBytesBound = smtBytes,
+            SmtDropUnsat = smtDrop,
             GatePolicy = new GatePolicy
             {
                 FailOnMaxSeverity = maxSev,

@@ -31,6 +31,8 @@ public sealed class Telemetry
     public long GasCost { get; set; }
     public bool Truncated { get; set; }
     public bool ReentrancyGuard { get; set; }
+    public HashSet<int> SmtUnknownOffsets { get; } = new();
+    public int SmtPrunedBranches { get; set; }
 
     public Telemetry Clone()
     {
@@ -54,6 +56,8 @@ public sealed class Telemetry
         copy.GasCost = GasCost;
         copy.Truncated = Truncated;
         copy.ReentrancyGuard = ReentrancyGuard;
+        foreach (var off in SmtUnknownOffsets) copy.SmtUnknownOffsets.Add(off);
+        copy.SmtPrunedBranches = SmtPrunedBranches;
         return copy;
     }
 }

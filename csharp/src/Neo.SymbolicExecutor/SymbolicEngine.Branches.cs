@@ -21,6 +21,35 @@ public sealed partial class SymbolicEngine
             return Single(state);
         }
 
+        // Symbolic — consult the SMT backend (if any) to prune unreachable branches.
+        var takeExpr = jumpOnTrue ? cond.Expression : Expr.Not(cond.Expression);
+        var notTakeExpr = jumpOnTrue ? Expr.Not(cond.Expression) : cond.Expression;
+        var (takeSat, notTakeSat) = ConsultSmt(state, takeExpr);
+        if (takeSat == Smt.SmtOutcome.Unsat && notTakeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Terminate(TerminalStatus.Stopped, "both branches unsatisfiable");
+            return Single(state);
+        }
+        if (takeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Telemetry.SmtPrunedBranches++;
+            MarkConditionalEnforcement(state, cond, taken: !jumpOnTrue);
+            state.PathConditions = state.PathConditions.Add(notTakeExpr);
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
+        if (notTakeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Telemetry.SmtPrunedBranches++;
+            MarkConditionalEnforcement(state, cond, taken: jumpOnTrue);
+            state.PathConditions = state.PathConditions.Add(takeExpr);
+            if (inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            state.Pc = inst.Target;
+            return Single(state);
+        }
+        if (takeSat == Smt.SmtOutcome.Unknown || notTakeSat == Smt.SmtOutcome.Unknown)
+            state.Telemetry.SmtUnknownOffsets.Add(inst.Offset);
+
         // Symbolic — fork into both branches.
         var taken = state.Clone();
         var notTaken = state;
@@ -95,6 +124,32 @@ public sealed partial class SymbolicEngine
             return Single(state);
         }
 
+        var (takeSat, notTakeSat) = ConsultSmt(state, cond.Expression);
+        if (takeSat == Smt.SmtOutcome.Unsat && notTakeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Terminate(TerminalStatus.Stopped, "both branches unsatisfiable");
+            return Single(state);
+        }
+        if (takeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Telemetry.SmtPrunedBranches++;
+            MarkConditionalEnforcement(state, cond, taken: false);
+            state.PathConditions = state.PathConditions.Add(Expr.Not(cond.Expression));
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
+        if (notTakeSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Telemetry.SmtPrunedBranches++;
+            MarkConditionalEnforcement(state, cond, taken: true);
+            state.PathConditions = state.PathConditions.Add(cond.Expression);
+            if (inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            state.Pc = inst.Target;
+            return Single(state);
+        }
+        if (takeSat == Smt.SmtOutcome.Unknown || notTakeSat == Smt.SmtOutcome.Unknown)
+            state.Telemetry.SmtUnknownOffsets.Add(inst.Offset);
+
         var taken = state.Clone();
         var notTaken = state;
         MarkConditionalEnforcement(taken, cond, taken: true);
@@ -105,5 +160,20 @@ public sealed partial class SymbolicEngine
         taken.Pc = inst.Target;
         notTaken.Pc = inst.EndOffset;
         return new[] { taken, notTaken };
+    }
+
+    /// <summary>
+    /// Ask the SMT backend whether each branch is satisfiable under accumulated path conditions.
+    /// Returns (Unknown, Unknown) when no backend is configured. Soundness: UNKNOWN never causes
+    /// the engine to drop a fork — only UNSAT does.
+    /// </summary>
+    private (Smt.SmtOutcome Take, Smt.SmtOutcome NotTake) ConsultSmt(ExecutionState state, Expression branchCond)
+    {
+        var backend = _options.SmtBackend;
+        if (backend is null || !backend.IsAvailable)
+            return (Smt.SmtOutcome.Unknown, Smt.SmtOutcome.Unknown);
+        var take = backend.IsSatisfiable(state.PathConditions, branchCond);
+        var notTake = backend.IsSatisfiable(state.PathConditions, Expr.Not(branchCond));
+        return (take, notTake);
     }
 }

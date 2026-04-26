@@ -29,7 +29,52 @@ public sealed class DetectorEngine
             foreach (var f in detector.Analyze(context))
                 raw.Add(f);
         }
+        if (context.SmtBackend?.IsAvailable == true)
+            raw = ValidateWithSmt(raw, context).ToList();
         return Dedupe(raw);
+    }
+
+    /// <summary>
+    /// For each finding, locate the originating <see cref="ExecutionState"/> (best-effort by
+    /// offset matching) and ask the SMT backend whether its path conditions are satisfiable.
+    /// SAT -> mark <see cref="Finding.PathSatisfiable"/>=true.
+    /// UNSAT -> drop the finding (when DropUnsatFindings) or annotate.
+    /// UNKNOWN -> leave as null; report it through the confidence rationale.
+    /// </summary>
+    private static IEnumerable<Finding> ValidateWithSmt(IEnumerable<Finding> findings, AnalysisContext context)
+    {
+        var smt = context.SmtBackend!;
+        foreach (var f in findings)
+        {
+            // Heuristic: pick a state whose path includes the finding's offset.
+            var state = context.States.FirstOrDefault(s => s.Path.Contains(f.Offset))
+                        ?? context.States.FirstOrDefault();
+            if (state is null) { yield return f; continue; }
+            var conds = state.PathConditions.ToList();
+            var outcome = smt.IsSatisfiable(conds);
+            if (outcome == Smt.SmtOutcome.Sat)
+            {
+                yield return f with { PathSatisfiable = true };
+            }
+            else if (outcome == Smt.SmtOutcome.Unsat)
+            {
+                if (context.DropUnsatFindings) continue;
+                yield return f with
+                {
+                    PathSatisfiable = false,
+                    ConfidenceReason = f.ConfidenceReason + "; path UNSAT under SMT",
+                    Confidence = System.Math.Round(f.Confidence * 0.25, 3),
+                };
+            }
+            else
+            {
+                yield return f with
+                {
+                    PathSatisfiable = null,
+                    ConfidenceReason = f.ConfidenceReason + "; SMT returned UNKNOWN",
+                };
+            }
+        }
     }
 
     public static ImmutableArray<Finding> Dedupe(IEnumerable<Finding> findings)

@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
     <ProjectReference Include="..\Neo.SymbolicExecutor.Detectors\Neo.SymbolicExecutor.Detectors.csproj" />
+    <ProjectReference Include="..\Neo.SymbolicExecutor.Smt\Neo.SymbolicExecutor.Smt.csproj" />
   </ItemGroup>
 
 </Project>

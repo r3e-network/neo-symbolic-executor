@@ -22,6 +22,8 @@ public sealed class AnalysisContext
     public Nef.ContractManifest? Manifest { get; init; }
     public Nef.NefFile? Nef { get; init; }
     public NativeContractRegistry Natives { get; init; } = NativeContractRegistry.Default;
+    public Smt.ISmtBackend? SmtBackend { get; init; }
+    public bool DropUnsatFindings { get; init; }
 }
 
 public abstract class BaseDetector : IDetector

@@ -26,5 +26,12 @@ public sealed record ExecutionOptions
     /// </summary>
     public bool MarkTruncatedOnBudget { get; init; } = true;
 
+    /// <summary>
+    /// Optional SMT backend for solver-backed path pruning. When null, the engine falls back to
+    /// syntactic-only branch handling (constant folding via the simplifier). Enabled via
+    /// <c>--smt</c> on the CLI.
+    /// </summary>
+    public Smt.ISmtBackend? SmtBackend { get; init; }
+
     public static ExecutionOptions Default { get; } = new();
 }
