@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Neo.SymbolicExecutor.Detectors</RootNamespace>
+    <AssemblyName>Neo.SymbolicExecutor.Detectors</AssemblyName>
+    <PackageId>Neo.SymbolicExecutor.Detectors</PackageId>
+    <Version>$(NeoSymExecVersion)</Version>
+    <Description>Security detectors for Neo N3 smart contract symbolic execution.</Description>
+    <PackageTags>NEO;Security;Detectors;Static-Analysis</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
+  </ItemGroup>
+
+</Project>

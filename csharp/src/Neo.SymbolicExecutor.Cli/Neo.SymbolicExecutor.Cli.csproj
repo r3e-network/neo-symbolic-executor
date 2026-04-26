@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Neo.SymbolicExecutor.Cli</RootNamespace>
+    <AssemblyName>neo-sym</AssemblyName>
+    <PackageId>Neo.SymbolicExecutor.Cli</PackageId>
+    <Version>$(NeoSymExecVersion)</Version>
+    <Description>Command-line interface for the Neo symbolic executor.</Description>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>neo-sym</ToolCommandName>
+    <PackageTags>NEO;CLI;Security;Static-Analysis</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
+    <ProjectReference Include="..\Neo.SymbolicExecutor.Detectors\Neo.SymbolicExecutor.Detectors.csproj" />
+  </ItemGroup>
+
+</Project>

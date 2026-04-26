@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Neo.SymbolicExecutor</RootNamespace>
+    <AssemblyName>Neo.SymbolicExecutor</AssemblyName>
+    <PackageId>Neo.SymbolicExecutor</PackageId>
+    <Version>$(NeoSymExecVersion)</Version>
+    <Description>Symbolic execution engine for Neo N3 smart contracts.</Description>
+    <PackageTags>NEO;NeoVM;Symbolic-Execution;Static-Analysis;Security</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Neo.VM" Version="$(NeoCorePackageVersion)" />
+    <PackageReference Include="Neo.IO" Version="$(NeoCorePackageVersion)" />
+    <PackageReference Include="Neo.Json" Version="$(NeoCorePackageVersion)" />
+    <PackageReference Include="Neo.Extensions" Version="$(NeoCorePackageVersion)" />
+  </ItemGroup>
+
+</Project>

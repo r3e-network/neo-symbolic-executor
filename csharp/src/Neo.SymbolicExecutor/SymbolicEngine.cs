@@ -1,0 +1,147 @@
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Numerics;
+using NeoVm = Neo.VM;
+
+namespace Neo.SymbolicExecutor;
+
+/// <summary>
+/// The symbolic execution driver. Owns the worklist and runs Step() per state until terminal.
+///
+/// Design choices reflecting prior audit findings:
+///  - State cloning is deep (Heap.Clone, Telemetry.Clone, frame Clone). No shallow leaks.
+///  - Witness model is symbolic (audit HIGH-3): CheckWitness pushes a fresh symbolic Bool
+///    that the engine tracks for enforcement consistency on the consuming branch only.
+///  - PUSHA target uses the resolved Target field (audit CRIT-1): never falls back to the raw
+///    operand delta when target == 0.
+///  - Cross-type equality (audit HIGH-2) is handled in <see cref="Expr.Eq"/> via canonical bytes.
+///  - Unknown opcodes terminate the state explicitly rather than silently no-op (audit symbolic
+///    engine HIGH severity).
+///
+/// This file contains the core dispatch + the most common opcodes. Less-common opcodes
+/// (compound types, splice, advanced math) are layered in via partial classes.
+/// </summary>
+public sealed partial class SymbolicEngine
+{
+    private readonly NeoProgram _program;
+    private readonly ExecutionOptions _options;
+    private readonly List<ExecutionState> _finalStates = new();
+    private readonly Queue<ExecutionState> _worklist = new();
+    private int _statesExplored;
+    private int _stepsExecuted;
+    private bool _budgetExceeded;
+    private string? _budgetReason;
+
+    public SymbolicEngine(NeoProgram program, ExecutionOptions? options = null)
+    {
+        _program = program;
+        _options = options ?? ExecutionOptions.Default;
+    }
+
+    public ExecutionResult Run(ExecutionState? initial = null)
+    {
+        var start = initial ?? CreateInitialState();
+        _worklist.Enqueue(start);
+
+        while (_worklist.Count > 0)
+        {
+            if (_finalStates.Count >= _options.MaxPaths)
+            {
+                _budgetExceeded = true;
+                _budgetReason = "max paths reached";
+                while (_worklist.TryDequeue(out var leftover))
+                {
+                    leftover.Telemetry.Truncated = true;
+                    leftover.Terminate(TerminalStatus.Stopped, "budget: max paths reached");
+                    _finalStates.Add(leftover);
+                }
+                break;
+            }
+
+            var state = _worklist.Dequeue();
+            _statesExplored++;
+
+            if (state.Status != TerminalStatus.Running)
+            {
+                _finalStates.Add(state);
+                continue;
+            }
+
+            try
+            {
+                var produced = StepBounded(state);
+                foreach (var s in produced)
+                {
+                    if (s.Status == TerminalStatus.Running)
+                        _worklist.Enqueue(s);
+                    else
+                        _finalStates.Add(s);
+                }
+            }
+            catch (AnalysisBudgetException bex)
+            {
+                state.Telemetry.Truncated = true;
+                state.Terminate(TerminalStatus.Stopped, "budget: " + bex.Message);
+                _finalStates.Add(state);
+                _budgetExceeded = true;
+                _budgetReason ??= bex.Message;
+            }
+            catch (VmFaultException vex)
+            {
+                state.Terminate(TerminalStatus.Faulted, vex.Message);
+                _finalStates.Add(state);
+            }
+        }
+
+        return new ExecutionResult(
+            _finalStates.ToImmutableArray(),
+            _statesExplored,
+            _stepsExecuted,
+            _budgetExceeded,
+            _budgetReason);
+    }
+
+    private ExecutionState CreateInitialState()
+    {
+        var state = new ExecutionState();
+        state.CallStack.Add(new CallFrame(returnPc: -1));
+        state.Pc = 0;
+        return state;
+    }
+
+    private IEnumerable<ExecutionState> StepBounded(ExecutionState state)
+    {
+        if (state.Steps >= _options.MaxSteps)
+        {
+            state.Telemetry.Truncated = true;
+            state.Terminate(TerminalStatus.Stopped, "budget: max steps reached");
+            return new[] { state };
+        }
+        state.Steps++;
+        _stepsExecuted++;
+
+        if (state.EvaluationStack.Count > _options.MaxStackSize)
+            throw new VmFaultException("evaluation stack overflow");
+
+        if (!state.VisitCounts.TryGetValue(state.Pc, out int visits)) visits = 0;
+        if (visits >= _options.MaxVisitsPerOffset)
+        {
+            state.Telemetry.Truncated = true;
+            state.Telemetry.LoopsDetected.Add(state.Pc);
+            state.Terminate(TerminalStatus.Stopped, "budget: visit cap at offset");
+            return new[] { state };
+        }
+        state.VisitCounts[state.Pc] = visits + 1;
+        state.Path.Add(state.Pc);
+
+        var inst = _program.AtOffset(state.Pc);
+        if (inst is null)
+        {
+            state.Terminate(TerminalStatus.Faulted, $"PC at unaligned offset 0x{state.Pc:X4}");
+            return new[] { state };
+        }
+
+        return Dispatch(state, inst);
+    }
+}
