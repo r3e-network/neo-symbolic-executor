@@ -1,0 +1,102 @@
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Neo.SymbolicExecutor.Detectors.Detectors;
+
+/// <summary>
+/// External call before the last storage write — the classic checks-effects-interactions
+/// violation. Carries amplification scoring per audit Phase 9:
+/// - multiple external calls before state effects
+/// - dynamic target hash before state effects
+/// - dynamic or All call flags before state effects
+/// - deep internal call chain before state effects
+///
+/// Severity policy (audit Phase 12): downgrade from CRITICAL to HIGH only when witness checks
+/// are *enforced* (not merely invoked but unused / fail-open).
+///
+/// Suppression (audit C1 finding): `reentrancy_guard` wired by the engine when a contract
+/// implements a Get-then-Assert-then-Put lock pattern. We honor the flag here.
+///
+/// Precision: native-contract read-only methods (Ledger, StdLib, CryptoLib, etc.) do NOT
+/// constitute "external calls" for reentrancy purposes — these can't re-enter the caller's
+/// storage. We filter via <see cref="NativeContractRegistry"/>.
+/// </summary>
+public sealed class ReentrancyDetector : BaseDetector
+{
+    public override string Name => "reentrancy";
+    public override Severity DefaultSeverity => Severity.Critical;
+    public override double DefaultConfidence => 0.9;
+
+    public override IEnumerable<Finding> Analyze(AnalysisContext context)
+    {
+        foreach (var state in context.States)
+        {
+            if (state.Telemetry.ReentrancyGuard) continue;
+            var calls = state.Telemetry.ExternalCalls;
+            if (calls.Count == 0) continue;
+            var writes = state.Telemetry.StorageOps
+                .Where(o => o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete)
+                .ToList();
+            if (writes.Count == 0) continue;
+
+            int lastWriteOffset = writes.Max(w => w.Offset);
+            var preWriteCalls = calls
+                .Where(c => !IsBenignNativeCall(context, c))
+                .Where(c => c.Offset < lastWriteOffset)
+                .ToList();
+            if (preWriteCalls.Count == 0) continue;
+
+            var first = preWriteCalls.OrderBy(c => c.Offset).First();
+
+            // Amplification scoring.
+            int amp = 0;
+            if (preWriteCalls.Count > 1) amp++;
+            if (preWriteCalls.Any(c => c.TargetHashDynamic)) amp++;
+            if (preWriteCalls.Any(c => c.MethodDynamic)) amp++;
+            if (preWriteCalls.Any(c => c.CallFlagsDynamic || c.CallFlags == CallFlagsAll)) amp++;
+            if (state.Telemetry.MaxCallStackDepth >= 8) amp++;
+
+            // Severity policy.
+            bool authEnforced = state.Telemetry.WitnessChecksEnforced.Count > 0
+                                || state.Telemetry.CallerHashChecks.Count > 0
+                                || state.Telemetry.SignatureChecks.Count > 0;
+            Severity severity = amp switch
+            {
+                >= 1 => Severity.Critical,                                  // amplified -> always critical
+                _ => authEnforced ? Severity.High : Severity.Critical,      // unamplified: auth downgrades, otherwise critical
+            };
+
+            var tags = new List<string> { "checks-effects-interactions" };
+            if (preWriteCalls.Count > 1) tags.Add("multiple-pre-write-calls");
+            if (preWriteCalls.Any(c => c.TargetHashDynamic)) tags.Add("dynamic-target-pre-write");
+            if (preWriteCalls.Any(c => c.MethodDynamic)) tags.Add("dynamic-method-pre-write");
+            if (state.Telemetry.MaxCallStackDepth >= 8) tags.Add("deep-call-chain");
+
+            yield return MakeFinding(
+                title: "External call precedes state write",
+                description: $"External call at 0x{first.Offset:X4} ({first.Method}) executes before " +
+                             $"a storage write at 0x{lastWriteOffset:X4}. A re-entrant callback could " +
+                             $"observe inconsistent state. Amplification factors: {amp}. " +
+                             $"Authorization enforced: {authEnforced}.",
+                offset: first.Offset,
+                severity: severity,
+                state: state,
+                tags: tags);
+        }
+    }
+
+    private static bool IsBenignNativeCall(AnalysisContext context, ExternalCall call)
+    {
+        // If the target hash is concrete and matches a known native, and the method is concrete and
+        // appears in the read-only list, it can't re-enter. Otherwise treat as suspect.
+        var hash = call.TargetHash?.AsConcreteBytes();
+        if (hash is null) return false;
+        string hex = System.Convert.ToHexString(hash).ToLowerInvariant();
+        var native = context.Natives.ByHash(hex);
+        if (native is null) return false;
+        return native.ReadOnlyMethods.Contains(call.Method, System.StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>CallFlags.All bitmask per Neo N3.</summary>
+    private const int CallFlagsAll = 0x0F;
+}
