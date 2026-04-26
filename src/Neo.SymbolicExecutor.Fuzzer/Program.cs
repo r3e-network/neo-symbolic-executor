@@ -110,6 +110,7 @@ internal static class Program
             new PipelineTarget(),
             new ReportGeneratorTarget(),
             new ExpressionSimplifierTarget(),
+            new RealNefTarget(),
         };
         var byName = allTargets.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 

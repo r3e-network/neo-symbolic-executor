@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using Neo.SymbolicExecutor;
@@ -145,7 +146,9 @@ internal static class Program
         if (path.EndsWith(".nef", StringComparison.OrdinalIgnoreCase))
         {
             var nef = NefFile.Parse(bytes, verifyChecksum: true);
-            return ScriptDecoder.Decode(nef.Script);
+            // Wire MethodToken[] through to the engine so CALLT can pop the right number of
+            // parameters and report a concrete target hash (audit M1 fix).
+            return ScriptDecoder.Decode(nef.Script).WithTokens(nef.Tokens.ToImmutableArray());
         }
         return ScriptDecoder.Decode(bytes);
     }

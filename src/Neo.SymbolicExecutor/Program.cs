@@ -6,7 +6,8 @@ using NeoVm = Neo.VM;
 namespace Neo.SymbolicExecutor;
 
 /// <summary>
-/// A decoded NeoVM script: original bytes, indexed instructions, resolved jump targets.
+/// A decoded NeoVM script: original bytes, indexed instructions, resolved jump targets,
+/// and (when loaded from a NEF) the contract's CALLT method tokens.
 /// </summary>
 public sealed class NeoProgram
 {
@@ -14,15 +15,27 @@ public sealed class NeoProgram
     public ImmutableArray<Instruction> Instructions { get; }
     public ImmutableDictionary<int, int> OffsetToIndex { get; }
 
+    /// <summary>
+    /// Method tokens declared in the source NEF for CALLT dispatch. May be null when the
+    /// program was decoded from raw bytes only — in that case the engine treats CALLT
+    /// metadata as fully dynamic (audit M1).
+    /// </summary>
+    public ImmutableArray<Nef.MethodToken> Tokens { get; }
+
     public NeoProgram(
         ReadOnlyMemory<byte> bytes,
         ImmutableArray<Instruction> instructions,
-        ImmutableDictionary<int, int> offsetToIndex)
+        ImmutableDictionary<int, int> offsetToIndex,
+        ImmutableArray<Nef.MethodToken> tokens = default)
     {
         Bytes = bytes;
         Instructions = instructions;
         OffsetToIndex = offsetToIndex;
+        Tokens = tokens.IsDefault ? ImmutableArray<Nef.MethodToken>.Empty : tokens;
     }
+
+    public NeoProgram WithTokens(ImmutableArray<Nef.MethodToken> tokens) =>
+        new(Bytes, Instructions, OffsetToIndex, tokens);
 
     public Instruction? AtOffset(int offset) =>
         OffsetToIndex.TryGetValue(offset, out int idx) ? Instructions[idx] : null;

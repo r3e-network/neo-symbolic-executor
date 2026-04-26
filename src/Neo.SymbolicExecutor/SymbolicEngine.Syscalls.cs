@@ -251,18 +251,46 @@ public sealed partial class SymbolicEngine
 
     private IEnumerable<ExecutionState> HandleCallToken(ExecutionState state, Instruction inst)
     {
-        // CALLT operand: 2-byte token index. Without a NEF parser hooked in here yet,
-        // we record an external call with dynamic metadata and push a return symbol.
+        // CALLT operand: 2-byte token index into the NEF's MethodToken[]. Audit M1 fix:
+        // when the program carries token metadata, pop the declared parameter count and only
+        // push a return value if the token has one. Without metadata we fall back to dynamic
+        // and pop nothing (engine continues; the unchecked-return / dynamic-call detectors
+        // surface the limitation).
+        ushort idx = inst.Operand.Length >= 2
+            ? System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(inst.Operand.Span)
+            : (ushort)0;
+
+        Nef.MethodToken? token = null;
+        if (idx < _program.Tokens.Length) token = _program.Tokens[idx];
+
         var ext = new ExternalCall
         {
             Offset = inst.Offset,
-            Method = "<callt>",
-            TargetHashDynamic = true,
-            MethodDynamic = true,
-            HasReturnValue = true,
+            Method = token?.Method ?? $"<callt#{idx}>",
+            TargetHash = token is not null
+                ? SymbolicValue.Bytes(token.Hash)
+                : null,
+            TargetHashDynamic = token is null,
+            MethodDynamic = token is null,
+            CallFlags = token?.CallFlags ?? 0,
+            CallFlagsDynamic = token is null,
+            HasReturnValue = token?.HasReturnValue ?? true,
         };
+
+        // Pop the declared parameter count; record them on the call for taint analysis.
+        if (token is not null)
+        {
+            for (int i = 0; i < token.ParametersCount; i++)
+            {
+                if (state.EvaluationStack.Count == 0)
+                    throw new VmFaultException($"CALLT to {token.Method}: stack underflow on parameter {i}");
+                ext.Args.Add(state.Pop());
+            }
+        }
+
         state.Telemetry.ExternalCalls.Add(ext);
-        state.Push(SymbolicValue.Symbol(Sort.Unknown, $"callt_ret_{inst.Offset}"));
+        if (ext.HasReturnValue)
+            state.Push(SymbolicValue.Symbol(Sort.Unknown, $"ext_ret_{inst.Offset}"));
         state.Pc = inst.EndOffset;
         return Single(state);
     }
