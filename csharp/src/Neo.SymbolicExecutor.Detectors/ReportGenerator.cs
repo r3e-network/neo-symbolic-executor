@@ -121,6 +121,16 @@ public static class ReportGenerator
                 sb.AppendLine($"- **Tags:** {string.Join(", ", f.Tags.OrderBy(t => t).Select(t => $"`{t}`"))}");
             sb.AppendLine();
             sb.AppendLine(f.Description);
+            if (f.Witness is { Count: > 0 } w)
+            {
+                sb.AppendLine();
+                sb.AppendLine("**Reproducer (concrete witness):**");
+                sb.AppendLine();
+                sb.AppendLine("| Symbol | Concrete value |");
+                sb.AppendLine("|---|---|");
+                foreach (var (k, v) in w.OrderBy(kv => kv.Key))
+                    sb.AppendLine($"| `{k}` | `{FormatWitnessValue(v)}` |");
+            }
         }
         return sb.ToString();
     }
@@ -194,6 +204,13 @@ public static class ReportGenerator
         {
             var tags = new JsonArray();
             foreach (var t in f.Tags.OrderBy(t => t)) tags.Add(t);
+            JsonObject? witness = null;
+            if (f.Witness is { Count: > 0 } w)
+            {
+                witness = new JsonObject();
+                foreach (var (k, v) in w.OrderBy(kv => kv.Key))
+                    witness[k] = FormatWitnessValue(v);
+            }
             arr.Add(new JsonObject
             {
                 ["detector"] = f.Detector,
@@ -205,8 +222,18 @@ public static class ReportGenerator
                 ["confidence_reason"] = f.ConfidenceReason,
                 ["tags"] = tags,
                 ["path_satisfiable"] = f.PathSatisfiable,
+                ["witness"] = witness,
             });
         }
         return arr;
     }
+
+    private static string FormatWitnessValue(object v) => v switch
+    {
+        System.Numerics.BigInteger bi => bi.ToString(),
+        bool b => b ? "true" : "false",
+        long l => l.ToString(),
+        byte[] bytes => "0x" + System.Convert.ToHexString(bytes),
+        _ => v?.ToString() ?? "<null>",
+    };
 }

@@ -37,9 +37,12 @@ public sealed class DetectorEngine
     /// <summary>
     /// For each finding, locate the originating <see cref="ExecutionState"/> (best-effort by
     /// offset matching) and ask the SMT backend whether its path conditions are satisfiable.
-    /// SAT -> mark <see cref="Finding.PathSatisfiable"/>=true.
-    /// UNSAT -> drop the finding (when DropUnsatFindings) or annotate.
-    /// UNKNOWN -> leave as null; report it through the confidence rationale.
+    /// SAT -> mark <see cref="Finding.PathSatisfiable"/>=true and attach a concrete witness.
+    /// UNSAT -> drop the finding (when DropUnsatFindings) or annotate with a confidence penalty.
+    /// UNKNOWN -> leave as null; report through the confidence rationale.
+    ///
+    /// Phase 4 of the SMT plan: a SAT witness attached to each finding is the reproducer the
+    /// user can replay. This is what raises the tool above static-only competitors.
     /// </summary>
     private static IEnumerable<Finding> ValidateWithSmt(IEnumerable<Finding> findings, AnalysisContext context)
     {
@@ -54,7 +57,8 @@ public sealed class DetectorEngine
             var outcome = smt.IsSatisfiable(conds);
             if (outcome == Smt.SmtOutcome.Sat)
             {
-                yield return f with { PathSatisfiable = true };
+                var witness = smt.BuildWitness(conds);
+                yield return f with { PathSatisfiable = true, Witness = witness };
             }
             else if (outcome == Smt.SmtOutcome.Unsat)
             {

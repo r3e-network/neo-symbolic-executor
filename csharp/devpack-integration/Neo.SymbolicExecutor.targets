@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Post-build target that runs neo-sym analyze against each compiled .nef artifact
+    produced by the Neo C# compiler.
+
+    The Neo C# compiler emits files like `bin/sc/<ContractName>.nef` and
+    `bin/sc/<ContractName>.manifest.json` next to the output assembly. We discover
+    .nef files in the contract output, then call neo-sym for each one with the
+    sibling manifest sidecar.
+  -->
+
+  <Target Name="NeoSymAnalyze"
+          AfterTargets="Build"
+          Condition="'$(NeoSymEnabled)' == 'true'">
+    <ItemGroup>
+      <_NeoSymNefFile Include="$(OutputPath)sc/*.nef" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(NeoSymOutputDir)" Condition="'@(_NeoSymNefFile)' != ''" />
+
+    <Message Importance="High" Text="neo-sym: analyzing %(NefFile.Filename)%(NefFile.Extension)"
+             Condition="'@(_NeoSymNefFile)' != ''" />
+
+    <PropertyGroup>
+      <_NeoSymExtension Condition="'$(NeoSymFormat)' == 'json'">.json</_NeoSymExtension>
+      <_NeoSymExtension Condition="'$(NeoSymFormat)' != 'json'">.md</_NeoSymExtension>
+      <_NeoSymSmtFlag Condition="'$(NeoSymUseSmt)' == 'true'"> --smt</_NeoSymSmtFlag>
+      <_NeoSymGateFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateFlag>
+    </PropertyGroup>
+
+    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSmtFlag)$(_NeoSymGateFlag)"
+          ContinueOnError="false"
+          Condition="'@(_NeoSymNefFile)' != ''"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

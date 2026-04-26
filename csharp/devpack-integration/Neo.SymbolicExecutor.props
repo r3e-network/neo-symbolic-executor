@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    Neo.SymbolicExecutor MSBuild integration for Neo DevPack contracts.
+
+    To opt in, add this file as <Import> in your contract's csproj OR
+    drop it into the same directory as a Directory.Build.props sibling.
+
+    Behavior:
+      - After the contract project builds, runs `neo-sym analyze <output.nef> ...`
+      - Honors gate flags (NeoSymFailOn*) to break the build on policy violations.
+      - Disable with <NeoSymEnabled>false</NeoSymEnabled>.
+  -->
+
+  <PropertyGroup>
+    <NeoSymEnabled Condition="'$(NeoSymEnabled)' == ''">true</NeoSymEnabled>
+    <NeoSymToolPath Condition="'$(NeoSymToolPath)' == ''">neo-sym</NeoSymToolPath>
+    <NeoSymFormat Condition="'$(NeoSymFormat)' == ''">markdown</NeoSymFormat>
+    <NeoSymOutputDir Condition="'$(NeoSymOutputDir)' == ''">$(OutputPath)neo-sym/</NeoSymOutputDir>
+    <NeoSymFailOnMaxSeverity Condition="'$(NeoSymFailOnMaxSeverity)' == ''">high</NeoSymFailOnMaxSeverity>
+    <NeoSymUseSmt Condition="'$(NeoSymUseSmt)' == ''">false</NeoSymUseSmt>
+  </PropertyGroup>
+</Project>
