@@ -33,6 +33,7 @@ public sealed class Telemetry
     public bool ReentrancyGuard { get; set; }
     public HashSet<int> SmtUnknownOffsets { get; } = new();
     public int SmtPrunedBranches { get; set; }
+    public int SmtConcretizations { get; set; }
 
     public Telemetry Clone()
     {
@@ -58,6 +59,7 @@ public sealed class Telemetry
         copy.ReentrancyGuard = ReentrancyGuard;
         foreach (var off in SmtUnknownOffsets) copy.SmtUnknownOffsets.Add(off);
         copy.SmtPrunedBranches = SmtPrunedBranches;
+        copy.SmtConcretizations = SmtConcretizations;
         return copy;
     }
 }

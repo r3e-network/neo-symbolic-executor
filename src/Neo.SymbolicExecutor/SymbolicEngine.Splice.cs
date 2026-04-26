@@ -9,8 +9,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleNewBuffer(ExecutionState state, Instruction inst)
     {
         var n = state.Pop();
-        var sz = n.AsConcreteInt();
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "NEWBUFFER requires concrete size"); return Single(state); }
+        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxItemSize);
+        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "NEWBUFFER requires concrete size (no SMT model)"); return Single(state); }
+        if (sz < 0 || sz > _options.MaxItemSize)
+            throw new VmFaultException($"NEWBUFFER size {sz} out of range");
         var buf = state.Heap.NewBuffer((int)sz.Value);
         state.Push(SymbolicValue.HeapRef(Sort.Buffer, buf.Id));
         state.Pc = inst.EndOffset;

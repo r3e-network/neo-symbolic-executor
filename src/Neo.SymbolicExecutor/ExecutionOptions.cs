@@ -33,5 +33,12 @@ public sealed record ExecutionOptions
     /// </summary>
     public Smt.ISmtBackend? SmtBackend { get; init; }
 
+    /// <summary>
+    /// Per-state cap on SMT concretizations of symbolic operands (PICK/ROLL/CALLA/NEWARRAY).
+    /// Each concretization adds an `expr == value` constraint, which can fork the path space
+    /// quickly; this cap prevents runaway exploration. 0 disables concretization entirely.
+    /// </summary>
+    public int MaxConcretizations { get; init; } = 8;
+
     public static ExecutionOptions Default { get; } = new();
 }

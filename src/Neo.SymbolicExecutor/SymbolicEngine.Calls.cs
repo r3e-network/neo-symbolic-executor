@@ -21,13 +21,15 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleCallA(ExecutionState state, Instruction inst)
     {
         var ptr = state.Pop();
-        var concreteTarget = ptr.AsConcreteInt();
+        var concreteTarget = TryConcretizeIndex(state, ptr,
+            lo: 0, hi: System.Math.Max(0, _program.Bytes.Length - 1));
         if (concreteTarget is null)
         {
-            // Symbolic CALLA: stop with a clear reason; SMT layer can later concretize.
-            state.Terminate(TerminalStatus.Stopped, "CALLA requires concrete target");
+            state.Terminate(TerminalStatus.Stopped, "CALLA requires concrete target (no SMT model)");
             return Single(state);
         }
+        if (concreteTarget.Value < 0 || concreteTarget.Value > int.MaxValue)
+            throw new VmFaultException($"CALLA target {concreteTarget.Value} out of Int32 range");
         if (state.CallStack.Count >= _options.MaxInvocationStackDepth)
             throw new VmFaultException("invocation stack overflow (CALLA)");
         var frame = new CallFrame(returnPc: inst.EndOffset);
@@ -95,8 +97,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleXDrop(ExecutionState state, Instruction inst)
     {
         var n = state.Pop();
-        var idx = n.AsConcreteInt();
-        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "XDROP requires concrete count"); return Single(state); }
+        var idx = TryConcretizeIndex(state, n, lo: 0, hi: state.EvaluationStack.Count);
+        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "XDROP requires concrete count (no SMT model)"); return Single(state); }
+        if (idx.Value < 0 || idx.Value > int.MaxValue)
+            throw new VmFaultException($"XDROP index {idx.Value} out of Int32 range");
         int i = (int)idx.Value;
         if (i < 0 || i >= state.EvaluationStack.Count)
             throw new VmFaultException($"XDROP index {i} out of range");
@@ -108,8 +112,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandlePick(ExecutionState state, Instruction inst)
     {
         var n = state.Pop();
-        var idx = n.AsConcreteInt();
-        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "PICK requires concrete count"); return Single(state); }
+        var idx = TryConcretizeIndex(state, n, lo: 0, hi: state.EvaluationStack.Count - 1);
+        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "PICK requires concrete count (no SMT model)"); return Single(state); }
+        if (idx.Value < 0 || idx.Value > int.MaxValue)
+            throw new VmFaultException($"PICK index {idx.Value} out of Int32 range");
         state.Push(state.Peek((int)idx.Value));
         state.Pc = inst.EndOffset;
         return Single(state);
@@ -118,8 +124,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleRoll(ExecutionState state, Instruction inst)
     {
         var n = state.Pop();
-        var idx = n.AsConcreteInt();
-        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "ROLL requires concrete count"); return Single(state); }
+        var idx = TryConcretizeIndex(state, n, lo: 0, hi: state.EvaluationStack.Count - 1);
+        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "ROLL requires concrete count (no SMT model)"); return Single(state); }
+        if (idx.Value < 0 || idx.Value > int.MaxValue)
+            throw new VmFaultException($"ROLL index {idx.Value} out of Int32 range");
         int i = (int)idx.Value;
         if (i < 0 || i >= state.EvaluationStack.Count)
             throw new VmFaultException($"ROLL index {i} out of range");
@@ -133,8 +141,10 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleReverseN(ExecutionState state, Instruction inst)
     {
         var n = state.Pop();
-        var idx = n.AsConcreteInt();
-        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "REVERSEN requires concrete count"); return Single(state); }
+        var idx = TryConcretizeIndex(state, n, lo: 0, hi: state.EvaluationStack.Count);
+        if (idx is null) { state.Terminate(TerminalStatus.Stopped, "REVERSEN requires concrete count (no SMT model)"); return Single(state); }
+        if (idx.Value < 0 || idx.Value > int.MaxValue)
+            throw new VmFaultException($"REVERSEN count {idx.Value} out of Int32 range");
         int count = (int)idx.Value;
         if (count > 1) ReverseTopN(state, count);
         state.Pc = inst.EndOffset;

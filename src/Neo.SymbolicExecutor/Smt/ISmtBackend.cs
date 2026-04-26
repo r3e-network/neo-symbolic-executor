@@ -39,6 +39,19 @@ public interface ISmtBackend
     /// </summary>
     IReadOnlyDictionary<string, object>? BuildWitness(IReadOnlyList<Expression> conditions);
 
+    /// <summary>
+    /// Phase 5 of the SMT integration plan: concretization. Find one concrete BigInteger value
+    /// for <paramref name="target"/> consistent with <paramref name="conditions"/>, optionally
+    /// bounded by [<paramref name="lo"/>, <paramref name="hi"/>] inclusive. Used by the engine
+    /// when an opcode needs a concrete index but receives a symbolic one (PICK/ROLL/CALLA/NEWARRAY).
+    /// Returns null on UNSAT or UNKNOWN.
+    /// </summary>
+    System.Numerics.BigInteger? ConcretizeInt(
+        IReadOnlyList<Expression> conditions,
+        Expression target,
+        System.Numerics.BigInteger? lo = null,
+        System.Numerics.BigInteger? hi = null);
+
     /// <summary>Diagnostics: query count, cache hits, unknowns. Surfaced in JSON reports.</summary>
     SmtStats GetStats();
 }

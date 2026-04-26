@@ -94,9 +94,9 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> NewSized(ExecutionState state, Instruction inst, string kind)
     {
         var n = state.Pop();
-        var sz = n.AsConcreteInt();
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, $"NEW{kind.ToUpper()} requires concrete size"); return Single(state); }
-        if (sz.Value < 0 || sz.Value > _options.MaxCollectionSize)
+        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
+        if (sz is null) { state.Terminate(TerminalStatus.Stopped, $"NEW{kind.ToUpper()} requires concrete size (no SMT model)"); return Single(state); }
+        if (sz < 0 || sz > _options.MaxCollectionSize)
             throw new VmFaultException($"NEW{kind.ToUpper()} size {sz} out of range");
         var fill = Enumerable.Repeat(SymbolicValue.Null(), (int)sz.Value);
         if (kind == "array")
@@ -118,10 +118,11 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> PackArrayOrStructOrMap(ExecutionState state, Instruction inst, PackMode mode)
     {
         var n = state.Pop();
-        var sz = n.AsConcreteInt();
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "PACK requires concrete size"); return Single(state); }
+        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
+        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "PACK requires concrete size (no SMT model)"); return Single(state); }
+        if (sz < 0 || sz > _options.MaxCollectionSize)
+            throw new VmFaultException($"PACK size {sz} out of range");
         int count = (int)sz.Value;
-        if (count < 0) throw new VmFaultException("PACK negative size");
         state.Heap.EnforceCollectionGrowth(count);
         switch (mode)
         {

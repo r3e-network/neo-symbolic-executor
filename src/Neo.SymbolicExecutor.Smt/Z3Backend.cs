@@ -124,6 +124,44 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         }
     }
 
+    public BigInteger? ConcretizeInt(
+        IReadOnlyList<Expression> conditions,
+        Expression target,
+        BigInteger? lo = null,
+        BigInteger? hi = null)
+    {
+        if (!IsAvailable) return null;
+        var translator = new Translator(_ctx);
+        var solver = _ctx.MkSolver();
+        var p = _ctx.MkParams();
+        p.Add("timeout", (uint)_timeoutMs);
+        solver.Parameters = p;
+        try
+        {
+            foreach (var c in conditions)
+                solver.Assert(translator.TranslateBool(c));
+            var bv = translator.TranslateInt(target);
+            if (lo.HasValue)
+                solver.Assert(_ctx.MkBVSGE(bv, _ctx.MkBV(lo.Value.ToString(), IntegerBits)));
+            if (hi.HasValue)
+                solver.Assert(_ctx.MkBVSLE(bv, _ctx.MkBV(hi.Value.ToString(), IntegerBits)));
+            _queries++;
+            if (solver.Check() != Status.SATISFIABLE)
+            {
+                _unknowns++;
+                return null;
+            }
+            _sat++;
+            var ev = solver.Model.Evaluate(bv, completion: true);
+            return ev is BitVecNum bn ? ToSignedBigInteger(bn) : null;
+        }
+        catch (Z3Exception)
+        {
+            _unknowns++;
+            return null;
+        }
+    }
+
     public IReadOnlyDictionary<string, object>? BuildWitness(IReadOnlyList<Expression> conditions)
     {
         if (!IsAvailable) return null;
