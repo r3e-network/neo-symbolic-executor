@@ -48,14 +48,17 @@ public sealed partial class SymbolicEngine
         {
             if (_finalStates.Count >= _options.MaxPaths)
             {
-                _budgetExceeded = true;
-                _budgetReason = "max paths reached";
-                while (_worklist.TryDequeue(out var leftover))
-                {
-                    leftover.Telemetry.Truncated = true;
-                    leftover.Terminate(TerminalStatus.Stopped, "budget: max paths reached");
-                    _finalStates.Add(leftover);
-                }
+                DrainWorklist("max paths reached");
+                break;
+            }
+
+            // Worklist cap: deeply-forking symbolic loops can fill the worklist with millions
+            // of states before any of them terminates (and thus before MaxPaths fires). When the
+            // worklist itself blows past its budget, drain it. Without this, path-explosion
+            // attacks would burn unbounded CPU before the engine returns.
+            if (_options.MaxQueuedStates > 0 && _worklist.Count >= _options.MaxQueuedStates)
+            {
+                DrainWorklist("max queued states reached");
                 break;
             }
 
@@ -121,6 +124,18 @@ public sealed partial class SymbolicEngine
             _stepsExecuted,
             _budgetExceeded,
             _budgetReason);
+    }
+
+    private void DrainWorklist(string reason)
+    {
+        _budgetExceeded = true;
+        _budgetReason = reason;
+        while (_worklist.TryDequeue(out var leftover))
+        {
+            leftover.Telemetry.Truncated = true;
+            leftover.Terminate(TerminalStatus.Stopped, "budget: " + reason);
+            _finalStates.Add(leftover);
+        }
     }
 
     private ExecutionState CreateInitialState()

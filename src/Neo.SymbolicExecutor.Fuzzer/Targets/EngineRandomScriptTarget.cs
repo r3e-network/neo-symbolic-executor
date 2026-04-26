@@ -14,6 +14,17 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
     public string Name => "engine";
     public Type[] ExpectedExceptions => Type.EmptyTypes; // engine.Run should swallow everything
 
+    private readonly ExecutionOptions _engineOptions = new()
+    {
+        MaxSteps = 2_000,
+        MaxPaths = 32,
+        MaxStackSize = 128,
+        MaxInvocationStackDepth = 64,
+        MaxItemSize = 64 * 1024,
+        MaxCollectionSize = 256,
+        MaxQueuedStates = 256,
+    };
+
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
     {
         var rng = new Random(seed);
@@ -25,16 +36,7 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
         try { program = ScriptDecoder.Decode(bytes); }
         catch (VmFaultException) { return true; } // decode failure is fine
 
-        var engine = new SymbolicEngine(program, new ExecutionOptions
-        {
-            MaxSteps = 2_000,
-            MaxPaths = 32,
-            MaxStackSize = 128,
-            MaxInvocationStackDepth = 64,
-            MaxItemSize = 64 * 1024,
-            MaxCollectionSize = 256,
-        });
-
+        var engine = new SymbolicEngine(program, _engineOptions);
         var result = engine.Run();
 
         // Property 1: every final state has a terminal status.
@@ -43,10 +45,13 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
             reason = "engine produced a state with status=Running after Run() returned";
             return false;
         }
-        // Property 2: bounded resource use vs the budget.
-        if (result.StepsExecuted > 2_000 * Math.Max(1, result.StatesExplored) + 1_000)
+        // Property: bounded total work. The engine has MaxSteps per state and a worklist cap;
+        // in the worst case it processes every queued state once. Allow generous headroom.
+        long maxAllowed = (long)_engineOptions.MaxSteps * Math.Max(1, _engineOptions.MaxQueuedStates) + 10_000;
+        if (result.StepsExecuted > maxAllowed)
         {
-            reason = $"step count {result.StepsExecuted} exceeds budget envelope";
+            reason = $"step count {result.StepsExecuted} > allowed {maxAllowed} " +
+                     $"(MaxSteps={_engineOptions.MaxSteps}, MaxQueuedStates={_engineOptions.MaxQueuedStates})";
             return false;
         }
         return true;

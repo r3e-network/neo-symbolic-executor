@@ -21,6 +21,13 @@ public sealed record ExecutionOptions
     public int MaxPowExponent { get; init; } = 256;
 
     /// <summary>
+    /// Cap on worklist size. Without this, deeply-forking symbolic loops can drive worklist
+    /// occupancy into the millions before any path terminates (and thus before MaxPaths fires).
+    /// When the cap is reached, queued states are drained as Stopped (Truncated). 0 disables.
+    /// </summary>
+    public int MaxQueuedStates { get; init; } = 4_096;
+
+    /// <summary>
     /// When the analysis budget is exceeded, mark the state truncated and emit it as a stopped
     /// terminal rather than discarding it. Detectors should respect <see cref="Telemetry.Truncated"/>.
     /// </summary>

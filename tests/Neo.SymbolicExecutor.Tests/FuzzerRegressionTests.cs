@@ -88,4 +88,30 @@ public class FuzzerRegressionTests
         result.FinalStates.Should().NotBeEmpty();
         result.FinalStates.All(s => s.Status != TerminalStatus.Running).Should().BeTrue();
     }
+
+    [Fact]
+    public void Engine_WorklistCap_BoundsPathExplosion()
+    {
+        // Bug: deeply-forking symbolic loops filled the worklist with millions of states before
+        // any of them terminated, so MaxPaths (which counts FINAL states) didn't fire until
+        // very late. Fix: MaxQueuedStates caps the worklist and triggers a drain.
+        // Repro from fuzz seed 575437178: a script with two backward JMPIF loops.
+        byte[] script =
+        {
+            0x18, 0x99, 0x0F, 0x0F, 0x4B, 0xAA, 0x9B, 0x24, 0xFE, 0x0B,
+            0xB6, 0x26, 0x02, 0x16, 0x0F, 0x24, 0xFA, 0xA0, 0x1D, 0x54, 0x40,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var engine = new SymbolicEngine(program, new ExecutionOptions
+        {
+            MaxSteps = 2_000,
+            MaxPaths = 32,
+            MaxQueuedStates = 256,
+        });
+        var result = engine.Run();
+        result.StatesExplored.Should().BeLessThan(50_000,
+            "the worklist cap should bound exploration well below the prior 1.3M-state blowup");
+        result.FinalStates.All(s => s.Status != TerminalStatus.Running).Should().BeTrue();
+        result.BudgetExceeded.Should().BeTrue();
+    }
 }
