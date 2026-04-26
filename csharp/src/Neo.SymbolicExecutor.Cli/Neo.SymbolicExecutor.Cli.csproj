@@ -13,7 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
     <ProjectReference Include="..\Neo.SymbolicExecutor.Detectors\Neo.SymbolicExecutor.Detectors.csproj" />
   </ItemGroup>

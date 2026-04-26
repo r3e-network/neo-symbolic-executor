@@ -1,11 +1,22 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Neo.SymbolicExecutor;
+using Neo.SymbolicExecutor.Detectors;
+using Neo.SymbolicExecutor.Nef;
 
 namespace Neo.SymbolicExecutor.Cli;
 
 internal static class Program
 {
+    /// <summary>
+    /// Exit codes:
+    ///   0 — success / gate passed.
+    ///   1 — analyzer error (parse failure, unhandled exception).
+    ///   2 — bad arguments.
+    ///   3 — gate violation (analysis succeeded but a configured gate fired).
+    /// </summary>
     public static int Main(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -13,35 +24,37 @@ internal static class Program
             PrintUsage();
             return 0;
         }
-
         try
         {
             return args[0] switch
             {
                 "decode" => Decode(args[1..]),
                 "explore" => Explore(args[1..]),
+                "analyze" => Analyze(args[1..]),
                 "version" => Version(),
-                _ => UnknownCommand(args[0]),
+                _ => Unknown(args[0]),
             };
+        }
+        catch (ArgumentException aex)
+        {
+            Console.Error.WriteLine($"error: {aex.Message}");
+            return 2;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
-            return 2;
+            return 1;
         }
     }
 
     private static int Decode(string[] args)
     {
-        if (args.Length < 1) { Console.Error.WriteLine("usage: neo-sym decode <script.bin>"); return 2; }
-        var bytes = File.ReadAllBytes(args[0]);
-        var program = ScriptDecoder.Decode(bytes);
-        Console.WriteLine($"Decoded {program.Instructions.Length} instructions from {bytes.Length} bytes");
+        if (args.Length < 1) throw new ArgumentException("usage: neo-sym decode <script.bin|.nef>");
+        var program = LoadProgram(args[0]);
+        Console.WriteLine($"Decoded {program.Instructions.Length} instructions from {program.Bytes.Length} bytes");
         foreach (var inst in program.Instructions)
         {
-            string operand = inst.Operand.Length > 0
-                ? $" {Convert.ToHexString(inst.Operand.Span)}"
-                : "";
+            string operand = inst.Operand.Length > 0 ? $" {Convert.ToHexString(inst.Operand.Span)}" : "";
             string target = inst.Target >= 0 ? $" -> 0x{inst.Target:X4}" : "";
             Console.WriteLine($"  0x{inst.Offset:X4}  {inst.OpCode}{operand}{target}");
         }
@@ -50,28 +63,82 @@ internal static class Program
 
     private static int Explore(string[] args)
     {
-        if (args.Length < 1) { Console.Error.WriteLine("usage: neo-sym explore <script.bin>"); return 2; }
-        var bytes = File.ReadAllBytes(args[0]);
-        var program = ScriptDecoder.Decode(bytes);
-        var engine = new SymbolicEngine(program);
-        var result = engine.Run();
+        if (args.Length < 1) throw new ArgumentException("usage: neo-sym explore <script.bin|.nef>");
+        var program = LoadProgram(args[0]);
+        var result = new SymbolicEngine(program).Run();
         Console.WriteLine($"Explored {result.StatesExplored} states ({result.StepsExecuted} steps).");
         Console.WriteLine($"Final states: {result.FinalStates.Length}.");
         if (result.BudgetExceeded) Console.WriteLine($"Budget exceeded: {result.BudgetReason}");
         foreach (var s in result.FinalStates)
-        {
             Console.WriteLine($"  {s.Status}: {s.TerminationReason ?? "<no reason>"}");
+        return result.AnyFaulted ? 0 : 0;
+    }
+
+    private static int Analyze(string[] args)
+    {
+        var opts = AnalyzeOptions.Parse(args);
+        var program = LoadProgram(opts.Path);
+        ContractManifest? manifest = null;
+        if (opts.ManifestPath is not null)
+            manifest = ContractManifest.FromFile(opts.ManifestPath);
+
+        var engine = new SymbolicEngine(program);
+        var execResult = engine.Run();
+
+        var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
+        var ctx = new AnalysisContext
+        {
+            States = execResult.FinalStates,
+            Manifest = manifest,
+        };
+        var findings = detectorEngine.Run(ctx);
+        var risk = RiskProfile.FromFindings(findings);
+        var gate = opts.GatePolicy.Evaluate(findings, risk);
+        var meta = new AnalysisMeta(
+            StatesExplored: execResult.StatesExplored,
+            StepsExecuted: execResult.StepsExecuted,
+            BudgetExceeded: execResult.BudgetExceeded,
+            BudgetReason: execResult.BudgetReason);
+        var report = new AnalysisReport(findings, risk, gate, meta);
+
+        // Always emit the report before deciding on gate exit code so CI artifacts exist.
+        string output = opts.Format switch
+        {
+            "json" => ReportGenerator.ToJson(report),
+            "markdown" or "md" => ReportGenerator.ToMarkdown(report),
+            _ => throw new ArgumentException($"unknown --format '{opts.Format}'; expected json|markdown"),
+        };
+        if (opts.OutputPath is null) Console.WriteLine(output);
+        else File.WriteAllText(opts.OutputPath, output);
+
+        if (!gate.Passed)
+        {
+            Console.Error.WriteLine($"gate failed ({gate.Violations.Length} violation(s))");
+            foreach (var v in gate.Violations) Console.Error.WriteLine($"  - {v}");
+            return 3;
         }
-        return result.AnyFaulted ? 1 : 0;
+        return 0;
+    }
+
+    private static NeoProgram LoadProgram(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        if (path.EndsWith(".nef", StringComparison.OrdinalIgnoreCase))
+        {
+            var nef = NefFile.Parse(bytes, verifyChecksum: true);
+            return ScriptDecoder.Decode(nef.Script);
+        }
+        return ScriptDecoder.Decode(bytes);
     }
 
     private static int Version()
     {
-        Console.WriteLine($"neo-sym {typeof(SymbolicEngine).Assembly.GetName().Version}");
+        var asm = typeof(SymbolicEngine).Assembly.GetName();
+        Console.WriteLine($"neo-sym {asm.Version}");
         return 0;
     }
 
-    private static int UnknownCommand(string cmd)
+    private static int Unknown(string cmd)
     {
         Console.Error.WriteLine($"error: unknown command '{cmd}'");
         PrintUsage();
@@ -83,10 +150,122 @@ internal static class Program
         Console.WriteLine("""
             Neo Symbolic Executor CLI
 
-            Usage:
-              neo-sym decode  <script.bin>      Decode and disassemble a NeoVM script.
-              neo-sym explore <script.bin>      Run symbolic exploration over a script.
-              neo-sym version                   Print version.
+            Commands:
+              neo-sym decode  <path>                  Disassemble a .bin or .nef script.
+              neo-sym explore <path>                  Symbolic exploration without detectors.
+              neo-sym analyze <path> [options]        Run detectors and emit a report.
+              neo-sym version
+
+            analyze options:
+              --manifest <path.manifest.json>         Manifest sidecar (enables ABI detectors).
+              --format json|markdown                  Report format (default: markdown).
+              --out <path>                            Write report to file (default: stdout).
+
+              # Gate flags:
+              --fail-on-max-severity <sev>            sev in info|low|medium|high|critical
+              --fail-on-total-findings <count>
+              --fail-on-weighted-score <score>
+              --fail-on-confidence-weighted-score <score>
+              --fail-on-severity-count <sev>=<count>  Repeatable.
+              --fail-on-detector-severity <det>=<sev> Repeatable.
+              --min-confidence <sev>=<float>          Repeatable.
             """);
     }
+}
+
+internal sealed class AnalyzeOptions
+{
+    public required string Path { get; init; }
+    public string? ManifestPath { get; init; }
+    public string Format { get; init; } = "markdown";
+    public string? OutputPath { get; init; }
+    public required GatePolicy GatePolicy { get; init; }
+
+    public static AnalyzeOptions Parse(string[] args)
+    {
+        if (args.Length < 1) throw new ArgumentException("usage: neo-sym analyze <path> [options]");
+        string path = args[0];
+        string? manifest = null;
+        string format = "markdown";
+        string? outPath = null;
+        Severity? maxSev = null;
+        int? totalCap = null;
+        int? wsCap = null;
+        int? cwsCap = null;
+        var sevCounts = new Dictionary<Severity, int>();
+        var detSev = new Dictionary<string, Severity>();
+        var minConf = new Dictionary<Severity, double>();
+
+        for (int i = 1; i < args.Length; i++)
+        {
+            string a = args[i];
+            string Next() => ++i < args.Length
+                ? args[i]
+                : throw new ArgumentException($"missing value for {a}");
+            switch (a)
+            {
+                case "--manifest": manifest = Next(); break;
+                case "--format": format = Next(); break;
+                case "--out": outPath = Next(); break;
+                case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
+                case "--fail-on-total-findings": totalCap = int.Parse(Next()); break;
+                case "--fail-on-weighted-score": wsCap = int.Parse(Next()); break;
+                case "--fail-on-confidence-weighted-score": cwsCap = int.Parse(Next()); break;
+                case "--fail-on-severity-count":
+                    {
+                        var parts = Next().Split('=', 2);
+                        if (parts.Length != 2) throw new ArgumentException("expected sev=count");
+                        sevCounts[ParseSeverity(parts[0])] = int.Parse(parts[1]);
+                        break;
+                    }
+                case "--fail-on-detector-severity":
+                    {
+                        var parts = Next().Split('=', 2);
+                        if (parts.Length != 2) throw new ArgumentException("expected detector=sev");
+                        detSev[parts[0]] = ParseSeverity(parts[1]);
+                        break;
+                    }
+                case "--min-confidence":
+                    {
+                        var parts = Next().Split('=', 2);
+                        if (parts.Length != 2) throw new ArgumentException("expected sev=float");
+                        if (!double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double f)
+                            || f < 0 || f > 1)
+                            throw new ArgumentException($"invalid confidence floor '{parts[1]}'");
+                        minConf[ParseSeverity(parts[0])] = f;
+                        break;
+                    }
+                default:
+                    throw new ArgumentException($"unknown option '{a}'");
+            }
+        }
+
+        return new AnalyzeOptions
+        {
+            Path = path,
+            ManifestPath = manifest,
+            Format = format,
+            OutputPath = outPath,
+            GatePolicy = new GatePolicy
+            {
+                FailOnMaxSeverity = maxSev,
+                FailOnTotalFindings = totalCap,
+                FailOnWeightedScore = wsCap,
+                FailOnConfidenceWeightedScore = cwsCap,
+                FailOnSeverityCount = sevCounts.Count > 0 ? sevCounts : null,
+                FailOnDetectorSeverity = detSev.Count > 0 ? detSev : null,
+                MinConfidence = minConf.Count > 0 ? minConf : null,
+            },
+        };
+    }
+
+    private static Severity ParseSeverity(string s) => s.ToLowerInvariant() switch
+    {
+        "info" => Severity.Info,
+        "low" => Severity.Low,
+        "medium" => Severity.Medium,
+        "high" => Severity.High,
+        "critical" => Severity.Critical,
+        _ => throw new ArgumentException($"unknown severity '{s}'"),
+    };
 }
