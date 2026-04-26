@@ -92,6 +92,27 @@ public sealed partial class SymbolicEngine
                 state.Terminate(TerminalStatus.Faulted, vex.Message);
                 _finalStates.Add(state);
             }
+            catch (CatchableVmException cex)
+            {
+                // A NeoVM-catchable exception bubbled up out of the dispatch path. Treat it like
+                // a THROW: route through the active TRY/CATCH stack, faulting the state if no
+                // handler is found. Without this catch, the exception leaks out of Run() and
+                // crashes the caller (audit lesson: every VM exception must have a destination).
+                state.UncaughtException = SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes(cex.Message));
+                state.Telemetry.ExceptionsThrown.Add(state.Pc);
+                foreach (var s in PropagateException(state))
+                {
+                    if (s.Status == TerminalStatus.Running) _worklist.Enqueue(s);
+                    else _finalStates.Add(s);
+                }
+            }
+            catch (System.OverflowException oex)
+            {
+                // BigInteger -> int cast overflow on a runtime-supplied index. Per NeoVM semantics
+                // an out-of-range index is a CatchableException; we surface as a faulted terminal.
+                state.Terminate(TerminalStatus.Faulted, $"index out of Int32 range: {oex.Message}");
+                _finalStates.Add(state);
+            }
         }
 
         return new ExecutionResult(

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Neo.SymbolicExecutor.Fuzzer</RootNamespace>
+    <AssemblyName>neo-sym-fuzz</AssemblyName>
+    <PackageId>Neo.SymbolicExecutor.Fuzzer</PackageId>
+    <Version>$(NeoSymExecVersion)</Version>
+    <Description>Long-running fuzzer for the Neo Symbolic Executor.</Description>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>neo-sym-fuzz</ToolCommandName>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
+    <ProjectReference Include="..\Neo.SymbolicExecutor.Detectors\Neo.SymbolicExecutor.Detectors.csproj" />
+  </ItemGroup>
+
+</Project>

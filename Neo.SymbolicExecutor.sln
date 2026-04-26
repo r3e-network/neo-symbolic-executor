@@ -10,6 +10,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neo.SymbolicExecutor.Cli", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neo.SymbolicExecutor.Tests", "tests\Neo.SymbolicExecutor.Tests\Neo.SymbolicExecutor.Tests.csproj", "{55555555-5555-5555-5555-555555555555}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neo.SymbolicExecutor.Fuzzer", "src\Neo.SymbolicExecutor.Fuzzer\Neo.SymbolicExecutor.Fuzzer.csproj", "{66666666-6666-6666-6666-666666666666}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

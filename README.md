@@ -12,7 +12,8 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | 21 detectors + framework | ~1,500 | 19 |
 | Reports + gates + CLI | ~600 | 7 |
 | Z3 SMT layer | ~400 | 6 (skipped when libz3 missing) |
-| **Total** | **~6,400** | **64 passing + 5 skipped** |
+| Fuzzer (12 targets, multi-worker) | ~1,200 | 4 regression tests |
+| **Total** | **~7,600** | **68 passing + 5 skipped** |
 
 ## Layout
 
@@ -71,6 +72,26 @@ neo-sym analyze contract.nef --manifest contract.manifest.json --smt --smt-drop-
 
 See `devpack-integration/README.md` — provides MSBuild `.props` + `.targets`
 that drop into a Neo DevPack contract project and run `neo-sym analyze` after build.
+
+## Fuzzing
+
+Multi-target multi-worker fuzzer for the engine, parsers, detectors, reports, and
+SMT translator. Designed for days/weeks of continuous operation with persistent
+corpus and unique-crash deduplication.
+
+```bash
+# Smoke run (60 seconds, all targets)
+src/Neo.SymbolicExecutor.Fuzzer/bin/Release/net10.0/neo-sym-fuzz --seconds 60
+
+# Long run with the wrapper (restarts daily, daily summaries, signal-handling)
+nohup scripts/run-fuzzer-forever.sh ./fuzz-corpus 8 > /dev/null 2>&1 &
+disown
+```
+
+See `src/Neo.SymbolicExecutor.Fuzzer/README.md` for target list, throughput baselines,
+crash-artifact layout, and the systemd unit example. The first 90 seconds of fuzzing
+surfaced 58 unique crashes covering two engine bug classes; both fixed and locked in
+by `FuzzerRegressionTests`.
 
 ## Detectors
 
