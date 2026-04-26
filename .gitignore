@@ -17,3 +17,7 @@ Thumbs.db
 TestResults/
 coverage*.xml
 *.coverage
+
+# Fuzz corpus / runtime artifacts
+fuzz-corpus/
+*-corpus/
