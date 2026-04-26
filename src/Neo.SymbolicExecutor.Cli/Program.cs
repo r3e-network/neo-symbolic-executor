@@ -83,20 +83,28 @@ internal static class Program
         if (opts.ManifestPath is not null)
             manifest = ContractManifest.FromFile(opts.ManifestPath);
 
+        // Audit C# #21 fix: scope the Z3Backend with `using` so the native Context is released
+        // when the analysis completes. For a one-shot CLI this is mostly hygiene; for any host
+        // that calls Analyze() repeatedly it prevents native-handle leaks.
         Smt.ISmtBackend? smtBackend = null;
+        Smt.Z3.Z3Backend? z3Owned = null;
         if (opts.UseSmt)
         {
-            var z3 = new Smt.Z3.Z3Backend(opts.SmtTimeoutMs, opts.SmtBytesBound);
-            if (!z3.IsAvailable)
+            z3Owned = new Smt.Z3.Z3Backend(opts.SmtTimeoutMs, opts.SmtBytesBound);
+            if (!z3Owned.IsAvailable)
             {
-                Console.Error.WriteLine($"warning: --smt requested but Z3 is unavailable: {z3.Version}");
+                Console.Error.WriteLine($"warning: --smt requested but Z3 is unavailable: {z3Owned.Version}");
                 Console.Error.WriteLine("  install platform-appropriate libz3 or remove --smt");
+                z3Owned.Dispose();
+                z3Owned = null;
             }
             else
             {
-                smtBackend = z3;
+                smtBackend = z3Owned;
             }
         }
+        try
+        {
         var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
         var engine = new SymbolicEngine(program, engineOptions);
         var execResult = engine.Run();
@@ -138,6 +146,11 @@ internal static class Program
             return 3;
         }
         return 0;
+        }
+        finally
+        {
+            z3Owned?.Dispose();
+        }
     }
 
     private static NeoProgram LoadProgram(string path)

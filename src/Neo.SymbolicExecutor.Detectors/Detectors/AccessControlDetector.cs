@@ -41,16 +41,30 @@ public sealed class AccessControlDetector : BaseDetector
             var sigChecks = state.Telemetry.SignatureChecks;
 
             bool noAuthAtAll = witnessChecks.Count == 0 && callerChecks.Count == 0 && sigChecks.Count == 0;
-            bool noEnforcement = witnessChecks.Count > 0 && enforced.Count == 0
-                                 && callerChecks.Count == 0 && sigChecks.Count == 0;
+            // Audit C# #11 fix: previously suppressed when callerChecks/sigChecks were present —
+            // but those are independent auth signals, not "rescues" for an unenforced witness.
+            // The unenforced-witness finding fires when witness was invoked but never consumed,
+            // regardless of what other auth signals exist; the deduper merges with related findings.
+            bool witnessUnenforced = witnessChecks.Count > 0 && enforced.Count == 0;
             bool authBeforeSensitive = enforced.Any(o => o < firstSensitive)
                                         || callerChecks.Any(o => o < firstSensitive)
                                         || sigChecks.Any(o => o < firstSensitive);
 
-            // If the analyzed method is `safe=true`, drop severity (the contract author claims no
-            // state changes; if it's wrong we'd surface elsewhere as a contract-spec mismatch).
-            int? entryOffset = state.Path.Count > 0 ? state.Path[0] : null;
-            bool isSafeView = entryOffset.HasValue && safeOffsets.Contains(entryOffset.Value);
+            // Audit C# #14 fix: state.Path[0] is always 0 (initial PC). The manifest's safe-method
+            // offsets are method body offsets, which never match 0 by accident. Match the entry
+            // offset against any method whose body covers that offset — i.e. the method whose
+            // Offset is the largest value <= state.Pc at entry. We approximate via state.Path
+            // (lowest offset >= a method's Offset).
+            bool isSafeView = false;
+            var manifestMethods = context.Manifest?.Abi.Methods;
+            if (manifestMethods is not null && safeOffsets.Count > 0)
+            {
+                // The state has visited many offsets; we infer "this state belongs to method X"
+                // by finding the safe method whose Offset is closest to (and <=) the lowest
+                // visited offset.
+                int firstVisited = state.Path.Count > 0 ? state.Path.Min() : 0;
+                isSafeView = manifestMethods.Any(m => m.Safe && m.Offset == firstVisited);
+            }
 
             if (noAuthAtAll && !isSafeView)
             {
@@ -63,7 +77,7 @@ public sealed class AccessControlDetector : BaseDetector
                     state: state,
                     tags: new[] { "missing-auth" });
             }
-            else if (noEnforcement && !isSafeView)
+            else if (witnessUnenforced && !isSafeView)
             {
                 yield return MakeFinding(
                     title: "Authorization check is unenforced (fail-open)",

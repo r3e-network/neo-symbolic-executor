@@ -29,17 +29,22 @@ public sealed class ContractManifest
 
     public static ContractManifest FromJson(JsonNode node)
     {
+        // Audit C# #28 fix: each "if (item is JsonObject jo)" guard rejects bare numbers/strings/
+        // arrays inside an object-shaped array, which would otherwise crash node[".."]. We accept
+        // JsonValue strings only for supportedstandards (which are bare strings by spec).
         var groups = new List<ContractGroup>();
         if (node["groups"] is JsonArray g)
-            foreach (var item in g) if (item is not null) groups.Add(ContractGroup.FromJson(item));
+            foreach (var item in g) if (item is JsonObject jo) groups.Add(ContractGroup.FromJson(jo));
 
         var standards = new List<string>();
         if (node["supportedstandards"] is JsonArray s)
-            foreach (var item in s) if (item is not null) standards.Add(item.GetValue<string>());
+            foreach (var item in s)
+                if (item is JsonValue jv && jv.TryGetValue<string>(out var str))
+                    standards.Add(str);
 
         var permissions = new List<ContractPermission>();
         if (node["permissions"] is JsonArray p)
-            foreach (var item in p) if (item is not null) permissions.Add(ContractPermission.FromJson(item));
+            foreach (var item in p) if (item is JsonObject jo) permissions.Add(ContractPermission.FromJson(jo));
 
         var trusts = ParseWildCardOfString(node["trusts"]);
 
@@ -83,7 +88,9 @@ public sealed class ContractManifest
         if (node is JsonArray ja)
         {
             var list = new List<string>();
-            foreach (var x in ja) if (x is not null) list.Add(x.GetValue<string>());
+            foreach (var x in ja)
+                if (x is JsonValue jvx && jvx.TryGetValue<string>(out var sx))
+                    list.Add(sx);
             return WildCard<string>.From(list);
         }
         return WildCard<string>.Empty;
@@ -100,10 +107,10 @@ public sealed class ContractAbi
         if (node is null) return new();
         var methods = new List<ContractMethodDescriptor>();
         if (node["methods"] is JsonArray m)
-            foreach (var item in m) if (item is not null) methods.Add(ContractMethodDescriptor.FromJson(item));
+            foreach (var item in m) if (item is JsonObject jo) methods.Add(ContractMethodDescriptor.FromJson(jo));
         var events = new List<ContractEventDescriptor>();
         if (node["events"] is JsonArray e)
-            foreach (var item in e) if (item is not null) events.Add(ContractEventDescriptor.FromJson(item));
+            foreach (var item in e) if (item is JsonObject jo) events.Add(ContractEventDescriptor.FromJson(jo));
         return new ContractAbi { Methods = methods, Events = events };
     }
 }
@@ -120,7 +127,7 @@ public sealed class ContractMethodDescriptor
     {
         var parameters = new List<ContractParameterDefinition>();
         if (node["parameters"] is JsonArray p)
-            foreach (var item in p) if (item is not null) parameters.Add(ContractParameterDefinition.FromJson(item));
+            foreach (var item in p) if (item is JsonObject jo) parameters.Add(ContractParameterDefinition.FromJson(jo));
         return new ContractMethodDescriptor
         {
             Name = node["name"]?.GetValue<string>() ?? "",
@@ -141,7 +148,7 @@ public sealed class ContractEventDescriptor
     {
         var parameters = new List<ContractParameterDefinition>();
         if (node["parameters"] is JsonArray p)
-            foreach (var item in p) if (item is not null) parameters.Add(ContractParameterDefinition.FromJson(item));
+            foreach (var item in p) if (item is JsonObject jo) parameters.Add(ContractParameterDefinition.FromJson(jo));
         return new ContractEventDescriptor
         {
             Name = node["name"]?.GetValue<string>() ?? "",
@@ -186,7 +193,9 @@ public sealed class ContractPermission
         else if (methodsNode is JsonArray ja)
         {
             var list = new List<string>();
-            foreach (var x in ja) if (x is not null) list.Add(x.GetValue<string>());
+            foreach (var x in ja)
+                if (x is JsonValue jvx && jvx.TryGetValue<string>(out var sx))
+                    list.Add(sx);
             methods = WildCard<string>.From(list);
         }
         else

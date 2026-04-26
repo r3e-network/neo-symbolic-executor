@@ -39,8 +39,12 @@ public sealed partial class SymbolicEngine
         if (current.HasFinally)
         {
             // Replace top-of-tryStack with a clone in Finally state (audit: avoid in-place mutation).
+            // Audit C# #1 fix: stash the post-finally continuation on the frame so ENDFINALLY
+            // can resume there. Without this, ENDFINALLY would default to its own EndOffset
+            // and skip any code between the finally block and the next instruction.
             var advanced = current.Clone();
             advanced.State = TryFrameState.Finally;
+            advanced.PostFinallyPc = continuation;
             frame.TryStack[^1] = advanced;
             state.Pc = current.FinallyOffset;
         }
@@ -64,10 +68,11 @@ public sealed partial class SymbolicEngine
             // Re-raise after finally ran.
             return PropagateException(state);
         }
-        // Normal post-finally jump: should have been set by ENDTRY's continuation. We default to falling
-        // through. (A fully correct model stores the continuation on the frame, but for now we let the
-        // contract's ENDTRY have set the PC explicitly via finally re-entry.)
-        state.Pc = inst.EndOffset;
+        // Audit C# #1 fix: resume at the continuation ENDTRY recorded on the frame, not
+        // the byte after ENDFINALLY. PostFinallyPc=-1 (default) means ENDTRY didn't set it,
+        // either because finally ran without a corresponding ENDTRY (unhandled-exception
+        // path uses PropagateException above) or via legacy paths — fall back to EndOffset.
+        state.Pc = current.PostFinallyPc >= 0 ? current.PostFinallyPc : inst.EndOffset;
         return Single(state);
     }
 

@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
     <ProjectReference Include="..\..\src\Neo.SymbolicExecutor.Detectors\Neo.SymbolicExecutor.Detectors.csproj" />
     <ProjectReference Include="..\..\src\Neo.SymbolicExecutor.Smt\Neo.SymbolicExecutor.Smt.csproj" />
+    <ProjectReference Include="..\..\src\Neo.SymbolicExecutor.Fuzzer\Neo.SymbolicExecutor.Fuzzer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

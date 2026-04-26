@@ -22,6 +22,8 @@ public sealed partial class SymbolicEngine
             return Single(state);
         }
 
+        // Audit C# #6 fix: accumulate per-syscall gas so GasExhaustionDetector has data to act on.
+        state.Telemetry.GasCost += syscall.Price;
         return DispatchSyscall(state, inst, syscall);
     }
 

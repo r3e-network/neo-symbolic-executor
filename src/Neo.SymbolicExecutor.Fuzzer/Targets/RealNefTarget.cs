@@ -64,7 +64,9 @@ public sealed class RealNefTarget : IFuzzTarget
         try { bytes = File.ReadAllBytes(path); }
         catch (IOException) { reproInput = Array.Empty<byte>(); reason = null; return true; }
 
-        reproInput = System.Text.Encoding.UTF8.GetBytes(path);
+        // Audit C# #24 fix: the reproducer must be the actual contract bytes, not the path
+        // string — otherwise CrashMinimizer receives a path and shrinks it to garbage.
+        reproInput = bytes;
         reason = null;
 
         NefFile nef;

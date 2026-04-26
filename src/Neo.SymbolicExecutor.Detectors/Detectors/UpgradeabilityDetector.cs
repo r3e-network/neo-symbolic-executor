@@ -20,14 +20,25 @@ public sealed class UpgradeabilityDetector : BaseDetector
     private static readonly HashSet<string> SensitiveMethods =
         new(StringComparer.OrdinalIgnoreCase) { "update", "destroy" };
 
+    private static bool IsContractManagement(NativeContractRegistry natives, byte[] hash) =>
+        natives.ByHash(System.Convert.ToHexString(hash))?.Name
+            .Equals("ContractManagement", StringComparison.OrdinalIgnoreCase) ?? false;
+
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {
+        var natives = context.Natives;
         foreach (var state in context.States)
         {
+            // Audit C# #12 fix: was matching 'update'/'destroy' as substrings, which fired on
+            // userland methods like updateBalance / propertyUpdater. Tighten to: exact name AND
+            // (a) target is concrete ContractManagement, OR (b) no concrete target (raw `update`/
+            // `destroy` invocation, which only resolves to ContractManagement at runtime). This
+            // eliminates the false-positive class while keeping coverage of native-call dispatch.
             var sensitive = state.Telemetry.ExternalCalls
                 .Where(c => SensitiveMethods.Contains(c.Method)
-                            || c.Method.Contains("update", StringComparison.OrdinalIgnoreCase)
-                            || c.Method.Contains("destroy", StringComparison.OrdinalIgnoreCase))
+                            && (c.TargetHash is null
+                                || (c.TargetHash.AsConcreteBytes() is byte[] hb
+                                    && IsContractManagement(natives, hb))))
                 .ToList();
             if (sensitive.Count == 0) continue;
 

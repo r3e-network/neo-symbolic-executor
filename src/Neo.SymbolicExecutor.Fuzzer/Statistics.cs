@@ -6,9 +6,10 @@ public sealed class Statistics
 {
     private readonly ConcurrentDictionary<string, long> _iterations = new();
     private readonly ConcurrentDictionary<string, long> _crashes = new();
-    public long TotalIterations { get; private set; }
-    public long TotalCrashes { get; private set; }
     public System.DateTime StartedUtc { get; } = System.DateTime.UtcNow;
+
+    private long _total;
+    private long _totalCrashes;
 
     public void RecordIteration(string target)
     {
@@ -22,11 +23,13 @@ public sealed class Statistics
         System.Threading.Interlocked.Increment(ref _totalCrashes);
     }
 
-    private long _total;
-    private long _totalCrashes;
-
     public long IterationsFor(string target) => _iterations.TryGetValue(target, out var v) ? v : 0;
     public long CrashesFor(string target) => _crashes.TryGetValue(target, out var v) ? v : 0;
-    public long Total => _total;
-    public long TotalCrashesNow => _totalCrashes;
+
+    /// <summary>Total iterations across all targets. Audit C# #23: the prior auto-property
+    /// was never assigned and always returned 0; this is the single source of truth.</summary>
+    public long Total => System.Threading.Interlocked.Read(ref _total);
+
+    /// <summary>Total crashes across all targets.</summary>
+    public long TotalCrashesNow => System.Threading.Interlocked.Read(ref _totalCrashes);
 }
