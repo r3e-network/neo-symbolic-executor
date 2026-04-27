@@ -105,16 +105,38 @@ public sealed partial class SymbolicEngine
         // external-call return values that flow in.
         MarkExternalCallReturnChecked(state, a);
         MarkExternalCallReturnChecked(state, b);
-        Expression rel = inst.OpCode switch
+        // Audit fix (iter-2 wakeup-10 differential): NeoVM's JMP* numeric branches use
+        // `Pop().GetInteger()` for both operands — they coerce Bool→0/1, Bytes→signed-LE int
+        // BEFORE comparing. This is DIFFERENT from EQUAL/NOTEQUAL which use type-aware
+        // StackItem.Equals (Boolean.Equals(Integer)=false). Our prior code routed JMPEQ/JMPNE
+        // through Expr.Eq/Ne (the type-aware path), which made `JMPEQ true 1` not jump even
+        // though NeoVM jumps. Use Expr.ConcreteInt to fold concretely; Lt/Le/Gt/Ge already
+        // canonicalize via ConcreteInt so they work for JMPGT/JMPGE/JMPLT/JMPLE unchanged.
+        Expression rel;
+        if (inst.OpCode is NeoVm.OpCode.JMPEQ or NeoVm.OpCode.JMPEQ_L
+                        or NeoVm.OpCode.JMPNE or NeoVm.OpCode.JMPNE_L)
         {
-            NeoVm.OpCode.JMPEQ or NeoVm.OpCode.JMPEQ_L => Expr.Eq(a.Expression, b.Expression),
-            NeoVm.OpCode.JMPNE or NeoVm.OpCode.JMPNE_L => Expr.Ne(a.Expression, b.Expression),
-            NeoVm.OpCode.JMPGT or NeoVm.OpCode.JMPGT_L => Expr.Gt(a.Expression, b.Expression),
-            NeoVm.OpCode.JMPGE or NeoVm.OpCode.JMPGE_L => Expr.Ge(a.Expression, b.Expression),
-            NeoVm.OpCode.JMPLT or NeoVm.OpCode.JMPLT_L => Expr.Lt(a.Expression, b.Expression),
-            NeoVm.OpCode.JMPLE or NeoVm.OpCode.JMPLE_L => Expr.Le(a.Expression, b.Expression),
-            _ => throw new VmFaultException("not a comparison branch"),
-        };
+            // Numeric equality: both sides via GetInteger.
+            if (Expr.ConcreteInt(a.Expression) is { } na && Expr.ConcreteInt(b.Expression) is { } nb)
+                rel = inst.OpCode is NeoVm.OpCode.JMPEQ or NeoVm.OpCode.JMPEQ_L
+                    ? Expr.Bool(na == nb)
+                    : Expr.Bool(na != nb);
+            else
+                rel = new BinaryExpr(Sort.Bool,
+                    inst.OpCode is NeoVm.OpCode.JMPEQ or NeoVm.OpCode.JMPEQ_L ? "num==" : "num!=",
+                    a.Expression, b.Expression);
+        }
+        else
+        {
+            rel = inst.OpCode switch
+            {
+                NeoVm.OpCode.JMPGT or NeoVm.OpCode.JMPGT_L => Expr.Gt(a.Expression, b.Expression),
+                NeoVm.OpCode.JMPGE or NeoVm.OpCode.JMPGE_L => Expr.Ge(a.Expression, b.Expression),
+                NeoVm.OpCode.JMPLT or NeoVm.OpCode.JMPLT_L => Expr.Lt(a.Expression, b.Expression),
+                NeoVm.OpCode.JMPLE or NeoVm.OpCode.JMPLE_L => Expr.Le(a.Expression, b.Expression),
+                _ => throw new VmFaultException("not a comparison branch"),
+            };
+        }
         var relValue = SymbolicValue.Of(rel, a.Taints.Union(b.Taints));
         return ConditionalBranchOnExpr(state, inst, relValue);
     }

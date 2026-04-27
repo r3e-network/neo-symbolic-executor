@@ -365,6 +365,25 @@ public static class Expr
         return new BinaryExpr(Sort.Bool, "==", a, b);
     }
 
+    /// <summary>
+    /// Numeric equality matching NeoVM's `NumEqual` and JMPEQ semantics: both operands are
+    /// converted via `Pop().GetInteger()` (Bool→0/1, Bytes→signed-LE int) before comparing.
+    /// Distinct from <see cref="Eq"/> which uses StackItem-Equals semantics (Boolean.Equals(
+    /// Integer) always returns false). The differential target found this in iter-2 wakeup-10:
+    /// `JMPEQ true 1` jumps in NeoVM (1 == 1) but our prior code didn't (different StackItem).
+    /// </summary>
+    public static Expression NumEq(Expression a, Expression b)
+    {
+        if (ConcreteInt(a) is { } na && ConcreteInt(b) is { } nb) return Bool(na == nb);
+        return new BinaryExpr(Sort.Bool, "num==", a, b);
+    }
+
+    public static Expression NumNe(Expression a, Expression b)
+    {
+        if (ConcreteInt(a) is { } na && ConcreteInt(b) is { } nb) return Bool(na != nb);
+        return new BinaryExpr(Sort.Bool, "num!=", a, b);
+    }
+
     public static Expression Ne(Expression a, Expression b)
     {
         var eq = Eq(a, b);

@@ -255,8 +255,11 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.BOOLAND: return Binary(state, inst, Expr.BoolAnd);
             case NeoVm.OpCode.BOOLOR:  return Binary(state, inst, Expr.BoolOr);
             case NeoVm.OpCode.NZ:      return Unary(state, inst, Expr.Nz);
-            case NeoVm.OpCode.NUMEQUAL: return Binary(state, inst, Expr.Eq);
-            case NeoVm.OpCode.NUMNOTEQUAL: return Binary(state, inst, Expr.Ne);
+            // Audit fix (iter-2 wakeup-10): NUMEQUAL / NUMNOTEQUAL pop both operands as
+            // GetInteger and compare numerically — this is DIFFERENT from EQUAL/NOTEQUAL which
+            // use type-aware StackItem.Equals (Bool != Int regardless of value). Use NumEq.
+            case NeoVm.OpCode.NUMEQUAL: return Binary(state, inst, Expr.NumEq);
+            case NeoVm.OpCode.NUMNOTEQUAL: return Binary(state, inst, Expr.NumNe);
             case NeoVm.OpCode.LT:     return Binary(state, inst, Expr.Lt);
             case NeoVm.OpCode.LE:     return Binary(state, inst, Expr.Le);
             case NeoVm.OpCode.GT:     return Binary(state, inst, Expr.Gt);
