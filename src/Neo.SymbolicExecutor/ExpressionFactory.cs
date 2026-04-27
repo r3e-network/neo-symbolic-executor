@@ -211,26 +211,26 @@ public static class Expr
 
     public static Expression ModMul(Expression a, Expression b, Expression m)
     {
-        if (a is IntConst ai && b is IntConst bi && m is IntConst mi)
+        if (ConcreteInt(a) is { } mm_a && ConcreteInt(b) is { } mm_b && ConcreteInt(m) is { } mm_m)
         {
-            if (mi.Value.IsZero) throw new VmFaultException("MODMUL with zero modulus");
-            return Int((ai.Value * bi.Value) % mi.Value);
+            if (mm_m.IsZero) throw new VmFaultException("MODMUL with zero modulus");
+            return Int((mm_a * mm_b) % mm_m);
         }
         return new TernaryExpr(Sort.Int, "modmul", a, b, m);
     }
 
     public static Expression ModPow(Expression a, Expression b, Expression m)
     {
-        if (a is IntConst ai && b is IntConst bi && m is IntConst mi)
+        if (ConcreteInt(a) is { } mp_a && ConcreteInt(b) is { } mp_b && ConcreteInt(m) is { } mp_m)
         {
-            if (mi.Value.IsZero) throw new VmFaultException("MODPOW with zero modulus");
+            if (mp_m.IsZero) throw new VmFaultException("MODPOW with zero modulus");
             // Audit fix (iter-2 wakeup-5 differential): NeoVM treats exp == -1 as modular
             // inverse via extended Euclidean. Any other negative exp throws. Match exactly.
-            if (bi.Value == -1)
-                return Int(ModInverse(ai.Value, mi.Value));
-            if (bi.Value < 0)
-                throw new VmFaultException($"MODPOW with negative exponent {bi.Value}");
-            return Int(BigInteger.ModPow(ai.Value, bi.Value, mi.Value));
+            if (mp_b == -1)
+                return Int(ModInverse(mp_a, mp_m));
+            if (mp_b < 0)
+                throw new VmFaultException($"MODPOW with negative exponent {mp_b}");
+            return Int(BigInteger.ModPow(mp_a, mp_b, mp_m));
         }
         return new TernaryExpr(Sort.Int, "modpow", a, b, m);
     }
@@ -262,22 +262,22 @@ public static class Expr
 
     public static Expression Shl(Expression a, Expression b, int maxShift = 256)
     {
-        if (a is IntConst ai && b is IntConst bi)
+        if (ConcreteInt(a) is { } shl_a && ConcreteInt(b) is { } shl_b)
         {
-            if (bi.Value < 0) throw new VmFaultException("SHL by negative count");
-            if (bi.Value > maxShift) throw new VmFaultException("SHL count too large");
-            return Int(ai.Value << (int)bi.Value);
+            if (shl_b < 0) throw new VmFaultException("SHL by negative count");
+            if (shl_b > maxShift) throw new VmFaultException("SHL count too large");
+            return Int(shl_a << (int)shl_b);
         }
         return new BinaryExpr(Sort.Int, "<<", a, b);
     }
 
     public static Expression Shr(Expression a, Expression b, int maxShift = 256)
     {
-        if (a is IntConst ai && b is IntConst bi)
+        if (ConcreteInt(a) is { } shr_a && ConcreteInt(b) is { } shr_b)
         {
-            if (bi.Value < 0) throw new VmFaultException("SHR by negative count");
-            if (bi.Value > maxShift) throw new VmFaultException("SHR count too large");
-            return Int(ai.Value >> (int)bi.Value);
+            if (shr_b < 0) throw new VmFaultException("SHR by negative count");
+            if (shr_b > maxShift) throw new VmFaultException("SHR count too large");
+            return Int(shr_a >> (int)shr_b);
         }
         return new BinaryExpr(Sort.Int, ">>", a, b);
     }
@@ -319,11 +319,26 @@ public static class Expr
     // ---- Comparison
     public static Expression Eq(Expression a, Expression b)
     {
-        // Cross-type primitive equality (audit HIGH-2): use canonical bytes.
-        if (a.Sort.IsCrossTypeEqualityCandidate() && b.Sort.IsCrossTypeEqualityCandidate())
+        // Audit fix (iter-2 wakeup-7 differential): NeoVM's Equals is more nuanced than
+        // "cross-type byte canonical". Boolean.Equals returns false for any non-Boolean (even
+        // bytes [1] vs true). Integer.Equals(ByteString) does byte-level compare; Integer.Equals(
+        // Boolean) returns false. So we must distinguish:
+        //   (Bool, Bool)            : compare values
+        //   (Int|Bytes, Int|Bytes)  : byte-canonical compare (NeoVM's PrimitiveType cross-equality)
+        //   (Bool, Int|Bytes), sym. : false (different StackItem types per NeoVM)
+        //   (Int, Int)              : direct compare (handled below)
+        //   (Bytes, Bytes)          : byte compare (handled by PrimitiveEqualsConcrete)
+        // The prior `IsCrossTypeEqualityCandidate` swept Bool into the cross-type bucket, which
+        // made `1 == true` reduce to BoolConst.True — and Ne/JMPNE around it produced the wrong
+        // branch direction. The differential target found this in 60 s.
+        if (a.IsConcrete && b.IsConcrete && a is not NullConst && b is not NullConst)
         {
-            if (a.IsConcrete && b.IsConcrete)
-                return Bool(PrimitiveEqualsConcrete(a, b));
+            bool aBool = a is BoolConst, bBool = b is BoolConst;
+            if (aBool && bBool) return Bool(((BoolConst)a).Value == ((BoolConst)b).Value);
+            // Bool vs (Int|Bytes) — NeoVM treats as different StackItem types: false.
+            if (aBool != bBool) return BoolConst.False;
+            // (Int|Bytes, Int|Bytes) — byte canonical.
+            return Bool(PrimitiveEqualsConcrete(a, b));
         }
         if (a is NullConst && b is NullConst) return BoolConst.True;
         if ((a is NullConst) != (b is NullConst))
@@ -404,8 +419,8 @@ public static class Expr
 
     public static Expression Within(Expression x, Expression lo, Expression hi)
     {
-        if (x is IntConst xi && lo is IntConst li && hi is IntConst hi2)
-            return Bool(li.Value <= xi.Value && xi.Value < hi2.Value);
+        if (ConcreteInt(x) is { } w_x && ConcreteInt(lo) is { } w_lo && ConcreteInt(hi) is { } w_hi)
+            return Bool(w_lo <= w_x && w_x < w_hi);
         return new TernaryExpr(Sort.Bool, "within", x, lo, hi);
     }
 

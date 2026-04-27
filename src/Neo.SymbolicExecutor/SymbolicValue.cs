@@ -16,7 +16,11 @@ public sealed record SymbolicValue(Expression Expression, ImmutableHashSet<strin
     public Sort Sort => Expression.Sort;
     public bool IsConcrete => Expression.IsConcrete;
 
-    public BigInteger? AsConcreteInt() => Expression is IntConst i ? i.Value : null;
+    // Audit fix (iter-2 wakeup-7 differential): canonicalize Bool/Bytes/Int via Expr.ConcreteInt
+    // (mirrors NeoVM's `Pop().GetInteger()`). Prior implementation only handled IntConst, so
+    // PICKITEM/REMOVE/MEMCPY/SUBSTR with a BoolConst index fell through to "requires concrete"
+    // when NeoVM cleanly converted true→1 / false→0.
+    public BigInteger? AsConcreteInt() => Expr.ConcreteInt(Expression);
     public bool? AsConcreteBool() => Expression is BoolConst b ? b.Value : null;
     public byte[]? AsConcreteBytes() => Expression is BytesConst by ? by.Value : null;
     public bool IsConcreteNull => Expression is NullConst;
