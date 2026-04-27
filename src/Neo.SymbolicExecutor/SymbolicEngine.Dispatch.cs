@@ -225,8 +225,14 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.AND:    return Binary(state, inst, Expr.And);
             case NeoVm.OpCode.OR:     return Binary(state, inst, Expr.Or);
             case NeoVm.OpCode.XOR:    return Binary(state, inst, Expr.Xor);
-            case NeoVm.OpCode.EQUAL:  return Binary(state, inst, Expr.Eq);
-            case NeoVm.OpCode.NOTEQUAL: return Binary(state, inst, Expr.Ne);
+            // Audit fix (iter-2 wakeup-12): EQUAL/NOTEQUAL use NeoVM's `x1.Equals(x2, limits)`
+            // which does DEEP structural comparison for Structs (recursively walking fields).
+            // The plain Expr.Eq fast-path treats HeapRef==HeapRef as ID equality, which is
+            // wrong for two NEWSTRUCT0 (they have different IDs but identical empty contents).
+            // Caught by differential: NEWSTRUCT0 NEWSTRUCT0 EQUAL DIV → NeoVM halts (true→1,
+            // 10/1=10), our engine pushed false then DIV by zero faulted.
+            case NeoVm.OpCode.EQUAL: return HandleEquality(state, inst, negate: false);
+            case NeoVm.OpCode.NOTEQUAL: return HandleEquality(state, inst, negate: true);
 
             case NeoVm.OpCode.SIGN:   return Unary(state, inst, Expr.Sign);
             case NeoVm.OpCode.ABS:    return Unary(state, inst, Expr.Abs);
@@ -442,6 +448,54 @@ public sealed partial class SymbolicEngine
         v.AsConcreteBytes() is byte[] bytes
             ? System.Text.Encoding.UTF8.GetString(bytes)
             : "<symbolic message>";
+
+    private IEnumerable<ExecutionState> HandleEquality(ExecutionState state, Instruction inst, bool negate)
+    {
+        var b = state.Pop();
+        var a = state.Pop();
+        Expression eq = StackItemEquals(state, a.Expression, b.Expression, depth: 0);
+        var result = negate ? Expr.Not(eq) : eq;
+        state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
+        state.Pc = inst.EndOffset;
+        return Single(state);
+    }
+
+    /// <summary>
+    /// Mirrors NeoVM's StackItem.Equals(other, limits) for the EQUAL/NOTEQUAL opcodes.
+    /// Primitives use Expr.Eq's type-aware byte-canonical semantics. HeapRefs:
+    ///  - Same id  → true
+    ///  - Different sort → false
+    ///  - Both Struct → deep recursive equality (walk fields, max-depth-bounded)
+    ///  - Map / Array / Buffer → reference identity (different ids ⇒ false)
+    /// Anything symbolic returns a BinaryExpr that downstream branching can resolve.
+    /// </summary>
+    private Expression StackItemEquals(ExecutionState state, Expression a, Expression b, int depth)
+    {
+        const int MaxDepth = 64;
+        if (a is HeapRef ah && b is HeapRef bh)
+        {
+            if (ah.ObjectId == bh.ObjectId) return BoolConst.True;
+            if (ah.RefSort != bh.RefSort) return BoolConst.False;
+            if (ah.RefSort == Sort.Struct && depth < MaxDepth)
+            {
+                var s1 = state.Heap.Objects.TryGetValue(ah.ObjectId, out var o1) ? o1 as StructObject : null;
+                var s2 = state.Heap.Objects.TryGetValue(bh.ObjectId, out var o2) ? o2 as StructObject : null;
+                if (s1 is null || s2 is null) return BoolConst.False;
+                if (s1.Fields.Count != s2.Fields.Count) return BoolConst.False;
+                Expression acc = BoolConst.True;
+                for (int i = 0; i < s1.Fields.Count; i++)
+                {
+                    var fEq = StackItemEquals(state, s1.Fields[i].Expression, s2.Fields[i].Expression, depth + 1);
+                    if (fEq is BoolConst bc && !bc.Value) return BoolConst.False;
+                    acc = Expr.BoolAnd(acc, fEq);
+                }
+                return acc;
+            }
+            // Array / Map / Buffer: NeoVM uses reference identity; different ids ⇒ false.
+            return BoolConst.False;
+        }
+        return Expr.Eq(a, b);
+    }
 
     private IEnumerable<ExecutionState> HandleShift(ExecutionState state, Instruction inst, string opName, bool isLeft)
     {
