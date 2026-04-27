@@ -29,7 +29,10 @@ public sealed partial class SymbolicEngine
 
             case NeoVm.OpCode.JMP:
             case NeoVm.OpCode.JMP_L:
-                if (inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+                // Audit fix (iter-2 wakeup-17 pipeline-consistency): only record valid back-edges
+                // in LoopsDetected. Negative jump targets fault on the next step, but the Add()
+                // before that point lets detectors emit Findings with negative offsets.
+                if (inst.Target >= 0 && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
                 state.Pc = inst.Target;
                 return Single(state);
 

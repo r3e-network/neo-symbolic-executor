@@ -19,7 +19,7 @@ public sealed partial class SymbolicEngine
             // Concrete branch — no fork.
             bool take = truthy.Value == jumpOnTrue;
             int target = take ? inst.Target : inst.EndOffset;
-            if (take && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            if (take && inst.Target >= 0 && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
             MarkConditionalEnforcement(state, cond, taken: take ? jumpOnTrue : !jumpOnTrue);
             state.Pc = target;
             return Single(state);
@@ -47,7 +47,11 @@ public sealed partial class SymbolicEngine
             state.Telemetry.SmtPrunedBranches++;
             MarkConditionalEnforcement(state, cond, taken: jumpOnTrue);
             state.PathConditions = state.PathConditions.Add(takeExpr);
-            if (inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            // Audit fix (iter-2 wakeup-17 pipeline-consistency): only record valid back-edges.
+            // A JMP whose sbyte delta makes target negative will fault on the next step, but
+            // the Add(-N) before that pollutes telemetry with negative offsets that downstream
+            // detectors can surface as Findings with negative offset.
+            if (inst.Target >= 0 && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
             state.Pc = inst.Target;
             return Single(state);
         }
@@ -66,7 +70,7 @@ public sealed partial class SymbolicEngine
         taken.PathConditions = taken.PathConditions.Add(jumpOnTrue ? cond.Expression : Expr.Not(cond.Expression));
         notTaken.PathConditions = notTaken.PathConditions.Add(jumpOnTrue ? Expr.Not(cond.Expression) : cond.Expression);
 
-        if (inst.Target < taken.Pc) taken.Telemetry.LoopsDetected.Add(inst.Target);
+        if (inst.Target >= 0 && inst.Target < taken.Pc) taken.Telemetry.LoopsDetected.Add(inst.Target);
         taken.Pc = inst.Target;
         notTaken.Pc = inst.EndOffset;
 
@@ -148,7 +152,7 @@ public sealed partial class SymbolicEngine
         {
             bool take = truthy.Value;
             int target = take ? inst.Target : inst.EndOffset;
-            if (take && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            if (take && inst.Target >= 0 && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
             MarkConditionalEnforcement(state, cond, taken: take);
             state.Pc = target;
             return Single(state);
@@ -173,7 +177,11 @@ public sealed partial class SymbolicEngine
             state.Telemetry.SmtPrunedBranches++;
             MarkConditionalEnforcement(state, cond, taken: true);
             state.PathConditions = state.PathConditions.Add(cond.Expression);
-            if (inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
+            // Audit fix (iter-2 wakeup-17 pipeline-consistency): only record valid back-edges.
+            // A JMP whose sbyte delta makes target negative will fault on the next step, but
+            // the Add(-N) before that pollutes telemetry with negative offsets that downstream
+            // detectors can surface as Findings with negative offset.
+            if (inst.Target >= 0 && inst.Target < state.Pc) state.Telemetry.LoopsDetected.Add(inst.Target);
             state.Pc = inst.Target;
             return Single(state);
         }
@@ -186,7 +194,7 @@ public sealed partial class SymbolicEngine
         MarkConditionalEnforcement(notTaken, cond, taken: false);
         taken.PathConditions = taken.PathConditions.Add(cond.Expression);
         notTaken.PathConditions = notTaken.PathConditions.Add(Expr.Not(cond.Expression));
-        if (inst.Target < taken.Pc) taken.Telemetry.LoopsDetected.Add(inst.Target);
+        if (inst.Target >= 0 && inst.Target < taken.Pc) taken.Telemetry.LoopsDetected.Add(inst.Target);
         taken.Pc = inst.Target;
         notTaken.Pc = inst.EndOffset;
         return new[] { taken, notTaken };
