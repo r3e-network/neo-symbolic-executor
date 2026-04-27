@@ -214,6 +214,38 @@ public class FuzzerRegressionTests
     }
 
     [Fact]
+    public void Engine_NegativeJumpTarget_NotRecordedInLoopsDetected_PipelineConsistency()
+    {
+        // Bug surfaced 2026-04-28 by pipeline-consistency target after 3 hours of campaign runtime
+        // (1.5 B iters): a JMP whose 1-byte sbyte delta produced a negative target was recorded
+        // in state.Telemetry.LoopsDetected before the next-step "PC at unaligned offset" fault.
+        // The DOS detector's MinOf() then surfaced the negative number as a Finding.Offset = -3,
+        // which the pipeline-consistency target's invariant check ("Offset >= 0") flagged.
+        // Repro from seed 1352486289.
+        byte[] script =
+        {
+            0x16, 0x18, 0xc8, 0x30, 0xfa, 0x1c, 0xc2, 0x11, 0x28, 0xf8,
+            0x45, 0x1c, 0x32, 0xf9, 0x9d, 0xc4, 0x06, 0x17, 0xcd, 0x3a,
+            0xa3, 0x53, 0x36, 0xa1, 0xa5, 0x46, 0x40,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program, new ExecutionOptions
+        {
+            MaxSteps = 4_000, MaxPaths = 32, MaxStackSize = 128,
+            MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
+            MaxCollectionSize = 256, MaxHeapObjects = 512,
+            MaxQueuedStates = 128, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+        }).Run();
+        // Every state's LoopsDetected must contain only non-negative offsets.
+        foreach (var s in result.FinalStates)
+        {
+            foreach (var off in s.Telemetry.LoopsDetected)
+                off.Should().BeGreaterThanOrEqualTo(0,
+                    "negative back-edge offsets corrupt downstream Finding offsets");
+        }
+    }
+
+    [Fact]
     public void Engine_WorklistCap_BoundsPathExplosion()
     {
         // Bug: deeply-forking symbolic loops filled the worklist with millions of states before
