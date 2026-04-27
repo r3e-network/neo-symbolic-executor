@@ -191,7 +191,12 @@ public sealed partial class SymbolicEngine
         state.VisitCounts[state.Pc] = visits + 1;
         state.Path.Add(state.Pc);
 
-        var inst = _program.AtOffset(state.Pc);
+        // Audit fix (iter-2 wakeup-4 differential): match Neo.VM by JIT-decoding the
+        // instruction at PC if the linear-scan index has no entry. NeoVM happily executes
+        // a JMP whose target lands inside the operand of a prior instruction; our engine
+        // used to fault on "unaligned offset" — a structural divergence the differential
+        // target found within 10 seconds.
+        var inst = _program.AtOffsetOrDecode(state.Pc);
         if (inst is null)
         {
             state.Terminate(TerminalStatus.Faulted, $"PC at unaligned offset 0x{state.Pc:X4}");

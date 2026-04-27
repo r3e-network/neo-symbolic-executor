@@ -242,8 +242,14 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.SQRT:   return UnaryArith(state, inst, "SQRT", Expr.Sqrt, overflow: false);
             case NeoVm.OpCode.MODMUL: return TernaryArith(state, inst, "MODMUL", Expr.ModMul);
             case NeoVm.OpCode.MODPOW: return TernaryArith(state, inst, "MODPOW", Expr.ModPow);
-            case NeoVm.OpCode.SHL:    return BinaryArith(state, inst, "SHL", (a, b) => Expr.Shl(a, b, _options.MaxShiftCount), overflow: true);
-            case NeoVm.OpCode.SHR:    return BinaryArith(state, inst, "SHR", (a, b) => Expr.Shr(a, b, _options.MaxShiftCount), overflow: false);
+            // Audit fix (iter-2 wakeup-4 differential): NeoVM's SHL/SHR pop the SHIFT first,
+            // then check `if (shift == 0) return;` BEFORE popping x. So a script with stack=[x]
+            // and SHL/SHR consuming a 0 shift leaves x on the stack — Neo.VM HALTs cleanly.
+            // Our prior `BinaryArith` always popped both unconditionally, producing a spurious
+            // Stack-underflow fault. Keep BinaryArith for symbolic shifts (the divergence is
+            // unobservable when shift is non-zero or symbolic); special-case concrete shift==0.
+            case NeoVm.OpCode.SHL:    return HandleShift(state, inst, "SHL", isLeft: true);
+            case NeoVm.OpCode.SHR:    return HandleShift(state, inst, "SHR", isLeft: false);
 
             case NeoVm.OpCode.NOT:    return Unary(state, inst, Expr.Not);
             case NeoVm.OpCode.BOOLAND: return Binary(state, inst, Expr.BoolAnd);
@@ -433,4 +439,30 @@ public sealed partial class SymbolicEngine
         v.AsConcreteBytes() is byte[] bytes
             ? System.Text.Encoding.UTF8.GetString(bytes)
             : "<symbolic message>";
+
+    private IEnumerable<ExecutionState> HandleShift(ExecutionState state, Instruction inst, string opName, bool isLeft)
+    {
+        var b = state.Pop();
+        // Only the concrete-zero case diverges from BinaryArith. For non-zero or symbolic
+        // shifts we apply the simplifier and pop x normally — matches NeoVM "shift != 0" path.
+        if (b.AsConcreteInt() is { } shift && shift == 0)
+        {
+            state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
+                inst.Offset, opName, b, null,
+                OverflowPossible: false, DivisorMaybeZero: false, Checked: false));
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
+        var a = state.Pop();
+        Expression result = isLeft
+            ? Expr.Shl(a.Expression, b.Expression, _options.MaxShiftCount)
+            : Expr.Shr(a.Expression, b.Expression, _options.MaxShiftCount);
+        state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
+        state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
+            inst.Offset, opName, a, b,
+            OverflowPossible: isLeft && (!a.IsConcrete || !b.IsConcrete),
+            DivisorMaybeZero: false, Checked: false));
+        state.Pc = inst.EndOffset;
+        return Single(state);
+    }
 }

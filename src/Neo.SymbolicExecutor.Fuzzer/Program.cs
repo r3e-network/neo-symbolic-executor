@@ -166,6 +166,10 @@ internal static class Program
             new PipelineConsistencyTarget(),
             new ReportRoundTripTarget(),
             new HeapInvariantTarget(),
+            // Tier-3: differential testing against the Neo.VM reference. Strongest possible oracle
+            // — flags the narrow case where Neo.VM HALTs cleanly but our symbolic engine FAULTs
+            // every path. SYSCALL/CALLT/CALLA scripts are skipped (we model a subset).
+            new DifferentialNeoVmTarget(),
         };
         var byName = allTargets.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 

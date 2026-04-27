@@ -130,6 +130,52 @@ public class FuzzerRegressionTests
     }
 
     [Fact]
+    public void Engine_JmpToInsideOperand_DecodesJustInTime_DifferentialOracle()
+    {
+        // Bug surfaced 2026-04-27 by differential-neovm target: a JMP whose target lands
+        // inside a previously-decoded instruction's operand bytes faulted the engine with
+        // "PC at unaligned offset" while Neo.VM happily executed the new instruction.
+        // Fix: NeoProgram.AtOffsetOrDecode JIT-decodes when the linear-scan index misses.
+        // Repro from seed=15672414. The JMP +14 lands inside the ISTYPE operand at offset 14
+        // (which is the byte 0x11 = PUSH1).
+        byte[] script =
+        {
+            0x22, 0x0e, 0x93, 0x97, 0xd1, 0xe0, 0x1d, 0x70,
+            0x09, 0x08, 0xa3, 0x4e, 0x9b, 0xd9, 0x11, 0x43,
+            0x0f, 0x3b, 0x88, 0xe6, 0x09, 0xa8, 0x40,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program, new ExecutionOptions
+        {
+            MaxSteps = 1_000, MaxPaths = 16, MaxStackSize = 64, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+        }).Run();
+        // The script may halt or stop; the key assertion is that NO state faults with
+        // "PC at unaligned" — that's the exact divergence we fixed.
+        result.FinalStates.Should().NotBeEmpty();
+        result.FinalStates.All(s =>
+            s.TerminationReason is null
+            || !s.TerminationReason.Contains("unaligned offset"))
+            .Should().BeTrue("JIT-decode should let any byte-aligned offset execute");
+    }
+
+    [Fact]
+    public void Engine_ShlShrZeroShift_DoesNotPopX_DifferentialOracle()
+    {
+        // Bug surfaced 2026-04-27 by differential-neovm target: NeoVM's SHL/SHR pop the
+        // shift count first and ONLY pop x when shift != 0. Our engine always popped both,
+        // producing a Stack-underflow fault on PUSH0 SHR with stack=[0].
+        // Repro from seed=15894885. Bytes: 10 a9 40 = PUSH0 SHR RET.
+        byte[] script = { 0x10, 0xA9, 0x40 };
+        var program = ScriptDecoder.Decode(script);
+        var result = new SymbolicEngine(program).Run();
+        result.FinalStates.Should().ContainSingle();
+        var s = result.FinalStates[0];
+        s.Status.Should().Be(TerminalStatus.Halted, "shift==0 should leave x on the stack and halt");
+        // Stack at end: empty (no x was on the stack to begin with).
+        s.EvaluationStack.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Engine_WorklistCap_BoundsPathExplosion()
     {
         // Bug: deeply-forking symbolic loops filled the worklist with millions of states before

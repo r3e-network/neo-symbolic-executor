@@ -71,6 +71,17 @@ public sealed partial class SymbolicEngine
         if (!IsDefinedStackItemType(typeByte) || typeByte == StackItemTypeCodes.Any)
             throw new VmFaultException($"CONVERT to invalid type byte 0x{typeByte:X2}");
 
+        // Audit fix (iter-2 wakeup-4 differential): NeoVM's Null.ConvertTo returns the Null
+        // itself regardless of target type (it's effectively a no-op for any defined target).
+        // Our prior implementation faulted on (Null, ByteString) etc. — the differential
+        // target found this immediately on the trivial PUSHNULL CONVERT 0x28 RET.
+        if (v.IsConcreteNull)
+        {
+            state.Push(v);
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
+
         // Same-sort convert is identity (other than wrapping). NeoVM allows this.
         if (TypeMatches(v, typeByte))
         {

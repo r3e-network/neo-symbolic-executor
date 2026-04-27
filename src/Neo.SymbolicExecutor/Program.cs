@@ -40,6 +40,21 @@ public sealed class NeoProgram
     public Instruction? AtOffset(int offset) =>
         OffsetToIndex.TryGetValue(offset, out int idx) ? Instructions[idx] : null;
 
+    /// <summary>
+    /// Look up an instruction at <paramref name="offset"/>; if the linear-scan index has no
+    /// entry there (i.e., the offset lands inside the operand of a previously-decoded
+    /// instruction), JIT-decode at that offset. This matches Neo.VM semantics: the runtime
+    /// VM decodes each instruction at the program counter on-demand and accepts jump targets
+    /// pointing into operand bytes of earlier instructions. Fuzzer differential testing
+    /// (target `differential-neovm`) found this divergence in 10 seconds: a JMP +14 that
+    /// landed inside an ISTYPE operand caused our engine to fault on "unaligned offset"
+    /// while Neo.VM HALTed cleanly.
+    /// </summary>
+    public Instruction? AtOffsetOrDecode(int offset) =>
+        OffsetToIndex.TryGetValue(offset, out int idx)
+            ? Instructions[idx]
+            : ScriptDecoder.DecodeOne(Bytes, offset);
+
     public Instruction RequireAt(int offset) =>
         AtOffset(offset) ?? throw new VmFaultException($"No instruction at offset {offset}");
 }
@@ -123,6 +138,48 @@ public static class ScriptDecoder
             return offset + System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(operand[..4]);
         }
         return -1;
+    }
+
+    /// <summary>
+    /// Decode a single instruction at <paramref name="offset"/> from the raw script bytes.
+    /// Returns null when the offset is out of range, when the byte is not a defined opcode,
+    /// or when the operand is truncated. Used by <see cref="NeoProgram.AtOffsetOrDecode"/>
+    /// to support jumps that land inside operand bytes (Neo.VM-compatible behavior).
+    /// </summary>
+    public static Instruction? DecodeOne(ReadOnlyMemory<byte> script, int offset)
+    {
+        var span = script.Span;
+        if (offset < 0 || offset >= span.Length) return null;
+        int pos = offset;
+        byte b = span[pos++];
+        if (!OpCodeInfo.IsDefined(b)) return null;
+        var op = (NeoVm.OpCode)b;
+
+        int operandSize;
+        int prefixSize = OpCodeInfo.OperandPrefixSize(op);
+        if (prefixSize > 0)
+        {
+            if (pos + prefixSize > span.Length) return null;
+            long size = ReadUnsigned(span.Slice(pos, prefixSize));
+            pos += prefixSize;
+            if (size < 0 || size > int.MaxValue) return null;
+            operandSize = (int)size;
+        }
+        else
+        {
+            operandSize = OpCodeInfo.FixedOperandSize(op);
+        }
+        if (operandSize < 0 || pos + operandSize > span.Length) return null;
+
+        var operandMem = script.Slice(pos, operandSize);
+        pos += operandSize;
+
+        int totalSize = pos - offset;
+        int target = -1;
+        if (OpCodeInfo.IsBranch(op))
+            target = ResolveBranchTarget(op, offset, operandMem.Span);
+
+        return new Instruction(offset, op, operandMem, totalSize, target);
     }
 
     public static (int CatchOffset, int FinallyOffset) ResolveTryTargets(Instruction inst)

@@ -312,12 +312,19 @@ public class AuditFixesTests
     [Fact]
     public void Convert_FaultsOnUnsupportedPair_EngineAuditH1()
     {
-        // Audit engine H1: CONVERT used to forward the input unchanged for unsupported pairs,
-        // letting Buffer-shaped values flow through ISTYPE Integer checks. Now faults.
+        // Audit engine H1: CONVERT used to forward the input unchanged for unsupported pairs.
+        // Subsequently (iter-2 wakeup-4 differential): NeoVM's Null.ConvertTo is a no-op for
+        // any defined target type, so PUSHNULL CONVERT 0x21 RET HALTS in NeoVM. The "fault"
+        // case is now: a non-Null source converted to a sort that has no defined conversion
+        // (e.g. Boolean → Buffer); previously these silently forwarded.
+        // Source: a Buffer (HeapRef sort) with target Integer is the previously-broken case
+        // — but Buffer→Integer is now legitimately supported via ConvertBufferToInt. The
+        // remaining truly-unsupported case is e.g. Buffer (heap) → ByteString (defined now)
+        // or rarer pairs. Use Map → ByteString which has no defined conversion.
         byte[] script =
         {
-            (byte)NeoVm.OpCode.PUSHNULL,
-            (byte)NeoVm.OpCode.CONVERT, 0x21,   // Null → Integer is not a defined conversion
+            (byte)NeoVm.OpCode.NEWMAP,                // pushes Map heap ref
+            (byte)NeoVm.OpCode.CONVERT, 0x28,         // Map → ByteString — undefined
             (byte)NeoVm.OpCode.RET,
         };
         var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();

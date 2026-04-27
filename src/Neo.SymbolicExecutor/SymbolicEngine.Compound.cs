@@ -587,13 +587,30 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> PopItem(ExecutionState state, Instruction inst)
     {
         var coll = state.Pop();
-        if (coll.Expression is not HeapRef href) throw new VmFaultException("POPITEM on non-array");
+        if (coll.Expression is not HeapRef href) throw new VmFaultException("POPITEM on non-collection");
         var obj = state.Heap.Get(href.ObjectId);
+        // Audit fix (iter-2 wakeup-4 differential): NeoVM accepts POPITEM on any CompoundType
+        // (Array, Struct, Map). Our prior implementation rejected Struct; the differential
+        // target found this within seconds.
         if (obj is ArrayObject a)
         {
-            if (a.Items.Count == 0) throw new CatchableVmException("POPITEM on empty array");
+            if (a.Items.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
             var v = a.Items[^1];
             a.Items.RemoveAt(a.Items.Count - 1);
+            state.Push(v);
+        }
+        else if (obj is StructObject st)
+        {
+            if (st.Fields.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
+            var v = st.Fields[^1];
+            st.Fields.RemoveAt(st.Fields.Count - 1);
+            state.Push(v);
+        }
+        else if (obj is MapObject m)
+        {
+            if (m.Entries.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
+            var (_, v) = m.Entries[^1];
+            m.Entries.RemoveAt(m.Entries.Count - 1);
             state.Push(v);
         }
         else
@@ -619,10 +636,19 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> MapValues(ExecutionState state, Instruction inst)
     {
         var coll = state.Pop();
-        if (coll.Expression is not HeapRef href) throw new VmFaultException("VALUES on non-map");
-        if (state.Heap.Get(href.ObjectId) is not MapObject m)
-            throw new VmFaultException("VALUES on non-map");
-        var arr = state.Heap.NewArray(m.Entries.Select(e => e.Value));
+        if (coll.Expression is not HeapRef href) throw new VmFaultException("VALUES on non-collection");
+        var obj = state.Heap.Get(href.ObjectId);
+        // Audit fix (iter-2 wakeup-4 differential): NeoVM's VALUES operates on any CompoundType
+        // — Array.SubItems, Struct.Fields, or Map.Entries.Values. Our prior code restricted
+        // to MapObject; the differential target found a real divergence on Array/Struct.
+        var values = obj switch
+        {
+            MapObject m => m.Entries.Select(e => e.Value),
+            ArrayObject a => a.Items.AsEnumerable(),
+            StructObject s => s.Fields.AsEnumerable(),
+            _ => throw new VmFaultException($"VALUES on {obj.Sort}"),
+        };
+        var arr = state.Heap.NewArray(values);
         state.Push(SymbolicValue.HeapRef(Sort.Array, arr.Id));
         state.Pc = inst.EndOffset;
         return Single(state);
