@@ -17,6 +17,11 @@ namespace Neo.SymbolicExecutor.Fuzzer.Coverage;
 /// </summary>
 public sealed class CoverageTracker
 {
+    /// <summary>Hard cap on tracked edges. Prevents pathological growth when state.Path emits
+    /// offsets outside the script range (which can happen for adversarial bytecode where Pc
+    /// briefly lands on an unaligned offset before the engine faults the state).</summary>
+    public const int MaxEdges = 65_536;
+
     private readonly ConcurrentDictionary<long, byte> _seen = new();
     private long _newCount;
     private long _hitCount;
@@ -24,6 +29,13 @@ public sealed class CoverageTracker
     /// <summary>Record visits, return how many were new.</summary>
     public int RecordPath(string target, IReadOnlyList<int> path)
     {
+        if (_seen.Count >= MaxEdges)
+        {
+            // At cap: count hits but stop adding new keys. Keeps the dict bounded and prevents
+            // it from being the leak source while we measure other targets in isolation.
+            Interlocked.Add(ref _hitCount, path.Count);
+            return 0;
+        }
         int newOnes = 0;
         int targetHash = target.GetHashCode();
         foreach (int off in path)

@@ -64,9 +64,34 @@ internal static class Program
                 : "runtime: unbounded (Ctrl+C to stop)");
             Console.WriteLine();
 
+            // Audit fix (iter-2 wakeup-1): hard watchdog. The async cancellation path
+            // through the worker pool occasionally hangs after MaxRuntime — likely because
+            // the catch-block CrashMinimizer doesn't observe the cancel token and can grind
+            // through 64 replays of a slow target. The long-run wrapper expects the dotnet
+            // process to exit at the chunk boundary; a hung process would stall the campaign
+            // forever. This watchdog runs as a background timer task and Environment.Exits
+            // if the configured runtime + 2 minute grace is exceeded.
+            if (opts.MaxRuntime is { } runtimeCap)
+            {
+                _ = Task.Run(async () =>
+                {
+                    var grace = runtimeCap + TimeSpan.FromMinutes(2);
+                    await Task.Delay(grace);
+                    Console.Error.WriteLine(
+                        $"[watchdog] runtime {runtimeCap} + 2 min grace elapsed; forcing Environment.Exit(2)");
+                    Environment.Exit(2);
+                });
+            }
+
             await campaign.RunAsync(cts.Token);
             int unique = campaign.Recorder.UniqueCrashes;
-            return unique == 0 ? 0 : 1;
+            // Belt-and-suspenders: even on clean exit we call Environment.Exit so any stray
+            // background ThreadPool tasks (e.g., the watchdog itself, GC scheduling, or a
+            // post-run minimizer) cannot keep the process alive past Main returning.
+            int exitCode = unique == 0 ? 0 : 1;
+            await Console.Out.FlushAsync();
+            Environment.Exit(exitCode);
+            return exitCode;  // unreachable; satisfies the compiler
         }
         catch (ArgumentException aex)
         {
@@ -152,9 +177,12 @@ internal static class Program
         bool stopOnFirst = false;
         TimeSpan statusInterval = TimeSpan.FromSeconds(10);
         // Audit-driven default: prior 4GB cap let the campaign accumulate ~1.5-1.9GB before the
-        // OOM killer hit a different process or the parent's RSS budget. Restart at 2GB GC-managed
-        // — the wrapper pulls fresh state, and we never see SIGKILL in practice.
-        long maxMemoryMb = 2048;
+        // OOM killer hit a different process. The 2GB cap from iter-2 surfaced a follow-up issue:
+        // memory still climbed to ~3.7GB before the cap fired, because (a) status thread runs
+        // every 10s and (b) workers were stuck in slow GC-bound iterations and didn't exit
+        // promptly. We now: (1) cap at 1.5GB, (2) check the flag inside the worker foreach, and
+        // (3) trigger an aggressive Gen-2 GC when mem crosses half the cap.
+        long maxMemoryMb = 1536;
         string? reproduce = null;
         var selected = new List<IFuzzTarget>(allTargets);
 

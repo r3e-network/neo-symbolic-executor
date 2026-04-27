@@ -75,7 +75,12 @@ public sealed class FuzzCampaign
         {
             foreach (var target in _opts.Targets)
             {
-                if (cancel.IsCancellationRequested) return;
+                // Audit fix (iter-2 wakeup-1): check the cap inside the foreach, not just at
+                // the outer while. Without this, when memory pressure drives the engine to
+                // millisecond-per-iteration speeds, the worker takes too long to drain a full
+                // pass through all 20 targets before noticing the cap and exiting. A 30-min
+                // tail of useless slow iterations during a stuck-fuzzer cycle is the result.
+                if (cancel.IsCancellationRequested || _memoryCapBreached) return;
                 int seed = unchecked((int)Interlocked.Increment(ref _seedCounter));
                 _stats.RecordIteration(target.Name);
                 try
@@ -150,6 +155,19 @@ public sealed class FuzzCampaign
         long total = _stats.Total;
         double rate = total / Math.Max(1, elapsed.TotalSeconds);
         long memMb = GC.GetTotalMemory(false) / (1024 * 1024);
+
+        // Audit fix (iter-2 wakeup-1): proactively trigger a Gen-2 collection when memory drifts
+        // past the soft floor. Without this, the new target set's per-iteration GC pressure
+        // accumulates until the LOH and Gen-2 are both bloated, dragging throughput by 20×.
+        // Default mode + non-blocking is the lightest GC hint we can give — Aggressive caused
+        // the runtime to hang in shutdown.
+        long softFloorMb = Math.Max(256, _opts.MaxMemoryMb / 2);
+        if (memMb > softFloorMb)
+        {
+            GC.Collect(generation: 2, GCCollectionMode.Default, blocking: false);
+            memMb = GC.GetTotalMemory(false) / (1024 * 1024);
+        }
+
         var sb = new System.Text.StringBuilder();
         sb.Append($"[{elapsed:hh\\:mm\\:ss}] iters={total:N0} ({rate:F0}/s) " +
                   $"mem={memMb}MB crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
