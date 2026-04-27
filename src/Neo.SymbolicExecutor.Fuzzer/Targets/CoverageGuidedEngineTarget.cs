@@ -25,7 +25,13 @@ public sealed class CoverageGuidedEngineTarget : IFuzzTarget
     public bool SupportsDirectReplay => true;
 
     private static readonly CoverageTracker GlobalTracker = new();
-    private static readonly InterestingCorpus GlobalCorpus = new(capacity: 4096);
+    // Optional disk persistence: if NEO_SYM_FUZZ_COV_DIR is set, the corpus loads any prior
+    // saved entries on construction and saves new ones to that directory. The wrapper script
+    // sets this to <fuzz-corpus-root>/coverage-corpus so coverage compounds across the daily
+    // 24h restarts. Without persistence, each restart loses all coverage state.
+    private static readonly InterestingCorpus GlobalCorpus = new(
+        capacity: 4096,
+        persistDir: System.Environment.GetEnvironmentVariable("NEO_SYM_FUZZ_COV_DIR"));
 
     public static long UniqueEdges => GlobalTracker.UniqueEdges;
     public static int CorpusSize => GlobalCorpus.Count;

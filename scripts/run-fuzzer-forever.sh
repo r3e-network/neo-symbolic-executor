@@ -24,8 +24,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FUZZER_DLL="$REPO_ROOT/src/Neo.SymbolicExecutor.Fuzzer/bin/Release/net10.0/neo-sym-fuzz.dll"
 LOGDIR="$CORPUS/logs"
 STOP_FILE="$CORPUS/STOP"
+COV_DIR="$CORPUS/coverage-corpus"
 
-mkdir -p "$CORPUS" "$LOGDIR"
+mkdir -p "$CORPUS" "$LOGDIR" "$COV_DIR"
+
+# Iter-2 wakeup-3: persist the coverage-guided corpus across daily restarts. The fuzzer's
+# CoverageGuidedEngineTarget reads this env var; if set, it loads any prior saved interesting
+# inputs on startup and writes new ones to disk. Without this, each chunk restart loses the
+# coverage-guided exploration state and the campaign re-explores the same shallow inputs.
+export NEO_SYM_FUZZ_COV_DIR="$COV_DIR"
 
 if [ ! -f "$FUZZER_DLL" ]; then
   echo "[wrapper] building fuzzer..."
