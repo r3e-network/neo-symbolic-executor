@@ -21,6 +21,22 @@ public sealed class Heap
         _nextId = 1;
     }
 
+    /// <summary>
+    /// Construct a Heap with explicit budgets. Used by <see cref="SymbolicEngine"/> to plumb
+    /// <see cref="ExecutionOptions"/> values through to the heap so a fuzz target's tighter
+    /// MaxItemSize / MaxHeapObjects actually constrain allocation. Without this constructor,
+    /// the default-constructed Heap silently overrode the engine's options and allowed up to
+    /// 1 MiB × 4096 = 4 GiB peaks per state — the iter-2 wakeup-2 memory bomb.
+    /// </summary>
+    public Heap(int maxObjects, int maxItemSize, int maxCollectionSize)
+    {
+        _objects = new Dictionary<int, HeapObject>();
+        _nextId = 1;
+        MaxObjects = maxObjects;
+        MaxItemSize = maxItemSize;
+        MaxCollectionSize = maxCollectionSize;
+    }
+
     private Heap(Dictionary<int, HeapObject> objects, int nextId, int maxObjects, int maxItemSize, int maxCollectionSize)
     {
         _objects = objects;

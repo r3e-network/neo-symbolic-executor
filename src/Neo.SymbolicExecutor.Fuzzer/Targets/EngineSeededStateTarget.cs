@@ -25,7 +25,14 @@ public sealed class EngineSeededStateTarget : IFuzzTarget
         try { program = ScriptDecoder.Decode(bytes); }
         catch (VmFaultException) { return true; }
 
-        var state = new ExecutionState();
+        // Audit fix (iter-2 wakeup-2): construct the Heap with the same budgets we'll pass to
+        // the engine. The default-constructed Heap allows up to 1 MiB × 4096 objects per state,
+        // which under symbolic forking produces multi-GB peaks. The seeded target uses smaller
+        // engine budgets but the heap was silently larger.
+        var state = new ExecutionState
+        {
+            Heap = new Heap(maxObjects: 256, maxItemSize: 16 * 1024, maxCollectionSize: 128),
+        };
         state.CallStack.Add(new CallFrame(returnPc: -1));
         state.Pc = 0;
 
@@ -48,6 +55,11 @@ public sealed class EngineSeededStateTarget : IFuzzTarget
             MaxPaths = 32,
             MaxStackSize = 128,
             MaxInvocationStackDepth = 32,
+            MaxItemSize = 16 * 1024,
+            MaxCollectionSize = 128,
+            MaxHeapObjects = 256,
+            MaxQueuedStates = 128,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run(state);
 
         if (result.FinalStates.Any(s => s.Status == TerminalStatus.Running))

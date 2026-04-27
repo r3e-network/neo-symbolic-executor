@@ -37,11 +37,13 @@ public sealed class StructureAwareMutationTarget : IFuzzTarget
         {
             MaxSteps = 2_000,
             MaxPaths = 32,
-            MaxQueuedStates = 256,
+            MaxQueuedStates = 128,
             MaxStackSize = 128,
             MaxInvocationStackDepth = 64,
-            MaxItemSize = 64 * 1024,
+            MaxItemSize = 32 * 1024,
             MaxCollectionSize = 256,
+            MaxHeapObjects = 512,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
 
         if (result.FinalStates.Any(s => s.Status == TerminalStatus.Running))

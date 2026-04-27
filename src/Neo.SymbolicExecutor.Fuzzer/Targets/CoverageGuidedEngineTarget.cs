@@ -30,19 +30,22 @@ public sealed class CoverageGuidedEngineTarget : IFuzzTarget
     public static long UniqueEdges => GlobalTracker.UniqueEdges;
     public static int CorpusSize => GlobalCorpus.Count;
 
-    // Audit fix (iter-2 wakeup-1): cut per-iteration peak memory roughly in half. Solo isolation
-    // testing showed engine-cov was the dominant memory-growth source — managed memory climbed
-    // to 559 MB in 25 seconds at 265K iter/s. Halving the budgets brings the iteration footprint
-    // down enough for the wrapper-restart cycle to pace itself rather than fire every few minutes.
+    // Audit fix (iter-2 wakeup-1+2): cap per-iteration memory tightly. Wakeup-1 halved the
+    // engine budgets; wakeup-2 added MaxHeapObjects to the picture after a single iteration
+    // jumped managed memory from 300 MB to 3.4 GB inside 10 seconds (path-fork explosion of
+    // a state with many heap allocations, each cloned 16+ times across the worklist). Heap
+    // budgets are now explicitly tight: 256 objects × 16 KiB = 4 MiB max heap per state.
     private readonly ExecutionOptions _engineOptions = new()
     {
         MaxSteps = 2_000,
         MaxPaths = 16,
         MaxStackSize = 96,
         MaxInvocationStackDepth = 32,
-        MaxItemSize = 32 * 1024,
+        MaxItemSize = 16 * 1024,
         MaxCollectionSize = 128,
-        MaxQueuedStates = 128,
+        MaxHeapObjects = 256,
+        MaxQueuedStates = 64,
+        PerRunDeadline = System.TimeSpan.FromSeconds(2),
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)

@@ -15,15 +15,20 @@ public sealed class EngineRandomScriptTarget : IFuzzTarget
     public Type[] ExpectedExceptions => Type.EmptyTypes; // engine.Run should swallow everything
     public bool SupportsDirectReplay => true;
 
+    // Audit fix (iter-2 wakeup-2): tighter heap budget. See CoverageGuidedEngineTarget for
+    // the memory-bomb context — the same applies to every target that runs the engine on
+    // generator-controlled bytecode.
     private readonly ExecutionOptions _engineOptions = new()
     {
         MaxSteps = 2_000,
         MaxPaths = 32,
         MaxStackSize = 128,
         MaxInvocationStackDepth = 64,
-        MaxItemSize = 64 * 1024,
+        MaxItemSize = 32 * 1024,
         MaxCollectionSize = 256,
-        MaxQueuedStates = 256,
+        MaxHeapObjects = 512,
+        MaxQueuedStates = 128,
+        PerRunDeadline = System.TimeSpan.FromSeconds(2),
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)

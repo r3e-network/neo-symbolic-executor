@@ -34,7 +34,8 @@ public sealed class HeapInvariantTarget : IFuzzTarget
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
             MaxSteps = 2_000, MaxPaths = 16, MaxStackSize = 64,
-            MaxItemSize = 16 * 1024, MaxCollectionSize = 128,
+            MaxItemSize = 16 * 1024, MaxCollectionSize = 128, MaxHeapObjects = 256,
+            MaxQueuedStates = 64, PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
 
         foreach (var s in result.FinalStates)

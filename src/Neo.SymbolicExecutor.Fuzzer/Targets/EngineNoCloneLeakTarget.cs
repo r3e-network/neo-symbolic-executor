@@ -29,6 +29,11 @@ public sealed class EngineNoCloneLeakTarget : IFuzzTarget
             MaxSteps = 1_000,
             MaxPaths = 16,
             MaxStackSize = 64,
+            MaxItemSize = 16 * 1024,
+            MaxCollectionSize = 128,
+            MaxHeapObjects = 256,
+            MaxQueuedStates = 64,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
         if (result.FinalStates.Length < 2) return true;
 

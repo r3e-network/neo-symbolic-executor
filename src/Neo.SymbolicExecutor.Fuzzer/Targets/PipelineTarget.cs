@@ -36,8 +36,11 @@ public sealed class PipelineTarget : IFuzzTarget
             MaxPaths = 32,
             MaxStackSize = 128,
             MaxInvocationStackDepth = 64,
-            MaxItemSize = 64 * 1024,
+            MaxItemSize = 32 * 1024,
             MaxCollectionSize = 256,
+            MaxHeapObjects = 512,
+            MaxQueuedStates = 128,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
 
         if (execResult.FinalStates.Any(s => s.Status == TerminalStatus.Running))

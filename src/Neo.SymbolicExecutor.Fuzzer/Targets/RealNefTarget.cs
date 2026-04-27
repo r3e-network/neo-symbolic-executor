@@ -93,8 +93,11 @@ public sealed class RealNefTarget : IFuzzTarget
             MaxPaths = 64,
             MaxStackSize = 256,
             MaxInvocationStackDepth = 128,
-            MaxItemSize = 256 * 1024,
-            MaxCollectionSize = 1024,
+            MaxItemSize = 64 * 1024,
+            MaxCollectionSize = 512,
+            MaxHeapObjects = 1024,
+            MaxQueuedStates = 256,
+            PerRunDeadline = System.TimeSpan.FromSeconds(5),
         }).Run();
 
         if (execResult.FinalStates.Any(s => s.Status == TerminalStatus.Running))

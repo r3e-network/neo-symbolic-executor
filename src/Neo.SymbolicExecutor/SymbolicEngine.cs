@@ -44,6 +44,13 @@ public sealed partial class SymbolicEngine
         var start = initial ?? CreateInitialState();
         _worklist.Enqueue(start);
 
+        // Audit fix (iter-2 wakeup-2 mem bomb): wall-clock deadline. A single state's fork
+        // point can spawn many heap clones in a single step (each path forks a new heap); none
+        // of those steps individually exceeds MaxSteps, but the aggregate memory pressure can
+        // jump 3 GB in a few hundred ms. Track an absolute deadline at engine entry and drain
+        // the worklist when it fires — the next step boundary picks it up.
+        var deadline = _options.PerRunDeadline is { } d ? System.DateTime.UtcNow + d : (System.DateTime?)null;
+
         while (_worklist.Count > 0)
         {
             if (_finalStates.Count >= _options.MaxPaths)
@@ -59,6 +66,12 @@ public sealed partial class SymbolicEngine
             if (_options.MaxQueuedStates > 0 && _worklist.Count >= _options.MaxQueuedStates)
             {
                 DrainWorklist("max queued states reached");
+                break;
+            }
+
+            if (deadline is { } dl && System.DateTime.UtcNow > dl)
+            {
+                DrainWorklist("per-run wall-clock deadline exceeded");
                 break;
             }
 
@@ -140,7 +153,14 @@ public sealed partial class SymbolicEngine
 
     private ExecutionState CreateInitialState()
     {
-        var state = new ExecutionState();
+        // Audit fix (iter-2 wakeup-2 memory bomb): construct the Heap with the engine's budgets
+        // rather than letting it default to 1 MiB × 4096 objects. Without this plumbing a single
+        // pathological iteration could allocate ~3 GB before any cap fired, freezing all six
+        // workers on that iteration.
+        var state = new ExecutionState
+        {
+            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
+        };
         state.CallStack.Add(new CallFrame(returnPc: -1));
         state.Pc = 0;
         return state;

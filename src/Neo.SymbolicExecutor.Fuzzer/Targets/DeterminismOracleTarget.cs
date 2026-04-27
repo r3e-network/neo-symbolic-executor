@@ -27,8 +27,9 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
     private static readonly ExecutionOptions Options = new()
     {
         MaxSteps = 2_000, MaxPaths = 32, MaxStackSize = 128,
-        MaxInvocationStackDepth = 64, MaxItemSize = 64 * 1024,
-        MaxCollectionSize = 256, MaxQueuedStates = 256,
+        MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
+        MaxCollectionSize = 256, MaxHeapObjects = 512,
+        MaxQueuedStates = 128, PerRunDeadline = System.TimeSpan.FromSeconds(2),
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)

@@ -14,9 +14,16 @@ public sealed record ExecutionOptions
     public int MaxStackSize { get; init; } = 2_048;
     public int MaxInvocationStackDepth { get; init; } = 1_024;
     public int MaxTryDepth { get; init; } = 16;
-    public int MaxItemSize { get; init; } = 1_048_576;
-    public int MaxCollectionSize { get; init; } = 2_048;
-    public int MaxHeapObjects { get; init; } = 4_096;
+    // Audit fix (iter-2 wakeup-2): tighter heap defaults to bound peak memory under fuzz-style
+    // path explosion. NeoVM's max stack item size is 1 MiB, but allowing every analyzer state to
+    // independently allocate a 1 MiB buffer × up to 4096 objects, then cloning that across 32+
+    // forked paths and 256+ queued states, produces multi-GB peaks before any cap fires. The
+    // analyzer doesn't need full NeoVM-scale buffers for symbolic exploration; 64 KiB items × 1024
+    // objects is a more realistic ceiling that still covers every Neo DevPack contract we've
+    // observed in practice. The CLI can still raise these via explicit --max-* flags if needed.
+    public int MaxItemSize { get; init; } = 65_536;
+    public int MaxCollectionSize { get; init; } = 512;
+    public int MaxHeapObjects { get; init; } = 1_024;
     public int MaxShiftCount { get; init; } = 256;
     public int MaxPowExponent { get; init; } = 256;
 
@@ -46,6 +53,16 @@ public sealed record ExecutionOptions
     /// quickly; this cap prevents runaway exploration. 0 disables concretization entirely.
     /// </summary>
     public int MaxConcretizations { get; init; } = 8;
+
+    /// <summary>
+    /// Wall-clock deadline for a single Run() call. When set and exceeded, the engine drains
+    /// the worklist as Stopped (Truncated) on the next step boundary. This is the only bound
+    /// that catches per-iteration memory bombs caused by path-fork explosion of heap allocations
+    /// — `MaxSteps` accounts work-per-state, not aggregate wall-clock, and a single state's
+    /// fork point can spawn 256+ clones each with their own heap before any of them advances
+    /// step-counted work. Default zero (disabled); fuzz targets set ~1-5 seconds.
+    /// </summary>
+    public System.TimeSpan? PerRunDeadline { get; init; }
 
     public static ExecutionOptions Default { get; } = new();
 }
