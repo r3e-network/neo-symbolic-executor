@@ -443,9 +443,11 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleShift(ExecutionState state, Instruction inst, string opName, bool isLeft)
     {
         var b = state.Pop();
-        // Only the concrete-zero case diverges from BinaryArith. For non-zero or symbolic
-        // shifts we apply the simplifier and pop x normally — matches NeoVM "shift != 0" path.
-        if (b.AsConcreteInt() is { } shift && shift == 0)
+        // Audit fix (iter-2 wakeup-5): NeoVM's GetInteger converts Bool/ByteString to BigInteger
+        // before checking shift==0. Use Expr.ConcreteInt for the same cross-type semantics —
+        // a PUSH5 NOT SHR (where NOT produces BoolConst.False = shift 0) used to underflow on
+        // the second pop because b.AsConcreteInt() returned null on a BoolConst.
+        if (Expr.ConcreteInt(b.Expression) is { } shift && shift == 0)
         {
             state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
                 inst.Offset, opName, b, null,

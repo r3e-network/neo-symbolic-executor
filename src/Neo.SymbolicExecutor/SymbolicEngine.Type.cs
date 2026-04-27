@@ -132,6 +132,13 @@ public sealed partial class SymbolicEngine
                 v.AsConcreteInt() is { } bi2
                     ? SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(Expr.IntegerToBytes(bi2)).Id)
                     : SymbolicValue.Of(new UnaryExpr(Sort.Buffer, "i2buf", v.Expression), v.Taints),
+            // Audit fix (iter-2 wakeup-5 differential): NeoVM's PrimitiveType.ConvertTo(Buffer)
+            // is `new Buffer(GetSpan())` — works for ANY primitive (Boolean, Integer, ByteString).
+            // Boolean's GetSpan returns [] for false and [1] for true.
+            (StackItemTypeCodes.Buffer, Sort.Bool) =>
+                v.AsConcreteBool() == true
+                    ? SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(new byte[] { 1 }).Id)
+                    : SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(System.Array.Empty<byte>()).Id),
 
             // Struct ↔ Array — sort change with content preserved per NeoVM rules. We allocate
             // a fresh heap object of the target sort containing the same items list.

@@ -42,6 +42,21 @@ public static class Expr
         return ab.AsSpan().SequenceEqual(bb);
     }
 
+    /// <summary>
+    /// Audit fix (iter-2 wakeup-5 differential): NeoVM's `Pop().GetInteger()` converts Boolean
+    /// (false=0, true=1) and ByteString (little-endian signed) to BigInteger. The numeric
+    /// comparison branches and arithmetic ops need to fold the same cross-type semantics or
+    /// they fail to resolve concrete comparisons like JMPGE (11, false) → fork instead of
+    /// concretely true.
+    /// </summary>
+    public static BigInteger? ConcreteInt(Expression e) => e switch
+    {
+        IntConst i => i.Value,
+        BoolConst b => b.Value ? BigInteger.One : BigInteger.Zero,
+        BytesConst by => BytesToInteger(by.Value),
+        _ => null,
+    };
+
     public static byte[] IntegerToBytes(BigInteger value)
     {
         if (value.IsZero) return Array.Empty<byte>();
@@ -55,18 +70,38 @@ public static class Expr
     }
 
     // ---- Boolean / truthiness
+    // Audit fix (iter-2 wakeup-5 differential): NeoVM's GetBoolean has type-specific rules:
+    //   ByteString → any-nonzero-byte (NOT just non-empty — `[0]` is FALSE)
+    //   CompoundType (Array/Struct/Map) → always TRUE
+    //   Buffer → always TRUE
+    //   Null → FALSE
+    // Our engine previously treated ByteString as length>0 (wrong for `[0,0,0]`) and
+    // returned null for HeapRef (causing NOT/SHR fast-paths to fall through to Pop).
     public static bool? Truthy(Expression e) => e switch
     {
         IntConst i => !i.Value.IsZero,
         BoolConst b => b.Value,
-        BytesConst by => by.Value.Length > 0,
+        BytesConst by => HasNonZeroByte(by.Value),
         NullConst => false,
+        HeapRef => true,
         _ => null,
     };
 
+    private static bool HasNonZeroByte(byte[] bytes)
+    {
+        foreach (var b in bytes) if (b != 0) return true;
+        return false;
+    }
+
     // ---- Arithmetic
+    // Audit fix (iter-2 wakeup-5 differential): every numeric simplifier should canonicalize
+    // Bool/Bytes/Int via ConcreteInt before deciding if it can fold concretely. NeoVM's
+    // Pop().GetInteger() does this implicit conversion; we have to mirror it or `false ABS`
+    // becomes a UnaryExpr that downstream comparisons can't fold to a known branch.
+
     public static Expression Add(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } ax && ConcreteInt(b) is { } bx) return Int(ax + bx);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value + bi.Value);
         if (a is IntConst z1 && z1.Value.IsZero) return b;
         if (b is IntConst z2 && z2.Value.IsZero) return a;
@@ -75,6 +110,7 @@ public static class Expr
 
     public static Expression Sub(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } ax2 && ConcreteInt(b) is { } bx2) return Int(ax2 - bx2);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value - bi.Value);
         if (b is IntConst z && z.Value.IsZero) return a;
         return new BinaryExpr(Sort.Int, "-", a, b);
@@ -82,6 +118,7 @@ public static class Expr
 
     public static Expression Mul(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } ax3 && ConcreteInt(b) is { } bx3) return Int(ax3 * bx3);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value * bi.Value);
         if (a is IntConst z && z.Value.IsZero) return Int(0);
         if (b is IntConst z2 && z2.Value.IsZero) return Int(0);
@@ -92,19 +129,19 @@ public static class Expr
 
     public static Expression Div(Expression a, Expression b)
     {
-        if (b is IntConst bz && bz.Value.IsZero)
+        if (ConcreteInt(b) is { } div_b && div_b.IsZero)
             throw new VmFaultException("DIV by zero");
-        if (a is IntConst ai && b is IntConst bi)
-            return Int(NeoTruncatedDivide(ai.Value, bi.Value));
+        if (ConcreteInt(a) is { } div_a && ConcreteInt(b) is { } div_b2)
+            return Int(NeoTruncatedDivide(div_a, div_b2));
         return new BinaryExpr(Sort.Int, "/", a, b);
     }
 
     public static Expression Mod(Expression a, Expression b)
     {
-        if (b is IntConst bz && bz.Value.IsZero)
+        if (ConcreteInt(b) is { } mod_b && mod_b.IsZero)
             throw new VmFaultException("MOD by zero");
-        if (a is IntConst ai && b is IntConst bi)
-            return Int(NeoTruncatedModulo(ai.Value, bi.Value));
+        if (ConcreteInt(a) is { } mod_a && ConcreteInt(b) is { } mod_b2)
+            return Int(NeoTruncatedModulo(mod_a, mod_b2));
         return new BinaryExpr(Sort.Int, "%", a, b);
     }
 
@@ -119,19 +156,19 @@ public static class Expr
 
     public static Expression Neg(Expression a)
     {
-        if (a is IntConst ai) return Int(-ai.Value);
+        if (ConcreteInt(a) is { } ax) return Int(-ax);
         return new UnaryExpr(Sort.Int, "neg", a);
     }
 
     public static Expression Abs(Expression a)
     {
-        if (a is IntConst ai) return Int(BigInteger.Abs(ai.Value));
+        if (ConcreteInt(a) is { } ax) return Int(BigInteger.Abs(ax));
         return new UnaryExpr(Sort.Int, "abs", a);
     }
 
     public static Expression Sign(Expression a)
     {
-        if (a is IntConst ai) return Int(ai.Value.Sign);
+        if (ConcreteInt(a) is { } ax) return Int(ax.Sign);
         return new UnaryExpr(Sort.Int, "sign", a);
     }
 
@@ -140,21 +177,21 @@ public static class Expr
 
     public static Expression Pow(Expression a, Expression b, int maxExponent = 256)
     {
-        if (a is IntConst ai && b is IntConst bi)
+        if (ConcreteInt(a) is { } pow_a && ConcreteInt(b) is { } pow_b)
         {
-            if (bi.Value < 0) throw new VmFaultException("POW negative exponent");
-            if (bi.Value > maxExponent) throw new VmFaultException("POW exponent too large");
-            return Int(BigInteger.Pow(ai.Value, (int)bi.Value));
+            if (pow_b < 0) throw new VmFaultException("POW negative exponent");
+            if (pow_b > maxExponent) throw new VmFaultException("POW exponent too large");
+            return Int(BigInteger.Pow(pow_a, (int)pow_b));
         }
         return new BinaryExpr(Sort.Int, "pow", a, b);
     }
 
     public static Expression Sqrt(Expression a)
     {
-        if (a is IntConst ai)
+        if (ConcreteInt(a) is { } sqrt_a)
         {
-            if (ai.Value < 0) throw new VmFaultException("SQRT negative input");
-            return Int(IntegerSquareRoot(ai.Value));
+            if (sqrt_a < 0) throw new VmFaultException("SQRT negative input");
+            return Int(IntegerSquareRoot(sqrt_a));
         }
         return new UnaryExpr(Sort.Int, "sqrt", a);
     }
@@ -187,11 +224,40 @@ public static class Expr
         if (a is IntConst ai && b is IntConst bi && m is IntConst mi)
         {
             if (mi.Value.IsZero) throw new VmFaultException("MODPOW with zero modulus");
+            // Audit fix (iter-2 wakeup-5 differential): NeoVM treats exp == -1 as modular
+            // inverse via extended Euclidean. Any other negative exp throws. Match exactly.
+            if (bi.Value == -1)
+                return Int(ModInverse(ai.Value, mi.Value));
             if (bi.Value < 0)
-                throw new VmFaultException("MODPOW with negative exponent (modular inverse) not modeled concretely");
+                throw new VmFaultException($"MODPOW with negative exponent {bi.Value}");
             return Int(BigInteger.ModPow(ai.Value, bi.Value, mi.Value));
         }
         return new TernaryExpr(Sort.Int, "modpow", a, b, m);
+    }
+
+    /// <summary>
+    /// Modular inverse via extended Euclidean. Mirrors Neo.VM.Utility.ModInverse exactly so
+    /// MODPOW with exp == -1 produces bit-identical output. Throws on invalid inputs (value
+    /// non-positive, modulus &lt; 2, or no inverse exists).
+    /// </summary>
+    private static BigInteger ModInverse(BigInteger value, BigInteger modulus)
+    {
+        if (value <= 0)
+            throw new VmFaultException($"MODPOW.ModInverse: value {value} must be positive");
+        if (modulus < 2)
+            throw new VmFaultException($"MODPOW.ModInverse: modulus {modulus} must be >= 2");
+        BigInteger r = value, old_r = modulus, s = 1, old_s = 0;
+        while (r > 0)
+        {
+            BigInteger q = old_r / r;
+            (old_r, r) = (r, old_r % r);
+            (old_s, s) = (s, old_s - q * s);
+        }
+        BigInteger result = old_s % modulus;
+        if (result < 0) result += modulus;
+        if (!(value * result % modulus).IsOne)
+            throw new VmFaultException($"MODPOW.ModInverse: no inverse for {value} mod {modulus}");
+        return result;
     }
 
     public static Expression Shl(Expression a, Expression b, int maxShift = 256)
@@ -222,6 +288,7 @@ public static class Expr
     // with non-int operands — a sort-lattice inconsistency.
     public static Expression And(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } and_a && ConcreteInt(b) is { } and_b) return Int(and_a & and_b);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value & bi.Value);
         if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) & (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "&", a, b);
@@ -229,6 +296,7 @@ public static class Expr
 
     public static Expression Or(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } or_a && ConcreteInt(b) is { } or_b) return Int(or_a | or_b);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value | bi.Value);
         if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) | (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "|", a, b);
@@ -236,6 +304,7 @@ public static class Expr
 
     public static Expression Xor(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } xor_a && ConcreteInt(b) is { } xor_b) return Int(xor_a ^ xor_b);
         if (a is IntConst ai && b is IntConst bi) return Int(ai.Value ^ bi.Value);
         if (a is BoolConst ab && b is BoolConst bb) return Int((ab.Value ? 1 : 0) ^ (bb.Value ? 1 : 0));
         return new BinaryExpr(Sort.Int, "^", a, b);
@@ -243,7 +312,7 @@ public static class Expr
 
     public static Expression Invert(Expression a)
     {
-        if (a is IntConst ai) return Int(~ai.Value);
+        if (ConcreteInt(a) is { } ax) return Int(~ax);
         return new UnaryExpr(Sort.Int, "~", a);
     }
 
@@ -270,6 +339,13 @@ public static class Expr
         }
         if (a is HeapRef ah && b is HeapRef bh)
             return Bool(ah.RefSort == bh.RefSort && ah.ObjectId == bh.ObjectId);
+        // Audit fix (iter-2 wakeup-5 differential): a HeapRef compared to a concrete primitive
+        // (Int/Bool/Bytes) reduces to BoolConst.False per NeoVM — they are different StackItem
+        // types and Equals returns false. The prior code emitted a BinaryExpr that downstream
+        // ops couldn't reduce, causing e.g. NEWMAP PUSH12 EQUAL SHR to underflow on the SHR
+        // because EQUAL's BinaryExpr result couldn't fold to 0 for the shift==0 fast path.
+        if (a is HeapRef && b.IsConcrete && b is not NullConst) return BoolConst.False;
+        if (b is HeapRef && a.IsConcrete && a is not NullConst) return BoolConst.False;
         if (a is BoolConst ab && b is BoolConst bb) return Bool(ab.Value == bb.Value);
         return new BinaryExpr(Sort.Bool, "==", a, b);
     }
@@ -281,38 +357,47 @@ public static class Expr
         return Not(eq);
     }
 
+    // Audit fix (iter-2 wakeup-5 differential): NeoVM's numeric comparisons (LT/LE/GT/GE)
+    // explicitly handle null on either side by pushing false, BEFORE attempting GetInteger.
+    // Our prior implementation fell through to a BinaryExpr that downstream ops couldn't fold.
     public static Expression Lt(Expression a, Expression b)
     {
-        if (a is IntConst ai && b is IntConst bi) return Bool(ai.Value < bi.Value);
+        if (a is NullConst || b is NullConst) return BoolConst.False;
+        if (ConcreteInt(a) is { } ax && ConcreteInt(b) is { } bx) return Bool(ax < bx);
         return new BinaryExpr(Sort.Bool, "<", a, b);
     }
 
     public static Expression Le(Expression a, Expression b)
     {
-        if (a is IntConst ai && b is IntConst bi) return Bool(ai.Value <= bi.Value);
+        if (a is NullConst || b is NullConst) return BoolConst.False;
+        if (ConcreteInt(a) is { } ax && ConcreteInt(b) is { } bx) return Bool(ax <= bx);
         return new BinaryExpr(Sort.Bool, "<=", a, b);
     }
 
     public static Expression Gt(Expression a, Expression b)
     {
-        if (a is IntConst ai && b is IntConst bi) return Bool(ai.Value > bi.Value);
+        if (a is NullConst || b is NullConst) return BoolConst.False;
+        if (ConcreteInt(a) is { } ax && ConcreteInt(b) is { } bx) return Bool(ax > bx);
         return new BinaryExpr(Sort.Bool, ">", a, b);
     }
 
     public static Expression Ge(Expression a, Expression b)
     {
-        if (a is IntConst ai && b is IntConst bi) return Bool(ai.Value >= bi.Value);
+        if (a is NullConst || b is NullConst) return BoolConst.False;
+        if (ConcreteInt(a) is { } ax && ConcreteInt(b) is { } bx) return Bool(ax >= bx);
         return new BinaryExpr(Sort.Bool, ">=", a, b);
     }
 
     public static Expression Min(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } min_a && ConcreteInt(b) is { } min_b) return Int(BigInteger.Min(min_a, min_b));
         if (a is IntConst ai && b is IntConst bi) return Int(BigInteger.Min(ai.Value, bi.Value));
         return new BinaryExpr(Sort.Int, "min", a, b);
     }
 
     public static Expression Max(Expression a, Expression b)
     {
+        if (ConcreteInt(a) is { } max_a && ConcreteInt(b) is { } max_b) return Int(BigInteger.Max(max_a, max_b));
         if (a is IntConst ai && b is IntConst bi) return Int(BigInteger.Max(ai.Value, bi.Value));
         return new BinaryExpr(Sort.Int, "max", a, b);
     }
@@ -327,8 +412,11 @@ public static class Expr
     // ---- Logic
     public static Expression Not(Expression a)
     {
-        if (a is BoolConst b) return Bool(!b.Value);
-        if (a is IntConst i) return Bool(i.Value.IsZero);  // NOT on int treats 0/1 as bool per NeoVM
+        // Audit fix (iter-2 wakeup-5 differential): use Truthy() so NOT(HeapRef)/NOT(NullConst)/
+        // NOT(BytesConst) all reduce concretely. Prior code only handled BoolConst and IntConst,
+        // so NEWARRAY0 NOT produced a UnaryExpr that downstream SHR couldn't fold to shift==0.
+        var t = Truthy(a);
+        if (t.HasValue) return Bool(!t.Value);
         if (a is UnaryExpr u && u.Op == "not") return u.Operand;
         return new UnaryExpr(Sort.Bool, "not", a);
     }
@@ -362,7 +450,7 @@ public static class Expr
 
     public static Expression Nz(Expression a)
     {
-        if (a is IntConst i) return Bool(!i.Value.IsZero);
+        if (ConcreteInt(a) is { } v) return Bool(!v.IsZero);
         return new UnaryExpr(Sort.Bool, "nz", a);
     }
 
