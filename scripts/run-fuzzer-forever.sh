@@ -34,6 +34,15 @@ mkdir -p "$CORPUS" "$LOGDIR" "$COV_DIR"
 # coverage-guided exploration state and the campaign re-explores the same shallow inputs.
 export NEO_SYM_FUZZ_COV_DIR="$COV_DIR"
 
+# Iter-2 wakeup-14: point real-nef target at curated DevPack/Solidity/Morpheus contract
+# corpus. The target recursively scans this directory for *.nef and runs the full pipeline
+# (parse → engine → detectors → report). When unset, the target trivially returns success
+# and produces no useful coverage. Curate a set of distinct contracts in the corpus dir.
+NEF_CORPUS="$CORPUS/real-nef-contracts"
+if [ -d "$NEF_CORPUS" ]; then
+  export NEO_SYM_FUZZ_NEF_DIR="$NEF_CORPUS"
+fi
+
 if [ ! -f "$FUZZER_DLL" ]; then
   echo "[wrapper] building fuzzer..."
   dotnet build "$REPO_ROOT/src/Neo.SymbolicExecutor.Fuzzer/Neo.SymbolicExecutor.Fuzzer.csproj" -c Release > "$LOGDIR/build.log" 2>&1
