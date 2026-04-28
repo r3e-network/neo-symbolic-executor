@@ -24,17 +24,24 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
     public Type[] ExpectedExceptions => Type.EmptyTypes;
     public bool SupportsDirectReplay => true;
 
-    // Audit fix (iter-2 wakeup-35): NO PerRunDeadline for the determinism oracle. A wall-clock
-    // deadline introduces test-flake by design — the first run is colder (JIT warmup) than the
-    // second, so the same script can exhaust 2 s on run 1 but complete on run 2 with mismatched
-    // step counts. Step + state + queue caps already bound work; the deadline was just a
-    // belt-and-suspenders safety net for malicious bytecode. Determinism testing needs neither.
+    // Audit fix (iter-2 wakeup-36): PerRunDeadline at 30 s.
+    //
+    // Iteration history:
+    //   wakeup-35: removed PerRunDeadline entirely — it caused JIT-warmup-dependent
+    //   non-determinism (first run hits 2 s deadline, second doesn't). But that left the
+    //   oracle without a memory safety net; a pathological iteration can allocate 8 GB
+    //   in a single Run() before MaxSteps fires.
+    //
+    //   wakeup-36 (now): PerRunDeadline = 30 s. JIT warmup variance is ~tens of ms; with
+    //   a 30 s budget that's < 0.2% of the limit, so both runs always agree on whether
+    //   the deadline fires. Memory bombs are still bounded.
     private static readonly ExecutionOptions Options = new()
     {
         MaxSteps = 2_000, MaxPaths = 32, MaxStackSize = 128,
         MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
         MaxCollectionSize = 256, MaxHeapObjects = 512,
         MaxQueuedStates = 128,
+        PerRunDeadline = System.TimeSpan.FromSeconds(30),
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
