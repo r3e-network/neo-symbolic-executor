@@ -66,8 +66,31 @@ while [ ! -f "$STOP_FILE" ]; do
   # files don't grow unbounded and so we can checkpoint a daily summary.
   dotnet "$FUZZER_DLL" --hours 24 --workers "$WORKERS" --corpus "$CORPUS" > "$LOGFILE" 2>&1 &
   FUZZ_PID=$!
+
+  # Iter-2 wakeup-26: idle-log watchdog. The dotnet process can occasionally end up in
+  # futex_wait with no status updates while the in-engine watchdog (which fires at
+  # MaxRuntime + 2 min, i.e. 24 h + 2 min) is too distant to help. If the log hasn't
+  # been written for 5 min, force-kill so the wrapper relaunches a fresh chunk.
+  IDLE_LIMIT=300
+  (
+    while kill -0 "$FUZZ_PID" 2>/dev/null; do
+      sleep 30
+      if [ -f "$LOGFILE" ]; then
+        last_mod=$(stat -c %Y "$LOGFILE" 2>/dev/null || echo 0)
+        now=$(date +%s)
+        if [ $((now - last_mod)) -gt $IDLE_LIMIT ]; then
+          echo "[wrapper] log idle > ${IDLE_LIMIT}s — killing fuzzer to force restart"
+          kill -KILL "$FUZZ_PID" 2>/dev/null || true
+          break
+        fi
+      fi
+    done
+  ) &
+  WATCHDOG_PID=$!
+
   wait $FUZZ_PID || true
   EXIT=$?
+  kill $WATCHDOG_PID 2>/dev/null || true
   echo "[wrapper] campaign chunk ended with exit=$EXIT at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   # Daily summary.
