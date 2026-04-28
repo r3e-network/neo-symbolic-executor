@@ -24,12 +24,17 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
     public Type[] ExpectedExceptions => Type.EmptyTypes;
     public bool SupportsDirectReplay => true;
 
+    // Audit fix (iter-2 wakeup-35): NO PerRunDeadline for the determinism oracle. A wall-clock
+    // deadline introduces test-flake by design — the first run is colder (JIT warmup) than the
+    // second, so the same script can exhaust 2 s on run 1 but complete on run 2 with mismatched
+    // step counts. Step + state + queue caps already bound work; the deadline was just a
+    // belt-and-suspenders safety net for malicious bytecode. Determinism testing needs neither.
     private static readonly ExecutionOptions Options = new()
     {
         MaxSteps = 2_000, MaxPaths = 32, MaxStackSize = 128,
         MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
         MaxCollectionSize = 256, MaxHeapObjects = 512,
-        MaxQueuedStates = 128, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+        MaxQueuedStates = 128,
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
