@@ -526,6 +526,37 @@ public class ReviewFixesTests
             .BeEquivalentTo(new[] { "arg_a", "arg_b" });
     }
 
+    [Fact]
+    public void Engine_CreateMethodEntryState_HandlesZeroAndManyParameters()
+    {
+        // Bare RET method: no INITSLOT, no params. Seeded with 0 args should HALT immediately.
+        byte[] retScript = { (byte)NeoVm.OpCode.RET };
+        var program = ScriptDecoder.Decode(retScript);
+        var engine = new SymbolicEngine(program);
+
+        var noArgs = engine.CreateMethodEntryState(offset: 0, parameters: Array.Empty<ContractParameterDefinition>());
+        noArgs.EvaluationStack.Should().BeEmpty("no parameters means no seeded symbolic values");
+        engine.Run(noArgs).FinalStates.Single().Status.Should().Be(TerminalStatus.Halted);
+
+        // Null parameters should behave like an empty list (degenerate but defined input).
+        var nullParams = new SymbolicEngine(program).CreateMethodEntryState(offset: 0, parameters: null);
+        nullParams.EvaluationStack.Should().BeEmpty();
+
+        // Many params + unfamiliar Type strings should not throw and should land within the
+        // engine's stack budget. 64 is well under the 2048 default MaxStackSize.
+        var manyParams = new List<ContractParameterDefinition>();
+        for (int i = 0; i < 64; i++)
+            manyParams.Add(new ContractParameterDefinition($"p{i}",
+                Type: i % 2 == 0 ? "Integer" : "ExoticUnseenType"));
+        var seededWithMany = new SymbolicEngine(program).CreateMethodEntryState(offset: 0, parameters: manyParams);
+        seededWithMany.EvaluationStack.Should().HaveCount(64);
+        // Param index 63 has Type "ExoticUnseenType" -> unmapped -> Sort.Bytes; pushed first
+        // (reverse order), so it sits at the bottom of the stack.
+        seededWithMany.EvaluationStack[0].Expression.Sort.Should().Be(Sort.Bytes);
+        // Param index 0 ("p0", "Integer") pushed last -> top of stack -> Sort.Int.
+        seededWithMany.EvaluationStack[^1].Expression.Sort.Should().Be(Sort.Int);
+    }
+
     private static ExecutionState NewState(int pc)
     {
         var state = new ExecutionState { Pc = pc };
