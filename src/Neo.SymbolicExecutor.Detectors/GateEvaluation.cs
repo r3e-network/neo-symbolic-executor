@@ -17,10 +17,14 @@ public sealed class GatePolicy
     public IReadOnlyDictionary<Severity, int>? FailOnSeverityCount { get; init; }
     public IReadOnlyDictionary<string, Severity>? FailOnDetectorSeverity { get; init; }
     public IReadOnlyDictionary<Severity, double>? MinConfidence { get; init; }
+    public bool FailOnBudgetExceeded { get; init; }
 
-    public GateEvaluation Evaluate(IReadOnlyList<Finding> findings, RiskProfile profile)
+    public GateEvaluation Evaluate(IReadOnlyList<Finding> findings, RiskProfile profile, bool budgetExceeded = false)
     {
         var violations = new List<string>();
+
+        if (FailOnBudgetExceeded && budgetExceeded)
+            violations.Add("analysis budget exceeded — results may be incomplete");
 
         // Audit fix: a clean run (zero findings) returns OverallMaxSeverity = Info as a sentinel,
         // which would falsely trip a `FailOnMaxSeverity = Info` gate. Skip the max-severity check
@@ -85,6 +89,7 @@ public sealed class GatePolicy
             b["fail-on-detector-severity"] = string.Join(",", ds.Select(kv => $"{kv.Key}={kv.Value.ToLowerString()}"));
         if (MinConfidence is { Count: > 0 } mc)
             b["min-confidence"] = string.Join(",", mc.Select(kv => $"{kv.Key.ToLowerString()}={kv.Value:0.00}"));
+        if (FailOnBudgetExceeded) b["fail-on-budget-exceeded"] = "true";
         return b.ToImmutable();
     }
 }

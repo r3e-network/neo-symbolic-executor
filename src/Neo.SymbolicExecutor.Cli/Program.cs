@@ -126,7 +126,7 @@ internal static class Program
             };
             var findings = detectorEngine.Run(ctx);
             var risk = RiskProfile.FromFindings(findings);
-            var gate = opts.GatePolicy.Evaluate(findings, risk);
+            var gate = opts.GatePolicy.Evaluate(findings, risk, execResult.BudgetExceeded);
             var meta = new AnalysisMeta(
                 StatesExplored: execResult.StatesExplored,
                 StepsExecuted: execResult.StepsExecuted,
@@ -283,6 +283,7 @@ internal static class Program
               --fail-on-severity-count <sev>=<count>  Repeatable.
               --fail-on-detector-severity <det>=<sev> Repeatable.
               --min-confidence <sev>=<float>          Repeatable.
+              --fail-on-budget-exceeded               Fail when analysis hit a budget cap.
             """);
     }
 }
@@ -329,6 +330,7 @@ internal sealed class AnalyzeOptions
         int? maxPaths = null;
         int? maxSteps = null;
         int? perRunDeadlineMs = null;
+        bool failOnBudget = false;
 
         // Audit C# #22 fix: int.Parse on overflow throws System.OverflowException with a
         // generic message. Wrap in a helper that surfaces the option name and bad value.
@@ -366,6 +368,7 @@ internal sealed class AnalyzeOptions
                 case "--smt-timeout": smtTimeout = ParsePositiveInt(a, Next()); smtFlagsSeen.Add(a); break;
                 case "--smt-bytes-bound": smtBytes = ParsePositiveInt(a, Next()); smtFlagsSeen.Add(a); break;
                 case "--smt-drop-unsat": smtDrop = true; smtFlagsSeen.Add(a); break;
+                case "--fail-on-budget-exceeded": failOnBudget = true; break;
                 case "--max-paths": maxPaths = ParsePositiveInt(a, Next()); break;
                 case "--max-steps": maxSteps = ParsePositiveInt(a, Next()); break;
                 case "--per-run-deadline-ms": perRunDeadlineMs = ParsePositiveInt(a, Next()); break;
@@ -429,6 +432,7 @@ internal sealed class AnalyzeOptions
                 FailOnSeverityCount = sevCounts.Count > 0 ? sevCounts : null,
                 FailOnDetectorSeverity = detSev.Count > 0 ? detSev : null,
                 MinConfidence = minConf.Count > 0 ? minConf : null,
+                FailOnBudgetExceeded = failOnBudget,
             },
         };
     }

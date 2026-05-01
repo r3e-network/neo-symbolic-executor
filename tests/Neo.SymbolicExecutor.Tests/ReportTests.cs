@@ -41,6 +41,21 @@ public class ReportTests
     }
 
     [Fact]
+    public void GatePolicy_FailsOnBudgetExceeded()
+    {
+        // Empty findings: a clean run that hit the budget cap is still incomplete and should
+        // surface that to CI when the operator opts into the gate.
+        var findings = System.Array.Empty<Finding>();
+        var risk = RiskProfile.FromFindings(findings);
+        var policy = new GatePolicy { FailOnBudgetExceeded = true };
+
+        policy.Evaluate(findings, risk, budgetExceeded: false).Passed.Should().BeTrue();
+        var failed = policy.Evaluate(findings, risk, budgetExceeded: true);
+        failed.Passed.Should().BeFalse();
+        failed.Violations.Should().Contain(v => v.Contains("budget exceeded"));
+    }
+
+    [Fact]
     public void GatePolicy_FailsOnTotal()
     {
         var findings = new[] { F("a", Severity.Low, "x", 0x10), F("a", Severity.Low, "y", 0x20) };
