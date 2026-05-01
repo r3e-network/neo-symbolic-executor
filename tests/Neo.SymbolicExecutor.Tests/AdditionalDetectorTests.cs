@@ -233,6 +233,172 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void PublicPrivilegedMethod_FlagsUnauthedMintStateChange()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Dapp","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"mint","parameters":[],"returntype":"Void","offset":256,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x100);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x120, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("supply")), SymbolicValue.Int(1), false, false));
+
+        var findings = new PublicPrivilegedMethodDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .ToList();
+
+        findings.Should().ContainSingle();
+        findings[0].Severity.Should().Be(Severity.High);
+        findings[0].Tags.Should().Contain(new[] { "dapp", "privileged-method", "missing-auth" });
+    }
+
+    [Fact]
+    public void PublicPrivilegedMethod_SkipsWhenAuthPrecedesStateChange()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Dapp","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"withdraw","parameters":[],"returntype":"Void","offset":256,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x100);
+        s.Telemetry.WitnessChecksEnforced.Add(0x105);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x120, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("vault")), SymbolicValue.Int(1), false, false));
+
+        new PublicPrivilegedMethodDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DefiSlippageOracle_FlagsSwapWithoutMinOutOrFreshOracleSignal()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("pool:reserve0")), SymbolicValue.Int(100), false, false));
+
+        var findings = new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .ToList();
+
+        findings.Should().ContainSingle();
+        findings[0].Severity.Should().Be(Severity.High);
+        findings[0].Tags.Should().Contain(new[] { "defi", "slippage", "oracle-freshness" });
+    }
+
+    [Fact]
+    public void DefiSlippageOracle_SkipsSwapWithMinOutAndFreshnessSignals()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.PathConditions = s.PathConditions.Add(Expr.Sym(Sort.Bool, "amountOutMin_ok"));
+        s.Telemetry.TimeAccesses.Add(0x210);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("pool:reserve0")), SymbolicValue.Int(100), false, false));
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NftOwnershipAuthorization_FlagsUnauthedNep11OwnershipWrite()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{"methods":[{"name":"transfer","parameters":[],"returntype":"Boolean","offset":768,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x300);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x330, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("owner:token42")), SymbolicValue.Bytes(new byte[20]), false, false));
+
+        var findings = new NftOwnershipAuthorizationDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .ToList();
+
+        findings.Should().ContainSingle();
+        findings[0].Severity.Should().Be(Severity.High);
+        findings[0].Tags.Should().Contain(new[] { "nft", "nep11", "ownership-auth" });
+    }
+
+    [Fact]
+    public void NftOwnershipAuthorization_SkipsWhenAuthPrecedesOwnershipWrite()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{"methods":[{"name":"burn","parameters":[],"returntype":"Boolean","offset":768,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x300);
+        s.Telemetry.CallerHashChecks.Add(0x310);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x330, StorageOpKind.Delete,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("owner:token42")), null, false, false));
+
+        new NftOwnershipAuthorizationDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ProtocolRiskFindings_SerializeThroughJsonReport()
+    {
+        var finding = new Finding(
+            "defi_slippage_oracle",
+            Severity.High,
+            "Swap-like method `swap` lacks DeFi price-safety signals",
+            "description",
+            0x220,
+            0.62,
+            "test",
+            System.Collections.Immutable.ImmutableHashSet.Create("defi", "slippage", "oracle-freshness"));
+        var findings = System.Collections.Immutable.ImmutableArray.Create(finding);
+        var risk = RiskProfile.FromFindings(findings);
+        var gate = new GatePolicy().Evaluate(findings, risk);
+
+        string json = ReportGenerator.ToJson(new AnalysisReport(findings, risk, gate, new AnalysisMeta()));
+
+        json.Should().Contain("defi_slippage_oracle");
+        json.Should().Contain("oracle-freshness");
+    }
+
+    [Fact]
     public void DefaultDetectorSet_HasAllAuditDrivenDetectors()
     {
         var detectors = DefaultDetectorSet.All();
@@ -246,7 +412,9 @@ public class AdditionalDetectorTests
             // 5 audit-derived new detectors
             "nep11_compliance", "callback_reentry", "crypto_verification_bypass",
             "replay_attack", "taint_flow_upgrade",
+            // Neo DApp / DeFi / NFT protocol-risk detectors
+            "public_privileged_method", "defi_slippage_oracle", "nft_ownership_authorization",
         });
-        detectors.Should().HaveCountGreaterThanOrEqualTo(21);
+        detectors.Should().HaveCountGreaterThanOrEqualTo(24);
     }
 }

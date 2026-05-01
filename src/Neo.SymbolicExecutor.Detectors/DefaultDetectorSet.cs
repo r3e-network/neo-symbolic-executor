@@ -6,7 +6,7 @@ namespace Neo.SymbolicExecutor.Detectors;
 /// <summary>
 /// Built-in detector list. Detectors are stateless — we cache a single shared instance list
 /// to avoid per-call allocations. Audit C# perf finding (iter 12): the prior `All()` returned
-/// a fresh array of 21 fresh detector instances on every call; with the fuzzer invoking it
+/// a fresh array of detector instances on every call; with the fuzzer invoking it
 /// from multiple targets per iteration, this drove sustained allocation pressure that
 /// contributed to multi-GB managed-heap growth on 1B+-iteration runs.
 /// </summary>
@@ -37,6 +37,10 @@ public static class DefaultDetectorSet
         new CryptoVerificationBypassDetector(),
         new ReplayAttackDetector(),
         new TaintFlowUpgradeDetector(),
+        // Neo DApp / DeFi / NFT protocol-risk detectors.
+        new PublicPrivilegedMethodDetector(),
+        new DefiSlippageOracleDetector(),
+        new NftOwnershipAuthorizationDetector(),
     };
 
     public static IReadOnlyList<IDetector> All() => _instances;
