@@ -21,3 +21,4 @@ coverage*.xml
 # Fuzz corpus / runtime artifacts
 fuzz-corpus/
 *-corpus/
+.omx/

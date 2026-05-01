@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Neo.SymbolicExecutor.Smt;
 using Neo.SymbolicExecutor.Smt.Z3;
@@ -7,69 +9,287 @@ using NeoVm = Neo.VM;
 namespace Neo.SymbolicExecutor.Tests;
 
 /// <summary>
-/// Z3 round-trip tests. Each test creates a fresh backend; if libz3 native loading fails we
-/// skip via Skip.If — this matches the audit SMT plan's "smt_available marker" testing contract.
+/// SMT round-trip tests. The backend uses z3 when available and a conservative portable fallback
+/// for simple integer constraints when z3 is missing.
 /// </summary>
 public class SmtTests
 {
-    private static (Z3Backend? backend, bool available) TryNew()
-    {
-        var b = new Z3Backend();
-        return (b, b.IsAvailable);
-    }
-
-    [SkippableFact]
+    [Fact]
     public void Z3_ReportsAvailable()
     {
-        var (b, ok) = TryNew(); using var _ = b!;
-        Skip.IfNot(ok, "Z3 native library not available");
-        b!.IsAvailable.Should().BeTrue();
-        b.Version.Should().NotBeNullOrEmpty();
+        using var backend = new Z3Backend();
+        backend.IsAvailable.Should().BeTrue();
+        backend.Version.Should().NotBeNullOrEmpty();
     }
 
-    [SkippableFact]
+    [Fact]
     public void Z3_TrivialContradictionUnsat()
     {
-        var (b, ok) = TryNew(); using var _ = b!;
-        Skip.IfNot(ok, "Z3 native library not available");
+        using var backend = new Z3Backend();
         var x = Expr.Sym(Sort.Int, "x");
         var conds = new List<Expression> { Expr.Eq(x, Expr.Int(0)), Expr.Gt(x, Expr.Int(0)) };
-        b!.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
     }
 
-    [SkippableFact]
+    [Fact]
     public void Z3_TrivialSatProducesWitness()
     {
-        var (b, ok) = TryNew(); using var _ = b!;
-        Skip.IfNot(ok, "Z3 native library not available");
+        using var backend = new Z3Backend();
         var x = Expr.Sym(Sort.Int, "x");
         var conds = new List<Expression> { Expr.Gt(x, Expr.Int(0)), Expr.Lt(x, Expr.Int(10)) };
-        b!.IsSatisfiable(conds).Should().Be(SmtOutcome.Sat);
-        var witness = b.BuildWitness(conds);
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(conds);
         witness.Should().NotBeNull();
         witness!.Should().ContainKey("x");
         ((System.Numerics.BigInteger)witness!["x"]).Should().BeInRange(1, 9);
     }
 
-    [SkippableFact]
+    [Fact]
+    public void Fallback_ProvesBasicConstraints_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+
+        backend.IsAvailable.Should().BeTrue();
+        backend.Version.Should().Contain("fallback");
+
+        var x = Expr.Sym(Sort.Int, "x");
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(x, Expr.Int(0)),
+            Expr.Gt(x, Expr.Int(0)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        var satisfiable = new List<Expression> { Expr.Gt(x, Expr.Int(0)), Expr.Lt(x, Expr.Int(10)) };
+        backend.IsSatisfiable(satisfiable).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(satisfiable);
+        witness.Should().NotBeNull();
+        ((System.Numerics.BigInteger)witness!["x"]).Should().BeInRange(1, 9);
+    }
+
+    [Fact]
+    public void Fallback_ProvesSimpleLinearArithmetic_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(Expr.Add(x, Expr.Int(1)), Expr.Int(4)),
+            Expr.Ne(x, Expr.Int(3)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        var satisfiable = new List<Expression>
+        {
+            Expr.Gt(Expr.Add(x, Expr.Int(2)), Expr.Int(5)),
+            Expr.Le(Expr.Sub(x, Expr.Int(1)), Expr.Int(9)),
+        };
+        backend.IsSatisfiable(satisfiable).Should().Be(SmtOutcome.Sat);
+        var value = backend.ConcretizeInt(satisfiable, Expr.Add(x, Expr.Int(1)), lo: 5, hi: 11);
+        value.Should().NotBeNull();
+        value!.Value.Should().BeInRange(5, 11);
+    }
+
+    [Fact]
+    public void Fallback_BuildsWitnessForUpperOnlyNegativeDomain_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var conditions = new List<Expression> { Expr.Lt(x, Expr.Int(-5)) };
+
+        backend.IsSatisfiable(conditions).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(conditions);
+
+        witness.Should().NotBeNull();
+        ((System.Numerics.BigInteger)witness!["x"]).Should().BeLessThan(-5);
+    }
+
+    [Fact]
+    public void Fallback_PropagatesSymbolEqualities_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var y = Expr.Sym(Sort.Int, "y");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(x, y),
+            Expr.Eq(x, Expr.Int(0)),
+            Expr.Gt(y, Expr.Int(0)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        var satisfiable = new List<Expression>
+        {
+            Expr.Eq(Expr.Add(x, Expr.Int(2)), y),
+            Expr.Eq(x, Expr.Int(3)),
+        };
+        backend.IsSatisfiable(satisfiable).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(satisfiable);
+        witness.Should().NotBeNull();
+        ((System.Numerics.BigInteger)witness!["x"]).Should().Be(3);
+        ((System.Numerics.BigInteger)witness!["y"]).Should().Be(5);
+    }
+
+    [Fact]
+    public void Fallback_ProvesScaledLinearArithmetic_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(Expr.Add(x, x), Expr.Int(5)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        var satisfiable = new List<Expression>
+        {
+            Expr.Eq(Expr.Mul(x, Expr.Int(3)), Expr.Int(12)),
+            Expr.Lt(Expr.Mul(x, Expr.Int(2)), Expr.Int(9)),
+        };
+        backend.IsSatisfiable(satisfiable).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(satisfiable);
+        witness.Should().NotBeNull();
+        ((System.Numerics.BigInteger)witness!["x"]).Should().Be(4);
+
+        var value = backend.ConcretizeInt(
+            new List<Expression> { Expr.Gt(Expr.Mul(x, Expr.Int(3)), Expr.Int(10)) },
+            Expr.Mul(x, Expr.Int(2)),
+            lo: 8,
+            hi: 20);
+        value.Should().NotBeNull();
+        value!.Value.Should().BeInRange(8, 20);
+    }
+
+    [Fact]
+    public void Fallback_ProvesTwoSymbolLinearRelations_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var y = Expr.Sym(Sort.Int, "y");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(Expr.Add(x, y), Expr.Int(5)),
+            Expr.Eq(x, Expr.Int(2)),
+            Expr.Ne(y, Expr.Int(3)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ge(x, Expr.Int(0)),
+            Expr.Ge(y, Expr.Int(0)),
+            Expr.Lt(Expr.Add(x, y), Expr.Int(0)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        var satisfiable = new List<Expression>
+        {
+            Expr.Eq(Expr.Add(x, y), Expr.Int(5)),
+            Expr.Eq(x, Expr.Int(2)),
+        };
+        backend.IsSatisfiable(satisfiable).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(satisfiable);
+        witness.Should().NotBeNull();
+        ((System.Numerics.BigInteger)witness!["x"]).Should().Be(2);
+        ((System.Numerics.BigInteger)witness!["y"]).Should().Be(3);
+    }
+
+    [Fact]
+    public void Fallback_PreservesExistingBounds_WhenExactValueArrivesLater()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Gt(x, Expr.Int(5)),
+            Expr.Eq(x, Expr.Int(2)),
+        }).Should().Be(SmtOutcome.Unsat);
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(x, Expr.Int(2)),
+            Expr.Gt(x, Expr.Int(5)),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_RejectsExcludedSingletonBound()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ge(x, Expr.Int(0)),
+            Expr.Le(x, Expr.Int(0)),
+            Expr.Ne(x, Expr.Int(0)),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
     public void Z3_QueryCacheCounted()
     {
-        var (b, ok) = TryNew(); using var _ = b!;
-        Skip.IfNot(ok, "Z3 native library not available");
+        using var backend = new Z3Backend();
         var x = Expr.Sym(Sort.Int, "x");
         var conds = new List<Expression> { Expr.Gt(x, Expr.Int(0)) };
-        b!.IsSatisfiable(conds);
-        b.IsSatisfiable(conds);  // identical -> cache hit
-        var stats = b.GetStats();
+        backend.IsSatisfiable(conds);
+        backend.IsSatisfiable(conds);  // identical -> cache hit
+        var stats = backend.GetStats();
         stats.Queries.Should().BeGreaterThanOrEqualTo(1);
         stats.CacheHits.Should().BeGreaterThanOrEqualTo(1);
     }
 
-    [SkippableFact]
+    [Fact]
+    public void Z3_ConcretizeIntRequestsDeclaredAuxiliaryTarget()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var fakeZ3 = Path.Combine(Path.GetTempPath(), $"fake-z3-{Guid.NewGuid():N}.sh");
+        File.WriteAllText(fakeZ3, """
+#!/usr/bin/env bash
+if [[ "$*" == *"-version"* ]]; then
+  echo "Z3 version fake"
+  exit 0
+fi
+
+input="$(cat)"
+if [[ "$input" == *"(get-value (|__target_0|))"* ]]; then
+  echo "sat"
+  echo "((|__target_0| (_ bv7 256)))"
+else
+  echo "sat"
+  echo "((|wrong| (_ bv0 256)))"
+fi
+""");
+        File.SetUnixFileMode(fakeZ3, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        try
+        {
+            using var restore = SetZ3Path(fakeZ3);
+            using var backend = new Z3Backend();
+            var x = Expr.Sym(Sort.Int, "x");
+
+            backend.ConcretizeInt(new List<Expression> { Expr.Eq(x, Expr.Int(7)) }, x)
+                .Should().Be(new System.Numerics.BigInteger(7));
+        }
+        finally
+        {
+            File.Delete(fakeZ3);
+        }
+    }
+
+    [Fact]
     public void Engine_PrunesUnreachableBranchUnderSmt()
     {
-        var (backend, ok) = TryNew(); using var _ = backend!;
-        Skip.IfNot(ok, "Z3 native library not available");
+        using var backend = new Z3Backend();
 
         // Layout: 0:NOP 1:JMPIF +4 (cond) ... fall-through:PUSH1 RET ... taken:PUSH2 RET
         // We seed a state with cond = (x > 0) AND a path condition x == 0. The taken branch is
@@ -98,7 +318,7 @@ public class SmtTests
         result.FinalStates[0].Telemetry.SmtPrunedBranches.Should().Be(1);
     }
 
-    [SkippableFact]
+    [Fact]
     public void Engine_NoPruneWithoutBackend()
     {
         // Same setup as above but no backend; the engine should fork into both branches.
@@ -121,5 +341,32 @@ public class SmtTests
 
         var result = new SymbolicEngine(program).Run(state);
         result.FinalStates.Length.Should().Be(2);
+    }
+
+    private static IDisposable ForceMissingZ3()
+    {
+        return SetZ3Path("/definitely/not/a/z3/executable");
+    }
+
+    private static IDisposable SetZ3Path(string path)
+    {
+        const string variable = "NEO_SYMBOLIC_EXECUTOR_Z3";
+        var previous = Environment.GetEnvironmentVariable(variable);
+        Environment.SetEnvironmentVariable(variable, path);
+        return new RestoreEnvironmentVariable(variable, previous);
+    }
+
+    private sealed class RestoreEnvironmentVariable : IDisposable
+    {
+        private readonly string _name;
+        private readonly string? _value;
+
+        public RestoreEnvironmentVariable(string name, string? value)
+        {
+            _name = name;
+            _value = value;
+        }
+
+        public void Dispose() => Environment.SetEnvironmentVariable(_name, _value);
     }
 }

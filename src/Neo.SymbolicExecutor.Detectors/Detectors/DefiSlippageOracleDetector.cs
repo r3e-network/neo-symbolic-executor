@@ -21,14 +21,17 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             var method = ProtocolRiskHelpers.MethodForState(context, state);
             bool swapLike = method is not null && ProtocolRiskHelpers.IsSwapLikeMethodName(method.Name);
             bool defiStateSignal = ProtocolRiskHelpers.HasDefiStateSignal(state);
-            if (!swapLike && !defiStateSignal) continue;
+            bool sourceDefiSignal = ProtocolRiskHelpers.HasDefiSourceSignal(context, state);
+            if (!swapLike && !defiStateSignal && !sourceDefiSignal) continue;
 
             bool externalTransfer = state.Telemetry.ExternalCalls.Any(ProtocolRiskHelpers.IsTokenTransferCall);
             bool writesState = state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite);
             if (!externalTransfer || !writesState) continue;
 
-            bool hasSlippageSignal = ProtocolRiskHelpers.HasSlippageSignal(state);
-            bool hasFreshnessSignal = ProtocolRiskHelpers.HasOracleFreshnessSignal(state);
+            bool hasSlippageSignal = ProtocolRiskHelpers.HasSlippageSignal(state)
+                                     || ProtocolRiskHelpers.HasSourceSlippageSignal(context, state);
+            bool hasFreshnessSignal = ProtocolRiskHelpers.HasOracleFreshnessSignal(state)
+                                      || ProtocolRiskHelpers.HasSourceFreshnessSignal(context, state);
             if (hasSlippageSignal && hasFreshnessSignal) continue;
 
             int offset = state.Telemetry.ExternalCalls
@@ -45,6 +48,7 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             var tags = new List<string> { "defi", "slippage", "oracle-freshness" };
             if (defiStateSignal) tags.Add("defi-state");
             if (ProtocolRiskHelpers.HasDynamicStateWrite(state)) tags.Add("dynamic-storage-key");
+            if (sourceDefiSignal) tags.Add("source-hint");
 
             yield return MakeFinding(
                 title: $"DeFi-like method `{methodName}` lacks price-safety signals",

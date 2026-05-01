@@ -21,6 +21,7 @@ public sealed class AnalysisContext
     public required IReadOnlyList<ExecutionState> States { get; init; }
     public Nef.ContractManifest? Manifest { get; init; }
     public Nef.NefFile? Nef { get; init; }
+    public SourceHints? SourceHints { get; init; }
     public NativeContractRegistry Natives { get; init; } = NativeContractRegistry.Default;
     public Smt.ISmtBackend? SmtBackend { get; init; }
     public bool DropUnsatFindings { get; init; }
@@ -78,7 +79,8 @@ public abstract class BaseDetector : IDetector
             Offset: offset,
             Confidence: System.Math.Round(System.Math.Clamp(conf, 0, 1), 3),
             ConfidenceReason: reason,
-            Tags: (tags ?? System.Linq.Enumerable.Empty<string>()).ToImmutableHashSet());
+            Tags: (tags ?? System.Linq.Enumerable.Empty<string>()).ToImmutableHashSet(),
+            PathConditions: state?.PathConditions.ToImmutableArray() ?? default);
     }
 
     /// <summary>

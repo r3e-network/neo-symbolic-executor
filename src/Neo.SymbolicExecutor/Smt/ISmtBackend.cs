@@ -11,7 +11,8 @@ public enum SmtOutcome
 
 /// <summary>
 /// Decoupling interface so the engine can call into an optional SMT layer without taking a hard
-/// dependency on Z3. The Neo.SymbolicExecutor.Smt project provides the Z3-backed implementation.
+/// dependency on Z3. The Neo.SymbolicExecutor.Smt project provides an SMT-LIB implementation
+/// backed by external Z3 when available, plus a conservative portable fallback.
 ///
 /// Soundness invariant: <see cref="SmtOutcome.Unknown"/> MUST be treated as "could be SAT" by
 /// callers — the engine never prunes on UNKNOWN, only on UNSAT. This preserves over-approximation:
@@ -19,7 +20,7 @@ public enum SmtOutcome
 /// </summary>
 public interface ISmtBackend
 {
-    /// <summary>True iff the backend is functional (z3 native libs loaded successfully).</summary>
+    /// <summary>True iff the backend is functional and can answer solver queries.</summary>
     bool IsAvailable { get; }
 
     string Version { get; }

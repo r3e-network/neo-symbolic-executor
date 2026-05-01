@@ -41,7 +41,11 @@ public static class StateGen
         {
             string method = rng.Next(5) switch
             {
-                0 => "transfer", 1 => "balanceOf", 2 => "update", 3 => "destroy", _ => "doStuff",
+                0 => "transfer",
+                1 => "balanceOf",
+                2 => "update",
+                3 => "destroy",
+                _ => "doStuff",
             };
             s.Telemetry.ExternalCalls.Add(new ExternalCall
             {

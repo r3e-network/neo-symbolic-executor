@@ -159,6 +159,17 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void DevPackTargets_PassesProjectSourceHintsByDefault()
+    {
+        string props = ReadRepoFile("devpack-integration/Neo.SymbolicExecutor.props");
+        string targets = ReadRepoFile("devpack-integration/Neo.SymbolicExecutor.targets");
+
+        props.Should().Contain("<NeoSymSourceDir Condition=\"'$(NeoSymSourceDir)' == ''\">$(MSBuildProjectDirectory)</NeoSymSourceDir>");
+        targets.Should().Contain("<_NeoSymSourceFlag Condition=\"'$(NeoSymSourceDir)' != ''\"> --source &quot;$(NeoSymSourceDir)&quot;</_NeoSymSourceFlag>");
+        targets.Should().Contain("$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymGateFlag)");
+    }
+
+    [Fact]
     public void ReportJson_EscapesHtmlSensitiveFindingText()
     {
         var finding = new Finding(
@@ -240,6 +251,21 @@ public class ReviewFixesTests
         act.Should().Throw<TargetInvocationException>()
             .Which.InnerException.Should().BeOfType<ArgumentException>()
             .Which.Message.Should().Contain("unknown --format");
+    }
+
+    [Fact]
+    public void CliAnalyze_ParsesSourceHintPaths()
+    {
+        var analyzeOptions = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "neo-sym.dll"))
+            .GetType("Neo.SymbolicExecutor.Cli.AnalyzeOptions", throwOnError: true)!;
+        var parse = analyzeOptions.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static)!;
+
+        var opts = parse.Invoke(null, new object[] { new[] { "contract.nef", "--source", "Contract.cs", "--source", "src" } })!;
+        var sourcePaths = (System.Collections.IEnumerable)opts.GetType()
+            .GetProperty("SourcePaths")!
+            .GetValue(opts)!;
+
+        sourcePaths.Cast<string>().Should().Equal("Contract.cs", "src");
     }
 
     [Theory]

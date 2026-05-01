@@ -23,7 +23,9 @@ public class DetectorTests
         var s = NewState();
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x10, Method = "doSomething", HasReturnValue = true,
+            Offset = 0x10,
+            Method = "doSomething",
+            HasReturnValue = true,
         });
         s.Telemetry.StorageOps.Add(new StorageOp(0x20, StorageOpKind.Put,
             SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
@@ -190,7 +192,10 @@ public class DetectorTests
         var s = NewState();
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x10, Method = "transfer", HasReturnValue = true, ReturnChecked = false,
+            Offset = 0x10,
+            Method = "transfer",
+            HasReturnValue = true,
+            ReturnChecked = false,
         });
 
         var findings = new UncheckedReturnDetector().Analyze(Ctx(s)).ToList();
@@ -204,7 +209,10 @@ public class DetectorTests
         var s = NewState();
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x10, Method = "transfer", HasReturnValue = true, ReturnChecked = true,
+            Offset = 0x10,
+            Method = "transfer",
+            HasReturnValue = true,
+            ReturnChecked = true,
         });
         new UncheckedReturnDetector().Analyze(Ctx(s)).Should().BeEmpty();
     }
@@ -215,15 +223,27 @@ public class DetectorTests
         var s = NewState();
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x10, Method = "x", TargetHashDynamic = true, MethodDynamic = true, HasReturnValue = true,
+            Offset = 0x10,
+            Method = "x",
+            TargetHashDynamic = true,
+            MethodDynamic = true,
+            HasReturnValue = true,
         });
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x20, Method = "y", TargetHashDynamic = true, MethodDynamic = false, HasReturnValue = true,
+            Offset = 0x20,
+            Method = "y",
+            TargetHashDynamic = true,
+            MethodDynamic = false,
+            HasReturnValue = true,
         });
         s.Telemetry.ExternalCalls.Add(new ExternalCall
         {
-            Offset = 0x30, Method = "z", TargetHashDynamic = false, MethodDynamic = true, HasReturnValue = true,
+            Offset = 0x30,
+            Method = "z",
+            TargetHashDynamic = false,
+            MethodDynamic = true,
+            HasReturnValue = true,
         });
 
         var findings = new DynamicCallTargetDetector().Analyze(Ctx(s)).ToList();

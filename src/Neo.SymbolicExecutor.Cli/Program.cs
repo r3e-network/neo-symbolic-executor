@@ -83,70 +83,64 @@ internal static class Program
         ContractManifest? manifest = null;
         if (opts.ManifestPath is not null)
             manifest = ContractManifest.FromFile(opts.ManifestPath);
+        SourceHints? sourceHints = opts.SourcePaths.Count > 0
+            ? SourceHints.FromPaths(opts.SourcePaths)
+            : null;
 
-        // Audit C# #21 fix: scope the Z3Backend with `using` so the native Context is released
-        // when the analysis completes. For a one-shot CLI this is mostly hygiene; for any host
-        // that calls Analyze() repeatedly it prevents native-handle leaks.
+        // Scope the backend so any per-analysis solver resources stay bounded for repeated hosts.
         Smt.ISmtBackend? smtBackend = null;
         Smt.Z3.Z3Backend? z3Owned = null;
         if (opts.UseSmt)
         {
             z3Owned = new Smt.Z3.Z3Backend(opts.SmtTimeoutMs, opts.SmtBytesBound);
-            if (!z3Owned.IsAvailable)
-            {
-                Console.Error.WriteLine($"warning: --smt requested but Z3 is unavailable: {z3Owned.Version}");
-                Console.Error.WriteLine("  install platform-appropriate libz3 or remove --smt");
-                z3Owned.Dispose();
-                z3Owned = null;
-            }
-            else
-            {
-                smtBackend = z3Owned;
-            }
+            if (z3Owned.Version.StartsWith("portable fallback", StringComparison.Ordinal))
+                Console.Error.WriteLine("warning: --smt using portable fallback; install z3 or set NEO_SYMBOLIC_EXECUTOR_Z3 for full SMT-LIB solving");
+            smtBackend = z3Owned;
         }
         try
         {
-        var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
-        var engine = new SymbolicEngine(program, engineOptions);
-        var execResult = engine.Run();
+            var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
+            var engine = new SymbolicEngine(program, engineOptions);
+            var execResult = engine.Run();
 
-        var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
-        var ctx = new AnalysisContext
-        {
-            States = execResult.FinalStates,
-            Manifest = manifest,
-            SmtBackend = smtBackend,
-            DropUnsatFindings = opts.SmtDropUnsat,
-        };
-        var findings = detectorEngine.Run(ctx);
-        var risk = RiskProfile.FromFindings(findings);
-        var gate = opts.GatePolicy.Evaluate(findings, risk);
-        var meta = new AnalysisMeta(
-            StatesExplored: execResult.StatesExplored,
-            StepsExecuted: execResult.StepsExecuted,
-            BudgetExceeded: execResult.BudgetExceeded,
-            BudgetReason: execResult.BudgetReason,
-            SmtAvailable: smtBackend?.IsAvailable ?? false,
-            SmtEngaged: smtBackend?.IsAvailable ?? false);
-        var report = new AnalysisReport(findings, risk, gate, meta);
+            var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
+            var ctx = new AnalysisContext
+            {
+                States = execResult.FinalStates,
+                Manifest = manifest,
+                SourceHints = sourceHints,
+                SmtBackend = smtBackend,
+                DropUnsatFindings = opts.SmtDropUnsat,
+            };
+            var findings = detectorEngine.Run(ctx);
+            var risk = RiskProfile.FromFindings(findings);
+            var gate = opts.GatePolicy.Evaluate(findings, risk);
+            var meta = new AnalysisMeta(
+                StatesExplored: execResult.StatesExplored,
+                StepsExecuted: execResult.StepsExecuted,
+                BudgetExceeded: execResult.BudgetExceeded,
+                BudgetReason: execResult.BudgetReason,
+                SmtAvailable: smtBackend?.IsAvailable ?? false,
+                SmtEngaged: smtBackend?.IsAvailable ?? false);
+            var report = new AnalysisReport(findings, risk, gate, meta);
 
-        // Always emit the report before deciding on gate exit code so CI artifacts exist.
-        string output = opts.Format switch
-        {
-            "json" => ReportGenerator.ToJson(report),
-            "markdown" or "md" => ReportGenerator.ToMarkdown(report),
-            _ => throw new ArgumentException($"unknown --format '{opts.Format}'; expected json|markdown"),
-        };
-        if (opts.OutputPath is null) Console.WriteLine(output);
-        else File.WriteAllText(opts.OutputPath, output);
+            // Always emit the report before deciding on gate exit code so CI artifacts exist.
+            string output = opts.Format switch
+            {
+                "json" => ReportGenerator.ToJson(report),
+                "markdown" or "md" => ReportGenerator.ToMarkdown(report),
+                _ => throw new InvalidOperationException($"validated format '{opts.Format}' unexpectedly reached report generation"),
+            };
+            if (opts.OutputPath is null) Console.WriteLine(output);
+            else File.WriteAllText(opts.OutputPath, output);
 
-        if (!gate.Passed)
-        {
-            Console.Error.WriteLine($"gate failed ({gate.Violations.Length} violation(s))");
-            foreach (var v in gate.Violations) Console.Error.WriteLine($"  - {v}");
-            return 3;
-        }
-        return 0;
+            if (!gate.Passed)
+            {
+                Console.Error.WriteLine($"gate failed ({gate.Violations.Length} violation(s))");
+                foreach (var v in gate.Violations) Console.Error.WriteLine($"  - {v}");
+                return 3;
+            }
+            return 0;
         }
         finally
         {
@@ -194,6 +188,7 @@ internal static class Program
 
             analyze options:
               --manifest <path.manifest.json>         Manifest sidecar (enables ABI detectors).
+              --source <file-or-dir>                  Optional C# source hints for protocol detectors; repeatable.
               --format json|markdown                  Report format (default: markdown).
               --out <path>                            Write report to file (default: stdout).
 
@@ -219,6 +214,7 @@ internal sealed class AnalyzeOptions
 {
     public required string Path { get; init; }
     public string? ManifestPath { get; init; }
+    public IReadOnlyList<string> SourcePaths { get; init; } = Array.Empty<string>();
     public string Format { get; init; } = "markdown";
     public string? OutputPath { get; init; }
     public required GatePolicy GatePolicy { get; init; }
@@ -232,6 +228,7 @@ internal sealed class AnalyzeOptions
         if (args.Length < 1) throw new ArgumentException("usage: neo-sym analyze <path> [options]");
         string path = args[0];
         string? manifest = null;
+        var sourcePaths = new List<string>();
         string format = "markdown";
         string? outPath = null;
         Severity? maxSev = null;
@@ -258,24 +255,39 @@ internal sealed class AnalyzeOptions
                 int.TryParse(val, out int n)
                     ? n
                     : throw new ArgumentException($"{label}: expected int32, got '{val}'");
+            int ParsePositiveInt(string label, string val)
+            {
+                int n = ParseInt(label, val);
+                return n > 0
+                    ? n
+                    : throw new ArgumentException($"{label}: expected positive int32, got '{val}'");
+            }
+            int ParseNonNegativeInt(string label, string val)
+            {
+                int n = ParseInt(label, val);
+                return n >= 0
+                    ? n
+                    : throw new ArgumentException($"{label}: expected non-negative int32, got '{val}'");
+            }
             switch (a)
             {
                 case "--manifest": manifest = Next(); break;
+                case "--source": sourcePaths.Add(Next()); break;
                 case "--format": format = Next(); break;
                 case "--out": outPath = Next(); break;
                 case "--smt": useSmt = true; break;
-                case "--smt-timeout": smtTimeout = ParseInt(a, Next()); break;
-                case "--smt-bytes-bound": smtBytes = ParseInt(a, Next()); break;
+                case "--smt-timeout": smtTimeout = ParsePositiveInt(a, Next()); break;
+                case "--smt-bytes-bound": smtBytes = ParsePositiveInt(a, Next()); break;
                 case "--smt-drop-unsat": smtDrop = true; break;
                 case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
-                case "--fail-on-total-findings": totalCap = ParseInt(a, Next()); break;
-                case "--fail-on-weighted-score": wsCap = ParseInt(a, Next()); break;
-                case "--fail-on-confidence-weighted-score": cwsCap = ParseInt(a, Next()); break;
+                case "--fail-on-total-findings": totalCap = ParseNonNegativeInt(a, Next()); break;
+                case "--fail-on-weighted-score": wsCap = ParseNonNegativeInt(a, Next()); break;
+                case "--fail-on-confidence-weighted-score": cwsCap = ParseNonNegativeInt(a, Next()); break;
                 case "--fail-on-severity-count":
                     {
                         var parts = Next().Split('=', 2);
                         if (parts.Length != 2) throw new ArgumentException("expected sev=count");
-                        sevCounts[ParseSeverity(parts[0])] = ParseInt(a, parts[1]);
+                        sevCounts[ParseSeverity(parts[0])] = ParseNonNegativeInt(a, parts[1]);
                         break;
                     }
                 case "--fail-on-detector-severity":
@@ -300,10 +312,14 @@ internal sealed class AnalyzeOptions
             }
         }
 
+        if (format is not ("json" or "markdown" or "md"))
+            throw new ArgumentException($"unknown --format '{format}'; expected json|markdown");
+
         return new AnalyzeOptions
         {
             Path = path,
             ManifestPath = manifest,
+            SourcePaths = sourcePaths.ToArray(),
             Format = format,
             OutputPath = outPath,
             UseSmt = useSmt,

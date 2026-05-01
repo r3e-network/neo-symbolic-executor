@@ -95,7 +95,10 @@ public sealed class NefFile
         long length = ReadVarInt(br, maxValue: maxLength);
         if (length < 0 || length > maxLength)
             throw new FormatException($"VarBytes length {length} out of range");
-        return br.ReadBytes((int)length);
+        var bytes = br.ReadBytes((int)length);
+        if (bytes.Length != length)
+            throw new FormatException($"VarBytes truncated: wanted {length}, got {bytes.Length}");
+        return bytes;
     }
 
     private static long ReadVarInt(BinaryReader br, long maxValue)

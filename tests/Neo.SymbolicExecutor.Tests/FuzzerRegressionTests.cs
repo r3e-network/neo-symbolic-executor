@@ -147,7 +147,10 @@ public class FuzzerRegressionTests
         var program = ScriptDecoder.Decode(script);
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 1_000, MaxPaths = 16, MaxStackSize = 64, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+            MaxSteps = 1_000,
+            MaxPaths = 16,
+            MaxStackSize = 64,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
         // The script may halt or stop; the key assertion is that NO state faults with
         // "PC at unaligned" — that's the exact divergence we fixed.
@@ -205,7 +208,10 @@ public class FuzzerRegressionTests
         var program = ScriptDecoder.Decode(script);
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 2_000, MaxPaths = 16, MaxStackSize = 64, MaxQueuedStates = 64,
+            MaxSteps = 2_000,
+            MaxPaths = 16,
+            MaxStackSize = 64,
+            MaxQueuedStates = 64,
             PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
         result.FinalStates.Should().NotBeEmpty(because: $"`{label}` must terminate");
@@ -231,10 +237,15 @@ public class FuzzerRegressionTests
         var program = ScriptDecoder.Decode(script);
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 4_000, MaxPaths = 32, MaxStackSize = 128,
-            MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
-            MaxCollectionSize = 256, MaxHeapObjects = 512,
-            MaxQueuedStates = 128, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+            MaxSteps = 4_000,
+            MaxPaths = 32,
+            MaxStackSize = 128,
+            MaxInvocationStackDepth = 64,
+            MaxItemSize = 32 * 1024,
+            MaxCollectionSize = 256,
+            MaxHeapObjects = 512,
+            MaxQueuedStates = 128,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
         // Every state's LoopsDetected must contain only non-negative offsets.
         foreach (var s in result.FinalStates)

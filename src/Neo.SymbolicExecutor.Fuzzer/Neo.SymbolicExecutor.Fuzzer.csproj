@@ -9,6 +9,7 @@
     <Description>Long-running fuzzer for the Neo Symbolic Executor.</Description>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>neo-sym-fuzz</ToolCommandName>
+    <PackageTags>NEO;Fuzzing;Security;Testing;Symbolic-Execution</PackageTags>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>

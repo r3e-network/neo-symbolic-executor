@@ -42,10 +42,15 @@ public sealed class PipelineConsistencyTarget : IFuzzTarget
 
         var execResult = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 4_000, MaxPaths = 32, MaxStackSize = 128,
-            MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
-            MaxCollectionSize = 256, MaxHeapObjects = 512,
-            MaxQueuedStates = 128, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+            MaxSteps = 4_000,
+            MaxPaths = 32,
+            MaxStackSize = 128,
+            MaxInvocationStackDepth = 64,
+            MaxItemSize = 32 * 1024,
+            MaxCollectionSize = 256,
+            MaxHeapObjects = 512,
+            MaxQueuedStates = 128,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
 
         var dEngine = new DetectorEngine(Detectors);

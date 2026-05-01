@@ -64,10 +64,12 @@ public sealed partial class SymbolicEngine
         SymbolicValue? msg = null;
         if (withMessage) msg = state.Pop();
         var cond = state.Pop();
+        MarkExternalCallReturnChecked(state, cond);
 
         var truthy = cond.Truthy();
         if (truthy == true)
         {
+            MarkConditionalEnforcement(state, cond, taken: true);
             state.Pc = inst.EndOffset;
             return Single(state);
         }
@@ -75,14 +77,36 @@ public sealed partial class SymbolicEngine
         {
             string reason = msg is null ? "ASSERT failed" : "ASSERT failed: " + DescribeMessage(msg);
             state.Terminate(TerminalStatus.Faulted, reason);
-            MarkExternalCallReturnChecked(state, cond);
             return Single(state);
         }
+
+        var (passSat, failSat) = ConsultSmt(state, cond.Expression);
+        if (passSat == Smt.SmtOutcome.Unsat && failSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Terminate(TerminalStatus.Stopped, "both ASSERT outcomes unsatisfiable");
+            return Single(state);
+        }
+        if (passSat == Smt.SmtOutcome.Unsat)
+        {
+            state.PathConditions = state.PathConditions.Add(Expr.Not(cond.Expression));
+            string reason = msg is null ? "ASSERT failed (symbolic)" : "ASSERT failed: " + DescribeMessage(msg);
+            state.Terminate(TerminalStatus.Faulted, reason);
+            return Single(state);
+        }
+        if (failSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Telemetry.SmtPrunedBranches++;
+            state.PathConditions = state.PathConditions.Add(cond.Expression);
+            MarkConditionalEnforcement(state, cond, taken: true);
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
+        if (passSat == Smt.SmtOutcome.Unknown || failSat == Smt.SmtOutcome.Unknown)
+            state.Telemetry.SmtUnknownOffsets.Add(inst.Offset);
 
         // Symbolic assertion: fork into the success path (continue) and failure path (faulted).
         var pass = state.Clone();
         pass.PathConditions = pass.PathConditions.Add(cond.Expression);
-        MarkExternalCallReturnChecked(pass, cond);
         MarkConditionalEnforcement(pass, cond, taken: true);
         pass.Pc = inst.EndOffset;
 

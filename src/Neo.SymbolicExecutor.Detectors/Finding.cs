@@ -17,7 +17,8 @@ public sealed record Finding(
     string ConfidenceReason,
     ImmutableHashSet<string> Tags,
     bool? PathSatisfiable = null,
-    IReadOnlyDictionary<string, object>? Witness = null)
+    IReadOnlyDictionary<string, object>? Witness = null,
+    ImmutableArray<Expression> PathConditions = default)
 {
     public string DedupeKey => $"{Detector}|{Title}|0x{Offset:X4}";
 }

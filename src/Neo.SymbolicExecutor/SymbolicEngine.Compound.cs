@@ -42,9 +42,9 @@ public sealed partial class SymbolicEngine
                     return NewSizedTyped(state, inst, (byte)inst.Operand.Span[0]);
                 }
 
-            case NeoVm.OpCode.PACK:    return PackArrayOrStructOrMap(state, inst, mode: PackMode.Array);
+            case NeoVm.OpCode.PACK: return PackArrayOrStructOrMap(state, inst, mode: PackMode.Array);
             case NeoVm.OpCode.PACKSTRUCT: return PackArrayOrStructOrMap(state, inst, mode: PackMode.Struct);
-            case NeoVm.OpCode.PACKMAP:    return PackArrayOrStructOrMap(state, inst, mode: PackMode.Map);
+            case NeoVm.OpCode.PACKMAP: return PackArrayOrStructOrMap(state, inst, mode: PackMode.Map);
 
             case NeoVm.OpCode.UNPACK:
                 return Unpack(state, inst);

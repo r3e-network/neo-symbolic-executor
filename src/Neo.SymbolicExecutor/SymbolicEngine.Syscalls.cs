@@ -33,7 +33,7 @@ public sealed partial class SymbolicEngine
         {
             case "System.Runtime.CheckWitness":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop();
+                    state.Pop();
                     state.Telemetry.WitnessChecks.Add(inst.Offset);
                     state.Push(SymbolicValue.Symbol(Sort.Bool, $"witness_ok_{inst.Offset}"));
                     state.Pc = inst.EndOffset;
@@ -68,15 +68,15 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Runtime.Notify":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // state args
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // event name
+                    state.Pop(); // state args
+                    state.Pop(); // event name
                     state.Telemetry.EventsEmitted.Add(inst.Offset);
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
             case "System.Runtime.Log":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop();
+                    state.Pop();
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
@@ -90,7 +90,7 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Storage.AsReadOnly":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop();
+                    state.Pop();
                     state.Push(SymbolicValue.Symbol(Sort.InteropInterface, $"storage_ctx_ro_{inst.Offset}"));
                     state.Pc = inst.EndOffset;
                     return Single(state);
@@ -129,7 +129,7 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Storage.Find":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // options
+                    state.Pop(); // options
                     var prefix = state.Pop();
                     var ctx = state.Pop();
                     state.Telemetry.StorageOps.Add(new StorageOp(inst.Offset, StorageOpKind.Find, prefix, null,
@@ -140,7 +140,7 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Iterator.Next":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop();
+                    state.Pop();
                     state.Push(SymbolicValue.Symbol(Sort.Bool, $"iterator_has_next_{inst.Offset}"));
                     state.Telemetry.IteratorLoops.Add(inst.Offset);
                     state.Pc = inst.EndOffset;
@@ -148,15 +148,15 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Iterator.Value":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop();
+                    state.Pop();
                     state.Push(SymbolicValue.Symbol(Sort.Bytes, $"iterator_value_{inst.Offset}"));
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
             case "System.Crypto.CheckSig":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // signature
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // pubkey
+                    state.Pop(); // signature
+                    state.Pop(); // pubkey
                     state.Telemetry.SignatureChecks.Add(inst.Offset);
                     state.Push(SymbolicValue.Symbol(Sort.Bool, $"sig_ok_{inst.Offset}"));
                     state.Pc = inst.EndOffset;
@@ -164,8 +164,8 @@ public sealed partial class SymbolicEngine
                 }
             case "System.Crypto.CheckMultisig":
                 {
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // signatures
-                    if (state.EvaluationStack.Count > 0) state.Pop(); // pubkeys
+                    state.Pop(); // signatures
+                    state.Pop(); // pubkeys
                     state.Telemetry.SignatureChecks.Add(inst.Offset);
                     state.Push(SymbolicValue.Symbol(Sort.Bool, $"multisig_ok_{inst.Offset}"));
                     state.Pc = inst.EndOffset;
@@ -185,11 +185,8 @@ public sealed partial class SymbolicEngine
             default:
                 // Modeled descriptor with no specific handler — push a sort-typed symbol if the
                 // descriptor declares a return value, otherwise nothing.
-                if (descriptor.PopArgs > 0)
-                {
-                    for (int i = 0; i < descriptor.PopArgs; i++)
-                        if (state.EvaluationStack.Count > 0) state.Pop();
-                }
+                for (int i = 0; i < descriptor.PopArgs; i++)
+                    state.Pop();
                 if (descriptor.HasReturnValue)
                     state.Push(SymbolicValue.Symbol(Sort.Unknown, $"{descriptor.Name}_ret_{inst.Offset}"));
                 state.Pc = inst.EndOffset;
@@ -238,7 +235,7 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleContractCallNative(ExecutionState state, Instruction inst)
     {
         // Audit C5: native calls must be recorded as ExternalCall so detectors see Update/Destroy.
-        if (state.EvaluationStack.Count > 0) state.Pop(); // version (some impls include)
+        state.Pop(); // version
         var ext = new ExternalCall
         {
             Offset = inst.Offset,

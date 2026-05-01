@@ -49,11 +49,13 @@ public sealed class DetectorEngine
         var smt = context.SmtBackend!;
         foreach (var f in findings)
         {
-            // Heuristic: pick a state whose path includes the finding's offset.
-            var state = context.States.FirstOrDefault(s => s.Path.Contains(f.Offset))
-                        ?? context.States.FirstOrDefault();
-            if (state is null) { yield return f; continue; }
-            var conds = state.PathConditions.ToList();
+            // Prefer the source state's path conditions captured when the detector emitted the
+            // finding. Fall back to the old offset heuristic only for hand-built findings.
+            var conds = f.PathConditions.IsDefault
+                ? (context.States.FirstOrDefault(s => s.Path.Contains(f.Offset))
+                   ?? context.States.FirstOrDefault())?.PathConditions.ToList()
+                : f.PathConditions.ToList();
+            if (conds is null) { yield return f; continue; }
             var outcome = smt.IsSatisfiable(conds);
             if (outcome == Smt.SmtOutcome.Sat)
             {

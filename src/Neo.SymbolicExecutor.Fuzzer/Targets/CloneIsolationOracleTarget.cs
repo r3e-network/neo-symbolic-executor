@@ -36,9 +36,14 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
 
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 1_000, MaxPaths = 16, MaxStackSize = 64,
-            MaxItemSize = 16 * 1024, MaxCollectionSize = 128, MaxHeapObjects = 256,
-            MaxQueuedStates = 64, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+            MaxSteps = 1_000,
+            MaxPaths = 16,
+            MaxStackSize = 64,
+            MaxItemSize = 16 * 1024,
+            MaxCollectionSize = 128,
+            MaxHeapObjects = 256,
+            MaxQueuedStates = 64,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
         if (result.FinalStates.Length == 0) return true;
 

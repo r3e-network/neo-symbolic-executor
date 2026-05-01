@@ -20,6 +20,15 @@ unique crashes to a persistent corpus for triage.
 | `pipeline` | Full `decode → run → detect → risk → gate → report` chain | JSON parses back; Markdown begins with the canonical H1 |
 | `report` | `ReportGenerator.{ToJson,ToMarkdown}` on random findings | Output round-trips through `JsonNode.Parse` |
 | `expr` | `Expr.*` simplifiers over random IR trees | No exceptions other than `VmFaultException` |
+| `real-nef` | Real NEF corpus from `NEO_SYM_FUZZ_NEF_DIR` | Parses and runs available NEF/manifest pairs without unexpected exceptions |
+| `structured-mutation` | Structured scripts with focused byte-level mutations | Mutations preserve bounded engine behavior |
+| `engine-cov` | Coverage-guided engine inputs with persistent interesting corpus | Newly covered paths are retained and replayed |
+| `engine-determinism` | Same generated script run twice | Final-state summaries stay deterministic |
+| `clone-isolation` | Deep state clone oracle | Heap, stack, telemetry, and path mutations do not bleed across clones |
+| `pipeline-consistency` | Full pipeline run twice on the same script | Findings and reports are stable |
+| `report-roundtrip` | Generated reports with varied finding text | JSON report shape round-trips through `JsonNode` |
+| `heap-invariants` | Heap-heavy engine scripts | Heap references remain valid and clone-safe |
+| `differential-neovm` | Bounded scripts against Neo.VM reference execution | Clean Neo.VM halts should not become all-fault symbolic runs |
 
 ## Quick start
 
@@ -114,18 +123,21 @@ neo-sym-fuzz --target engine --seed 197456258 --seconds 1
 The `--reproduce <input.bin>` flag is wired but its driver is target-dependent and still
 maturing — for now, the seed-driven entry point is the canonical replay.
 
-## Throughput baselines
+## Historical throughput baselines
 
-On a developer laptop (4 worker threads, dotnet 10):
+On a developer laptop (4 worker threads, dotnet 10), the original 12-target campaign measured:
 
-- ~150K–170K iterations/sec across all 12 targets combined
+- ~150K–170K iterations/sec across the original 12 targets combined
 - ~5 minutes ≈ 50M iterations
 - ~24 hours ≈ ~14 billion iterations
 
+Current 21-target campaigns include real-NEF, coverage-guided, consistency, heap-invariant,
+and differential Neo.VM oracles, so throughput depends on the enabled target mix and corpus.
+
 ## Bug-hunting record
 
-The first run of this fuzzer (90 seconds, 12 targets) found 58 unique crashes covering two
-underlying bug classes in the engine:
+The first run of the original 12-target fuzzer (90 seconds) found 58 unique crashes covering
+two underlying bug classes in the engine:
 
 1. `CatchableVmException` leaking out of `SymbolicEngine.Run()` when PICKITEM/REMOVE
    produced an out-of-range index.

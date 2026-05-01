@@ -23,7 +23,7 @@ public sealed class NftOwnershipAuthorizationDetector : BaseDetector
 
         foreach (var state in context.States)
         {
-            var method = ProtocolRiskHelpers.MethodForState(context, state);
+            bool sourceOwnershipSignal = ProtocolRiskHelpers.HasNftSourceSignal(context, state);
 
             var firstOwnershipWrite = state.Telemetry.StorageOps
                 .Where(ProtocolRiskHelpers.IsNftOwnershipWrite)
@@ -33,17 +33,22 @@ public sealed class NftOwnershipAuthorizationDetector : BaseDetector
                 ?? state.Telemetry.StorageOps
                     .Where(ProtocolRiskHelpers.IsDynamicStateWrite)
                     .OrderBy(op => op.Offset)
+                    .FirstOrDefault()
+                ?? state.Telemetry.StorageOps
+                    .Where(op => sourceOwnershipSignal && ProtocolRiskHelpers.IsStateWrite(op))
+                    .OrderBy(op => op.Offset)
                     .FirstOrDefault();
             if (ownershipWrite is null) continue;
             if (ProtocolRiskHelpers.HasAuthBefore(state, ownershipWrite.Offset)) continue;
 
-            bool dynamicKey = !ProtocolRiskHelpers.IsNftOwnershipWrite(ownershipWrite);
+            bool dynamicKey = ProtocolRiskHelpers.IsDynamicStateWrite(ownershipWrite);
             var tags = new List<string> { "nft", "nep11", "ownership-auth" };
             if (dynamicKey) tags.Add("dynamic-storage-key");
+            if (sourceOwnershipSignal) tags.Add("source-hint");
 
             yield return MakeFinding(
                 title: "NEP-11 ownership or approval write lacks early authorization",
-                description: $"NEP-11 path writes an ownership/approval-like or dynamic storage key at "
+                description: $"NEP-11 path writes an ownership/approval-like, source-indicated, or dynamic storage key at "
                            + $"0x{ownershipWrite.Offset:X4} before an enforced witness, caller-hash, or signature check. "
                            + "NFT transfer, burn, and approval flows should prove owner/operator authority before changing "
                            + "token ownership or approvals.",

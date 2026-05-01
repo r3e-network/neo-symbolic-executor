@@ -116,6 +116,32 @@ internal static class ProtocolRiskHelpers
         return state.Telemetry.StorageOps.Any(op => KeyContainsAny(op, DefiStateHints));
     }
 
+    public static bool HasDefiSourceSignal(AnalysisContext context, ExecutionState state)
+    {
+        var method = MethodForState(context, state);
+        return context.SourceHints?.MethodContainsAny(
+            method?.Name,
+            SwapNames.Concat(DefiStateHints).Concat(OracleHints)) == true;
+    }
+
+    public static bool HasSourceSlippageSignal(AnalysisContext context, ExecutionState state)
+    {
+        var method = MethodForState(context, state);
+        return context.SourceHints?.MethodContainsAny(method?.Name, SlippageHints) == true;
+    }
+
+    public static bool HasSourceFreshnessSignal(AnalysisContext context, ExecutionState state)
+    {
+        var method = MethodForState(context, state);
+        return context.SourceHints?.MethodContainsAny(method?.Name, FreshnessHints.Concat(OracleHints)) == true;
+    }
+
+    public static bool HasNftSourceSignal(AnalysisContext context, ExecutionState state)
+    {
+        var method = MethodForState(context, state);
+        return context.SourceHints?.MethodContainsAny(method?.Name, NftKeyHints) == true;
+    }
+
     public static bool HasDynamicStateWrite(ExecutionState state) =>
         state.Telemetry.StorageOps.Any(IsDynamicStateWrite);
 

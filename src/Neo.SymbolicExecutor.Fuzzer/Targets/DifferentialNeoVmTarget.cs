@@ -145,5 +145,5 @@ public sealed class DifferentialNeoVmTarget : IFuzzTarget
         || r.Contains("budget:")
         || r.Contains("size") && r.Contains("exceeds")
         || r.Contains("PC at unaligned");   // see iter-2 wakeup-4: JIT decode covers most cases
-                                             // but corner cases (post-RET PC overshoot etc.) remain
+                                            // but corner cases (post-RET PC overshoot etc.) remain
 }

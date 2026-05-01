@@ -88,8 +88,11 @@ while [ ! -f "$STOP_FILE" ]; do
   ) &
   WATCHDOG_PID=$!
 
-  wait $FUZZ_PID || true
-  EXIT=$?
+  if wait "$FUZZ_PID"; then
+    EXIT=0
+  else
+    EXIT=$?
+  fi
   kill $WATCHDOG_PID 2>/dev/null || true
   echo "[wrapper] campaign chunk ended with exit=$EXIT at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -102,7 +105,7 @@ while [ ! -f "$STOP_FILE" ]; do
     echo
     echo "Unique crashes recorded:"
     if [ -d "$CORPUS/crashes" ]; then
-      find "$CORPUS/crashes" -mindepth 1 -maxdepth 1 -type d | sort | while read d; do
+      find "$CORPUS/crashes" -mindepth 1 -maxdepth 1 -type d | sort | while read -r d; do
         target=$(basename "$d" | cut -d'-' -f1)
         sig=$(basename "$d")
         first=$(jq -r '.first_seen_utc // "?"' "$d/meta.json" 2>/dev/null || echo "?")

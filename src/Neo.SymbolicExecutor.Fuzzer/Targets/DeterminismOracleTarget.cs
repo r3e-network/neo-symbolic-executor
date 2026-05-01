@@ -37,9 +37,13 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
     //   the deadline fires. Memory bombs are still bounded.
     private static readonly ExecutionOptions Options = new()
     {
-        MaxSteps = 2_000, MaxPaths = 32, MaxStackSize = 128,
-        MaxInvocationStackDepth = 64, MaxItemSize = 32 * 1024,
-        MaxCollectionSize = 256, MaxHeapObjects = 512,
+        MaxSteps = 2_000,
+        MaxPaths = 32,
+        MaxStackSize = 128,
+        MaxInvocationStackDepth = 64,
+        MaxItemSize = 32 * 1024,
+        MaxCollectionSize = 256,
+        MaxHeapObjects = 512,
         MaxQueuedStates = 128,
         PerRunDeadline = System.TimeSpan.FromSeconds(30),
     };

@@ -116,7 +116,7 @@ internal static class Program
         if (!target.SupportsDirectReplay)
         {
             Console.Error.WriteLine($"Target '{target.Name}' does not support direct-input replay.");
-            Console.Error.WriteLine("Try: --target decoder|nef|engine|engine-cov|engine-determinism — or use --seed instead.");
+            Console.Error.WriteLine($"Try: --target {DirectReplayTargetsText()} — or use --seed instead.");
             return 2;
         }
 
@@ -142,35 +142,7 @@ internal static class Program
 
     private static CliOpts ParseArgs(string[] args)
     {
-        var allTargets = new IFuzzTarget[]
-        {
-            new ScriptDecoderTarget(),
-            new NefParserTarget(),
-            new NefMutationTarget(),
-            new ManifestParserTarget(),
-            new EngineRandomScriptTarget(),
-            new EngineSeededStateTarget(),
-            new EngineNoCloneLeakTarget(),
-            new DetectorEngineTarget(),
-            new CombinedDetectorsOnEngineTarget(),
-            new PipelineTarget(),
-            new ReportGeneratorTarget(),
-            new ExpressionSimplifierTarget(),
-            new RealNefTarget(),
-            new StructureAwareMutationTarget(),
-            // Tier-2: oracle-rich targets — added 2026-04-27 after the first 320M-iter campaign
-            // surfaced zero new crashes, indicating prior oracles were too lenient.
-            new CoverageGuidedEngineTarget(),
-            new DeterminismOracleTarget(),
-            new CloneIsolationOracleTarget(),
-            new PipelineConsistencyTarget(),
-            new ReportRoundTripTarget(),
-            new HeapInvariantTarget(),
-            // Tier-3: differential testing against the Neo.VM reference. Strongest possible oracle
-            // — flags the narrow case where Neo.VM HALTs cleanly but our symbolic engine FAULTs
-            // every path. SYSCALL/CALLT/CALLA scripts are skipped (we model a subset).
-            new DifferentialNeoVmTarget(),
-        };
+        var allTargets = CreateTargets();
         var byName = allTargets.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 
         TimeSpan? maxRuntime = null;
@@ -194,26 +166,48 @@ internal static class Program
         {
             string a = args[i];
             string Next() => ++i < args.Length ? args[i] : throw new ArgumentException($"missing value for {a}");
+            int ParseInt(string label, string value) =>
+                int.TryParse(value, out int parsed)
+                    ? parsed
+                    : throw new ArgumentException($"{label}: expected int32, got '{value}'");
+            long ParseLong(string label, string value) =>
+                long.TryParse(value, out long parsed)
+                    ? parsed
+                    : throw new ArgumentException($"{label}: expected int64, got '{value}'");
+            int ParsePositiveInt(string label, string value)
+            {
+                int parsed = ParseInt(label, value);
+                return parsed > 0
+                    ? parsed
+                    : throw new ArgumentException($"{label}: expected positive int32, got '{value}'");
+            }
+            long ParsePositiveLong(string label, string value)
+            {
+                long parsed = ParseLong(label, value);
+                return parsed > 0
+                    ? parsed
+                    : throw new ArgumentException($"{label}: expected positive int64, got '{value}'");
+            }
             switch (a)
             {
                 case "--seconds":
                 case "--duration":
-                    maxRuntime = TimeSpan.FromSeconds(int.Parse(Next()));
+                    maxRuntime = TimeSpan.FromSeconds(ParsePositiveInt(a, Next()));
                     break;
                 case "--minutes":
-                    maxRuntime = TimeSpan.FromMinutes(int.Parse(Next()));
+                    maxRuntime = TimeSpan.FromMinutes(ParsePositiveInt(a, Next()));
                     break;
                 case "--hours":
-                    maxRuntime = TimeSpan.FromHours(int.Parse(Next()));
+                    maxRuntime = TimeSpan.FromHours(ParsePositiveInt(a, Next()));
                     break;
                 case "--forever":
                     forever = true;
                     break;
                 case "--workers":
-                    workers = Math.Max(1, int.Parse(Next()));
+                    workers = ParsePositiveInt(a, Next());
                     break;
                 case "--seed":
-                    startSeed = int.Parse(Next());
+                    startSeed = ParseInt(a, Next());
                     break;
                 case "--corpus":
                     corpus = Next();
@@ -235,10 +229,10 @@ internal static class Program
                     stopOnFirst = true;
                     break;
                 case "--status-seconds":
-                    statusInterval = TimeSpan.FromSeconds(int.Parse(Next()));
+                    statusInterval = TimeSpan.FromSeconds(ParsePositiveInt(a, Next()));
                     break;
                 case "--max-memory-mb":
-                    maxMemoryMb = long.Parse(Next());
+                    maxMemoryMb = ParsePositiveLong(a, Next());
                     break;
                 case "--reproduce":
                     reproduce = Next();
@@ -267,7 +261,7 @@ internal static class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("""
+        Console.WriteLine($"""
             Neo Symbolic Executor — Fuzzer
 
             Usage:
@@ -285,8 +279,7 @@ internal static class Program
 
             Targets:
               --target <names>        Comma-separated list. Default: all.
-                                      Known: decoder, nef, manifest, engine, clone-leak,
-                                      detectors, report, expr.
+                                      Known: {KnownTargetsText()}.
 
             Output:
               --corpus <dir>          Where to record crash artifacts (default: ./fuzz-corpus).
@@ -306,6 +299,55 @@ internal static class Program
               1   At least one new unique crash recorded under --corpus.
               2   Bad arguments.
             """);
+    }
+
+    private static IFuzzTarget[] CreateTargets() => new IFuzzTarget[]
+    {
+        new ScriptDecoderTarget(),
+        new NefParserTarget(),
+        new NefMutationTarget(),
+        new ManifestParserTarget(),
+        new EngineRandomScriptTarget(),
+        new EngineSeededStateTarget(),
+        new EngineNoCloneLeakTarget(),
+        new DetectorEngineTarget(),
+        new CombinedDetectorsOnEngineTarget(),
+        new PipelineTarget(),
+        new ReportGeneratorTarget(),
+        new ExpressionSimplifierTarget(),
+        new RealNefTarget(),
+        new StructureAwareMutationTarget(),
+        // Tier-2: oracle-rich targets — added 2026-04-27 after the first 320M-iter campaign
+        // surfaced zero new crashes, indicating prior oracles were too lenient.
+        new CoverageGuidedEngineTarget(),
+        new DeterminismOracleTarget(),
+        new CloneIsolationOracleTarget(),
+        new PipelineConsistencyTarget(),
+        new ReportRoundTripTarget(),
+        new HeapInvariantTarget(),
+        // Tier-3: differential testing against the Neo.VM reference. Strongest possible oracle
+        // — flags the narrow case where Neo.VM HALTs cleanly but our symbolic engine FAULTs
+        // every path. SYSCALL/CALLT/CALLA scripts are skipped (we model a subset).
+        new DifferentialNeoVmTarget(),
+    };
+
+    private static string KnownTargetsText() => FormatTargetNames(CreateTargets());
+
+    private static string DirectReplayTargetsText() =>
+        string.Join("|", CreateTargets().Where(target => target.SupportsDirectReplay).Select(target => target.Name));
+
+    private static string FormatTargetNames(IEnumerable<IFuzzTarget> targets)
+    {
+        var chunks = targets.Select(target => target.Name)
+            .Chunk(4)
+            .Select(chunk => string.Join(", ", chunk))
+            .ToArray();
+        for (int i = 0; i < chunks.Length - 1; i++)
+            chunks[i] += ",";
+
+        return string.Join(
+            "\n                                      ",
+            chunks);
     }
 
     private sealed record CliOpts

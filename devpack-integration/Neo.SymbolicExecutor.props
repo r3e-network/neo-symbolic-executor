@@ -15,8 +15,8 @@
     <NeoSymEnabled Condition="'$(NeoSymEnabled)' == ''">true</NeoSymEnabled>
     <NeoSymToolPath Condition="'$(NeoSymToolPath)' == ''">neo-sym</NeoSymToolPath>
     <NeoSymFormat Condition="'$(NeoSymFormat)' == ''">markdown</NeoSymFormat>
-    <NeoSymOutputDir Condition="'$(NeoSymOutputDir)' == ''">$(OutputPath)neo-sym/</NeoSymOutputDir>
     <NeoSymFailOnMaxSeverity Condition="'$(NeoSymFailOnMaxSeverity)' == ''">high</NeoSymFailOnMaxSeverity>
     <NeoSymUseSmt Condition="'$(NeoSymUseSmt)' == ''">false</NeoSymUseSmt>
+    <NeoSymSourceDir Condition="'$(NeoSymSourceDir)' == ''">$(MSBuildProjectDirectory)</NeoSymSourceDir>
   </PropertyGroup>
 </Project>

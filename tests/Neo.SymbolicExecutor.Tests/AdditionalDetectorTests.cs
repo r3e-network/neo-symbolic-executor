@@ -408,6 +408,80 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void DefiSlippageOracle_UsesMethodLocalSourceHintsForOpaquePoolLogic()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"execute","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("opaque")), SymbolicValue.Int(100), false, false));
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                var reserveAfter = pool.Reserve0 + amountIn;
+                storage.Put("opaque", reserveAfter);
+                return true;
+            }
+        """);
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("source-hint");
+    }
+
+    [Fact]
+    public void DefiSlippageOracle_SourceHintsDoNotBleedAcrossMethods()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"execute","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("opaque")), SymbolicValue.Int(100), false, false));
+        var sourceHints = SourceHints.FromText("""
+            public bool other()
+            {
+                var reserveAfter = pool.Reserve0 + amountIn;
+                return true;
+            }
+
+            public bool execute()
+            {
+                storage.Put("opaque", amountIn);
+                return true;
+            }
+        """);
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void NftOwnershipAuthorization_FlagsUnauthedNep11OwnershipWrite()
     {
         var manifest = Nef.ContractManifest.FromJson("""
@@ -487,6 +561,35 @@ public class AdditionalDetectorTests
         new NftOwnershipAuthorizationDetector()
             .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
             .Should().ContainSingle();
+    }
+
+    [Fact]
+    public void NftOwnershipAuthorization_UsesMethodLocalSourceHintsForOpaqueOwnershipLogic()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{"methods":[{"name":"doIt","parameters":[],"returntype":"Boolean","offset":768,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x300);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x330, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("opaque")), SymbolicValue.Bytes(new byte[20]), false, false));
+        var sourceHints = SourceHints.FromText("""
+            public bool doIt(UInt256 tokenId, UInt160 to)
+            {
+                owners[tokenId] = to;
+                approvals.Remove(tokenId);
+                return true;
+            }
+        """);
+
+        new NftOwnershipAuthorizationDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("source-hint")
+            .And.NotContain("dynamic-storage-key");
     }
 
     [Fact]

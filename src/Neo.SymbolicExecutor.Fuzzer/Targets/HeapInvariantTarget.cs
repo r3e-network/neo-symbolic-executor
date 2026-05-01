@@ -33,9 +33,14 @@ public sealed class HeapInvariantTarget : IFuzzTarget
 
         var result = new SymbolicEngine(program, new ExecutionOptions
         {
-            MaxSteps = 2_000, MaxPaths = 16, MaxStackSize = 64,
-            MaxItemSize = 16 * 1024, MaxCollectionSize = 128, MaxHeapObjects = 256,
-            MaxQueuedStates = 64, PerRunDeadline = System.TimeSpan.FromSeconds(2),
+            MaxSteps = 2_000,
+            MaxPaths = 16,
+            MaxStackSize = 64,
+            MaxItemSize = 16 * 1024,
+            MaxCollectionSize = 128,
+            MaxHeapObjects = 256,
+            MaxQueuedStates = 64,
+            PerRunDeadline = System.TimeSpan.FromSeconds(2),
         }).Run();
 
         foreach (var s in result.FinalStates)
@@ -84,8 +89,8 @@ public sealed class HeapInvariantTarget : IFuzzTarget
                 case MapObject mo:
                     foreach (var (k, val) in mo.Entries) { queue.Enqueue(k); queue.Enqueue(val); }
                     break;
-                // BufferObject cells are bare Expressions (bytes), not SymbolicValues, and cannot
-                // themselves carry heap refs. Skipping.
+                    // BufferObject cells are bare Expressions (bytes), not SymbolicValues, and cannot
+                    // themselves carry heap refs. Skipping.
             }
         }
         reason = string.Empty;

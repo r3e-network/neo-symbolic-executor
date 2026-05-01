@@ -44,7 +44,7 @@ public class SmtConcretizationTests
     public void TryConcretizeIndex_HelperUsesBackend()
     {
         // White-box: verify TryConcretizeIndex appends a path condition when SMT solves.
-        // We don't have libz3 on this host so we use a stub backend.
+        // Use a stub backend so this white-box test stays focused on engine concretization.
         var stub = new StubBackend(new BigInteger(3));
         byte[] script =
         {

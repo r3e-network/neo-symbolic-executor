@@ -43,12 +43,18 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.JMPIFNOT_L:
                 return ConditionalBranch(state, inst, jumpOnTrue: false);
 
-            case NeoVm.OpCode.JMPEQ: case NeoVm.OpCode.JMPEQ_L:
-            case NeoVm.OpCode.JMPNE: case NeoVm.OpCode.JMPNE_L:
-            case NeoVm.OpCode.JMPGT: case NeoVm.OpCode.JMPGT_L:
-            case NeoVm.OpCode.JMPGE: case NeoVm.OpCode.JMPGE_L:
-            case NeoVm.OpCode.JMPLT: case NeoVm.OpCode.JMPLT_L:
-            case NeoVm.OpCode.JMPLE: case NeoVm.OpCode.JMPLE_L:
+            case NeoVm.OpCode.JMPEQ:
+            case NeoVm.OpCode.JMPEQ_L:
+            case NeoVm.OpCode.JMPNE:
+            case NeoVm.OpCode.JMPNE_L:
+            case NeoVm.OpCode.JMPGT:
+            case NeoVm.OpCode.JMPGT_L:
+            case NeoVm.OpCode.JMPGE:
+            case NeoVm.OpCode.JMPGE_L:
+            case NeoVm.OpCode.JMPLT:
+            case NeoVm.OpCode.JMPLT_L:
+            case NeoVm.OpCode.JMPLE:
+            case NeoVm.OpCode.JMPLE_L:
                 return ComparisonBranch(state, inst);
 
             case NeoVm.OpCode.CALL:
@@ -172,16 +178,24 @@ public sealed partial class SymbolicEngine
                     state.Pc = inst.EndOffset; return Single(state);
                 }
 
-            case NeoVm.OpCode.LDSFLD0: case NeoVm.OpCode.LDSFLD1: case NeoVm.OpCode.LDSFLD2:
-            case NeoVm.OpCode.LDSFLD3: case NeoVm.OpCode.LDSFLD4: case NeoVm.OpCode.LDSFLD5:
+            case NeoVm.OpCode.LDSFLD0:
+            case NeoVm.OpCode.LDSFLD1:
+            case NeoVm.OpCode.LDSFLD2:
+            case NeoVm.OpCode.LDSFLD3:
+            case NeoVm.OpCode.LDSFLD4:
+            case NeoVm.OpCode.LDSFLD5:
             case NeoVm.OpCode.LDSFLD6:
                 state.Push(LoadSlot(state.StaticFields, op - NeoVm.OpCode.LDSFLD0));
                 state.Pc = inst.EndOffset; return Single(state);
             case NeoVm.OpCode.LDSFLD:
                 state.Push(LoadSlot(state.StaticFields, inst.Operand.Span[0]));
                 state.Pc = inst.EndOffset; return Single(state);
-            case NeoVm.OpCode.STSFLD0: case NeoVm.OpCode.STSFLD1: case NeoVm.OpCode.STSFLD2:
-            case NeoVm.OpCode.STSFLD3: case NeoVm.OpCode.STSFLD4: case NeoVm.OpCode.STSFLD5:
+            case NeoVm.OpCode.STSFLD0:
+            case NeoVm.OpCode.STSFLD1:
+            case NeoVm.OpCode.STSFLD2:
+            case NeoVm.OpCode.STSFLD3:
+            case NeoVm.OpCode.STSFLD4:
+            case NeoVm.OpCode.STSFLD5:
             case NeoVm.OpCode.STSFLD6:
                 StoreSlot(state.StaticFields, op - NeoVm.OpCode.STSFLD0, state.Pop());
                 state.Pc = inst.EndOffset; return Single(state);
@@ -189,16 +203,24 @@ public sealed partial class SymbolicEngine
                 StoreSlot(state.StaticFields, inst.Operand.Span[0], state.Pop());
                 state.Pc = inst.EndOffset; return Single(state);
 
-            case NeoVm.OpCode.LDLOC0: case NeoVm.OpCode.LDLOC1: case NeoVm.OpCode.LDLOC2:
-            case NeoVm.OpCode.LDLOC3: case NeoVm.OpCode.LDLOC4: case NeoVm.OpCode.LDLOC5:
+            case NeoVm.OpCode.LDLOC0:
+            case NeoVm.OpCode.LDLOC1:
+            case NeoVm.OpCode.LDLOC2:
+            case NeoVm.OpCode.LDLOC3:
+            case NeoVm.OpCode.LDLOC4:
+            case NeoVm.OpCode.LDLOC5:
             case NeoVm.OpCode.LDLOC6:
                 state.Push(LoadSlot(state.CurrentFrame.Locals, op - NeoVm.OpCode.LDLOC0));
                 state.Pc = inst.EndOffset; return Single(state);
             case NeoVm.OpCode.LDLOC:
                 state.Push(LoadSlot(state.CurrentFrame.Locals, inst.Operand.Span[0]));
                 state.Pc = inst.EndOffset; return Single(state);
-            case NeoVm.OpCode.STLOC0: case NeoVm.OpCode.STLOC1: case NeoVm.OpCode.STLOC2:
-            case NeoVm.OpCode.STLOC3: case NeoVm.OpCode.STLOC4: case NeoVm.OpCode.STLOC5:
+            case NeoVm.OpCode.STLOC0:
+            case NeoVm.OpCode.STLOC1:
+            case NeoVm.OpCode.STLOC2:
+            case NeoVm.OpCode.STLOC3:
+            case NeoVm.OpCode.STLOC4:
+            case NeoVm.OpCode.STLOC5:
             case NeoVm.OpCode.STLOC6:
                 StoreSlot(state.CurrentFrame.Locals, op - NeoVm.OpCode.STLOC0, state.Pop());
                 state.Pc = inst.EndOffset; return Single(state);
@@ -206,16 +228,24 @@ public sealed partial class SymbolicEngine
                 StoreSlot(state.CurrentFrame.Locals, inst.Operand.Span[0], state.Pop());
                 state.Pc = inst.EndOffset; return Single(state);
 
-            case NeoVm.OpCode.LDARG0: case NeoVm.OpCode.LDARG1: case NeoVm.OpCode.LDARG2:
-            case NeoVm.OpCode.LDARG3: case NeoVm.OpCode.LDARG4: case NeoVm.OpCode.LDARG5:
+            case NeoVm.OpCode.LDARG0:
+            case NeoVm.OpCode.LDARG1:
+            case NeoVm.OpCode.LDARG2:
+            case NeoVm.OpCode.LDARG3:
+            case NeoVm.OpCode.LDARG4:
+            case NeoVm.OpCode.LDARG5:
             case NeoVm.OpCode.LDARG6:
                 state.Push(LoadSlot(state.CurrentFrame.Args, op - NeoVm.OpCode.LDARG0));
                 state.Pc = inst.EndOffset; return Single(state);
             case NeoVm.OpCode.LDARG:
                 state.Push(LoadSlot(state.CurrentFrame.Args, inst.Operand.Span[0]));
                 state.Pc = inst.EndOffset; return Single(state);
-            case NeoVm.OpCode.STARG0: case NeoVm.OpCode.STARG1: case NeoVm.OpCode.STARG2:
-            case NeoVm.OpCode.STARG3: case NeoVm.OpCode.STARG4: case NeoVm.OpCode.STARG5:
+            case NeoVm.OpCode.STARG0:
+            case NeoVm.OpCode.STARG1:
+            case NeoVm.OpCode.STARG2:
+            case NeoVm.OpCode.STARG3:
+            case NeoVm.OpCode.STARG4:
+            case NeoVm.OpCode.STARG5:
             case NeoVm.OpCode.STARG6:
                 StoreSlot(state.CurrentFrame.Args, op - NeoVm.OpCode.STARG0, state.Pop());
                 state.Pc = inst.EndOffset; return Single(state);
@@ -225,9 +255,9 @@ public sealed partial class SymbolicEngine
 
             // ---- Bitwise / Arithmetic / Compare
             case NeoVm.OpCode.INVERT: return Unary(state, inst, Expr.Invert);
-            case NeoVm.OpCode.AND:    return Binary(state, inst, Expr.And);
-            case NeoVm.OpCode.OR:     return Binary(state, inst, Expr.Or);
-            case NeoVm.OpCode.XOR:    return Binary(state, inst, Expr.Xor);
+            case NeoVm.OpCode.AND: return Binary(state, inst, Expr.And);
+            case NeoVm.OpCode.OR: return Binary(state, inst, Expr.Or);
+            case NeoVm.OpCode.XOR: return Binary(state, inst, Expr.Xor);
             // Audit fix (iter-2 wakeup-12): EQUAL/NOTEQUAL use NeoVM's `x1.Equals(x2, limits)`
             // which does DEEP structural comparison for Structs (recursively walking fields).
             // The plain Expr.Eq fast-path treats HeapRef==HeapRef as ID equality, which is
@@ -237,18 +267,18 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.EQUAL: return HandleEquality(state, inst, negate: false);
             case NeoVm.OpCode.NOTEQUAL: return HandleEquality(state, inst, negate: true);
 
-            case NeoVm.OpCode.SIGN:   return Unary(state, inst, Expr.Sign);
-            case NeoVm.OpCode.ABS:    return Unary(state, inst, Expr.Abs);
+            case NeoVm.OpCode.SIGN: return Unary(state, inst, Expr.Sign);
+            case NeoVm.OpCode.ABS: return Unary(state, inst, Expr.Abs);
             case NeoVm.OpCode.NEGATE: return Unary(state, inst, Expr.Neg);
-            case NeoVm.OpCode.INC:    return UnaryArith(state, inst, "INC", Expr.Inc, overflow: true);
-            case NeoVm.OpCode.DEC:    return UnaryArith(state, inst, "DEC", Expr.Dec, overflow: true);
-            case NeoVm.OpCode.ADD:    return BinaryArith(state, inst, "ADD", Expr.Add, overflow: true);
-            case NeoVm.OpCode.SUB:    return BinaryArith(state, inst, "SUB", Expr.Sub, overflow: true);
-            case NeoVm.OpCode.MUL:    return BinaryArith(state, inst, "MUL", Expr.Mul, overflow: true);
-            case NeoVm.OpCode.DIV:    return BinaryArith(state, inst, "DIV", Expr.Div, overflow: false, divisorMatters: true);
-            case NeoVm.OpCode.MOD:    return BinaryArith(state, inst, "MOD", Expr.Mod, overflow: false, divisorMatters: true);
-            case NeoVm.OpCode.POW:    return BinaryArith(state, inst, "POW", (a, b) => Expr.Pow(a, b, _options.MaxPowExponent), overflow: true);
-            case NeoVm.OpCode.SQRT:   return UnaryArith(state, inst, "SQRT", Expr.Sqrt, overflow: false);
+            case NeoVm.OpCode.INC: return UnaryArith(state, inst, "INC", Expr.Inc, overflow: true);
+            case NeoVm.OpCode.DEC: return UnaryArith(state, inst, "DEC", Expr.Dec, overflow: true);
+            case NeoVm.OpCode.ADD: return BinaryArith(state, inst, "ADD", Expr.Add, overflow: true);
+            case NeoVm.OpCode.SUB: return BinaryArith(state, inst, "SUB", Expr.Sub, overflow: true);
+            case NeoVm.OpCode.MUL: return BinaryArith(state, inst, "MUL", Expr.Mul, overflow: true);
+            case NeoVm.OpCode.DIV: return BinaryArith(state, inst, "DIV", Expr.Div, overflow: false, divisorMatters: true);
+            case NeoVm.OpCode.MOD: return BinaryArith(state, inst, "MOD", Expr.Mod, overflow: false, divisorMatters: true);
+            case NeoVm.OpCode.POW: return BinaryArith(state, inst, "POW", (a, b) => Expr.Pow(a, b, _options.MaxPowExponent), overflow: true);
+            case NeoVm.OpCode.SQRT: return UnaryArith(state, inst, "SQRT", Expr.Sqrt, overflow: false);
             case NeoVm.OpCode.MODMUL: return TernaryArith(state, inst, "MODMUL", Expr.ModMul);
             case NeoVm.OpCode.MODPOW: return TernaryArith(state, inst, "MODPOW", Expr.ModPow);
             // Audit fix (iter-2 wakeup-4 differential): NeoVM's SHL/SHR pop the SHIFT first,
@@ -257,24 +287,24 @@ public sealed partial class SymbolicEngine
             // Our prior `BinaryArith` always popped both unconditionally, producing a spurious
             // Stack-underflow fault. Keep BinaryArith for symbolic shifts (the divergence is
             // unobservable when shift is non-zero or symbolic); special-case concrete shift==0.
-            case NeoVm.OpCode.SHL:    return HandleShift(state, inst, "SHL", isLeft: true);
-            case NeoVm.OpCode.SHR:    return HandleShift(state, inst, "SHR", isLeft: false);
+            case NeoVm.OpCode.SHL: return HandleShift(state, inst, "SHL", isLeft: true);
+            case NeoVm.OpCode.SHR: return HandleShift(state, inst, "SHR", isLeft: false);
 
-            case NeoVm.OpCode.NOT:    return Unary(state, inst, Expr.Not);
+            case NeoVm.OpCode.NOT: return Unary(state, inst, Expr.Not);
             case NeoVm.OpCode.BOOLAND: return Binary(state, inst, Expr.BoolAnd);
-            case NeoVm.OpCode.BOOLOR:  return Binary(state, inst, Expr.BoolOr);
-            case NeoVm.OpCode.NZ:      return Unary(state, inst, Expr.Nz);
+            case NeoVm.OpCode.BOOLOR: return Binary(state, inst, Expr.BoolOr);
+            case NeoVm.OpCode.NZ: return Unary(state, inst, Expr.Nz);
             // Audit fix (iter-2 wakeup-10): NUMEQUAL / NUMNOTEQUAL pop both operands as
             // GetInteger and compare numerically — this is DIFFERENT from EQUAL/NOTEQUAL which
             // use type-aware StackItem.Equals (Bool != Int regardless of value). Use NumEq.
             case NeoVm.OpCode.NUMEQUAL: return Binary(state, inst, Expr.NumEq);
             case NeoVm.OpCode.NUMNOTEQUAL: return Binary(state, inst, Expr.NumNe);
-            case NeoVm.OpCode.LT:     return Binary(state, inst, Expr.Lt);
-            case NeoVm.OpCode.LE:     return Binary(state, inst, Expr.Le);
-            case NeoVm.OpCode.GT:     return Binary(state, inst, Expr.Gt);
-            case NeoVm.OpCode.GE:     return Binary(state, inst, Expr.Ge);
-            case NeoVm.OpCode.MIN:    return Binary(state, inst, Expr.Min);
-            case NeoVm.OpCode.MAX:    return Binary(state, inst, Expr.Max);
+            case NeoVm.OpCode.LT: return Binary(state, inst, Expr.Lt);
+            case NeoVm.OpCode.LE: return Binary(state, inst, Expr.Le);
+            case NeoVm.OpCode.GT: return Binary(state, inst, Expr.Gt);
+            case NeoVm.OpCode.GE: return Binary(state, inst, Expr.Ge);
+            case NeoVm.OpCode.MIN: return Binary(state, inst, Expr.Min);
+            case NeoVm.OpCode.MAX: return Binary(state, inst, Expr.Max);
             case NeoVm.OpCode.WITHIN:
                 {
                     var hi = state.Pop().Expression;

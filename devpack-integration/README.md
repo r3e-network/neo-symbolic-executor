@@ -39,6 +39,7 @@ directory; MSBuild auto-imports `Directory.Build.{props,targets}` sibling pairs.
 | `NeoSymOutputDir`               | `$(OutputPath)neo-sym/` | Where to write the report          |
 | `NeoSymFailOnMaxSeverity`       | `high`        | Build fails when a finding meets/exceeds this severity |
 | `NeoSymUseSmt`                  | `false`       | Engage SMT path pruning + finding validation           |
+| `NeoSymSourceDir`               | `$(MSBuildProjectDirectory)` | C# source hint directory for protocol detectors |
 
 To override, set the property in the contract's `.csproj` before importing the targets:
 
@@ -46,6 +47,7 @@ To override, set the property in the contract's `.csproj` before importing the t
 <PropertyGroup>
   <NeoSymFailOnMaxSeverity>critical</NeoSymFailOnMaxSeverity>
   <NeoSymUseSmt>true</NeoSymUseSmt>
+  <NeoSymSourceDir>$(MSBuildProjectDirectory)</NeoSymSourceDir>
 </PropertyGroup>
 ```
 
@@ -73,7 +75,8 @@ build will fail with exit 3 if any gate fires; CI logs surface the violation.
 ## What's analyzed
 
 `neo-sym analyze` runs the symbolic executor over the contract's emitted
-`.nef`, parses the manifest sidecar, then runs all 24 detectors:
+`.nef`, parses the manifest sidecar, reads C# source hints from `NeoSymSourceDir`,
+then runs all 24 detectors:
 
 - Reentrancy (with audit-driven amplification scoring)
 - Access control (manifest `safe` flag respected)

@@ -9,11 +9,11 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 |---|---|---|
 | Engine + decoder + types | ~4,600 | 11 smoke + 6 fuzz |
 | NEF + manifest parsers | ~400 | 5 |
-| 24 detectors + framework | ~2,800 | 31 |
-| Reports + gates + CLI | ~700 | 7 |
+| 24 detectors + framework | ~3,000 | 34 |
+| Reports + gates + CLI | ~750 | 9 |
 | SMT-LIB layer | ~1,700 | 15 |
 | Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
-| **Total** | **~13,200** | **176 passing** |
+| **Total** | **~13,500** | **181 passing** |
 
 ## Layout
 
@@ -28,7 +28,7 @@ neo-symbolic-executor/
 │   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
 │   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
-├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 176 tests total
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 181 tests total
 └── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 
@@ -51,6 +51,7 @@ neo-sym explore contract.nef
 # Full analysis
 neo-sym analyze contract.nef \
   --manifest contract.manifest.json \
+  --source ./src \
   --format markdown \
   --out report.md \
   --fail-on-max-severity high
@@ -127,8 +128,10 @@ by `FuzzerRegressionTests`.
 - `nft_ownership_authorization` — NEP-11 ownership/approval or dynamic-key writes before owner/operator authorization
 - `unknown_instructions` — coverage gap surface (INFO)
 
-With `--smt`: each finding is validated for path satisfiability; infeasible findings are
-dropped (or downgraded), and SAT findings include a concrete witness reproducer.
+With `--source <file-or-dir>`, protocol detectors use method-local C# source hints to recover
+intent that NEF bytecode does not preserve, such as reserve, amount-out, deadline, owner, and
+approval naming. With `--smt`, each finding is validated for path satisfiability; infeasible
+findings are dropped (or downgraded), and SAT findings include a concrete witness reproducer.
 
 ## Audit traceability
 
@@ -148,7 +151,8 @@ finding in its XML doc comments. Examples baked in from day one:
 - 5 new detectors covering audit gaps: NEP-11, callback re-entry, replay, crypto bypass,
   taint-flow upgrade
 - 3 Neo protocol-risk detectors covering DApp privileged methods, DeFi slippage/oracle
-  safety, NEP-11 ownership authorization, unusual method names, and dynamic storage keys
+  safety, NEP-11 ownership authorization, unusual method names, dynamic storage keys, and
+  method-local source hints
 
 ## License
 
