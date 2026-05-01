@@ -12,8 +12,8 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | 24 detectors + framework | ~3,000 | 34 |
 | Reports + gates + CLI | ~750 | 9 |
 | SMT-LIB layer | ~1,700 | 15 |
-| Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
-| **Total** | **~13,500** | **191 passing** |
+| Fuzzer (22 targets, multi-worker) | ~3,500 | 16 regressions + 6 fuzz |
+| **Total** | **~13,600** | **192 passing** |
 
 The CLI's `analyze` command runs the engine once per manifest ABI entrypoint, seeding the eval
 stack with one fresh symbolic value per declared parameter. Without a manifest the engine runs
