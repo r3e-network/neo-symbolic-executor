@@ -7,13 +7,18 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 
 | Component | LOC | Tests |
 |---|---|---|
-| Engine + decoder + types | ~4,600 | 11 smoke + 6 fuzz |
+| Engine + decoder + types | ~4,900 | 11 smoke + 6 fuzz |
 | NEF + manifest parsers | ~400 | 5 |
 | 24 detectors + framework | ~3,000 | 34 |
 | Reports + gates + CLI | ~750 | 9 |
 | SMT-LIB layer | ~1,700 | 15 |
 | Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
-| **Total** | **~13,500** | **190 passing** |
+| **Total** | **~13,500** | **191 passing** |
+
+The CLI's `analyze` command runs the engine once per manifest ABI entrypoint, seeding the eval
+stack with one fresh symbolic value per declared parameter. Without a manifest the engine runs
+once from offset 0 with an empty stack — useful for ad-hoc bytecode but not for real DevPack
+contracts whose dispatcher needs the method-name argument.
 
 ## Layout
 

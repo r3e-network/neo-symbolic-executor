@@ -163,12 +163,19 @@ public static class ReportGenerator
 
     private static JsonObject BuildRiskJson(RiskProfile risk)
     {
+        // Sort dictionary iteration explicitly so JSON output is byte-identical across runs
+        // even if upstream LINQ groupings ever reorder. Severity counts emit in canonical
+        // critical-first order; detector dictionaries sort alphabetically by key.
         var sevCounts = new JsonObject();
-        foreach (var (s, n) in risk.SeverityCounts) sevCounts[s.ToLowerString()] = n;
+        foreach (var s in new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info })
+            if (risk.SeverityCounts.TryGetValue(s, out int n))
+                sevCounts[s.ToLowerString()] = n;
         var detMax = new JsonObject();
-        foreach (var (d, s) in risk.DetectorMaxSeverity) detMax[d] = s.ToLowerString();
+        foreach (var (d, s) in risk.DetectorMaxSeverity.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
+            detMax[d] = s.ToLowerString();
         var detConf = new JsonObject();
-        foreach (var (d, c) in risk.DetectorAverageConfidence) detConf[d] = c;
+        foreach (var (d, c) in risk.DetectorAverageConfidence.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
+            detConf[d] = c;
         return new JsonObject
         {
             ["overall_max_severity"] = risk.OverallMaxSeverity.ToLowerString(),
@@ -184,7 +191,8 @@ public static class ReportGenerator
     private static JsonObject BuildGateJson(GateEvaluation gate)
     {
         var policies = new JsonObject();
-        foreach (var (k, v) in gate.Policies) policies[k] = v;
+        foreach (var (k, v) in gate.Policies.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
+            policies[k] = v;
         var violations = new JsonArray();
         foreach (var v in gate.Violations) violations.Add(v);
         return new JsonObject
