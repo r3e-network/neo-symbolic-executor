@@ -87,6 +87,10 @@ internal static class Program
             ? SourceHints.FromPaths(opts.SourcePaths)
             : null;
 
+        if (opts.DanglingSmtFlags.Count > 0)
+            Console.Error.WriteLine(
+                $"warning: ignored {string.Join(", ", opts.DanglingSmtFlags)} — pass --smt to engage the SMT backend.");
+
         // Scope the backend so any per-analysis solver resources stay bounded for repeated hosts.
         Smt.ISmtBackend? smtBackend = null;
         Smt.Z3.Z3Backend? z3Owned = null;
@@ -296,6 +300,9 @@ internal sealed class AnalyzeOptions
     public int SmtTimeoutMs { get; init; } = 5000;
     public int SmtBytesBound { get; init; } = 64;
     public bool SmtDropUnsat { get; init; }
+    /// <summary>Names of SMT-only flags the user passed without --smt. Reported as a warning so
+    /// the user does not assume their --smt-* settings took effect.</summary>
+    public IReadOnlyList<string> DanglingSmtFlags { get; init; } = Array.Empty<string>();
     public int? MaxPaths { get; init; }
     public int? MaxSteps { get; init; }
     public int? PerRunDeadlineMs { get; init; }
@@ -319,6 +326,7 @@ internal sealed class AnalyzeOptions
         int smtTimeout = 5000;
         int smtBytes = 64;
         bool smtDrop = false;
+        var smtFlagsSeen = new List<string>();
         int? maxPaths = null;
         int? maxSteps = null;
         int? perRunDeadlineMs = null;
@@ -356,9 +364,9 @@ internal sealed class AnalyzeOptions
                 case "--format": format = Next(); break;
                 case "--out": outPath = Next(); break;
                 case "--smt": useSmt = true; break;
-                case "--smt-timeout": smtTimeout = ParsePositiveInt(a, Next()); break;
-                case "--smt-bytes-bound": smtBytes = ParsePositiveInt(a, Next()); break;
-                case "--smt-drop-unsat": smtDrop = true; break;
+                case "--smt-timeout": smtTimeout = ParsePositiveInt(a, Next()); smtFlagsSeen.Add(a); break;
+                case "--smt-bytes-bound": smtBytes = ParsePositiveInt(a, Next()); smtFlagsSeen.Add(a); break;
+                case "--smt-drop-unsat": smtDrop = true; smtFlagsSeen.Add(a); break;
                 case "--max-paths": maxPaths = ParsePositiveInt(a, Next()); break;
                 case "--max-steps": maxSteps = ParsePositiveInt(a, Next()); break;
                 case "--per-run-deadline-ms": perRunDeadlineMs = ParsePositiveInt(a, Next()); break;
@@ -409,6 +417,7 @@ internal sealed class AnalyzeOptions
             SmtTimeoutMs = smtTimeout,
             SmtBytesBound = smtBytes,
             SmtDropUnsat = smtDrop,
+            DanglingSmtFlags = useSmt ? Array.Empty<string>() : smtFlagsSeen,
             MaxPaths = maxPaths,
             MaxSteps = maxSteps,
             PerRunDeadlineMs = perRunDeadlineMs,
