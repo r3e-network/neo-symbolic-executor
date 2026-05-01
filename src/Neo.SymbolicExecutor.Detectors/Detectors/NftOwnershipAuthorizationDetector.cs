@@ -24,29 +24,33 @@ public sealed class NftOwnershipAuthorizationDetector : BaseDetector
         foreach (var state in context.States)
         {
             var method = ProtocolRiskHelpers.MethodForState(context, state);
-            bool ownershipMethod = method is not null
-                && (method.Name.Equals("transfer", System.StringComparison.OrdinalIgnoreCase)
-                    || method.Name.Equals("burn", System.StringComparison.OrdinalIgnoreCase)
-                    || method.Name.Contains("approve", System.StringComparison.OrdinalIgnoreCase));
 
             var firstOwnershipWrite = state.Telemetry.StorageOps
                 .Where(ProtocolRiskHelpers.IsNftOwnershipWrite)
                 .OrderBy(op => op.Offset)
                 .FirstOrDefault();
-            if (firstOwnershipWrite is not { } ownershipWrite) continue;
-            if (!ownershipMethod && method is not null && !ProtocolRiskHelpers.IsPrivilegedMethodName(method.Name)) continue;
+            var ownershipWrite = firstOwnershipWrite
+                ?? state.Telemetry.StorageOps
+                    .Where(ProtocolRiskHelpers.IsDynamicStateWrite)
+                    .OrderBy(op => op.Offset)
+                    .FirstOrDefault();
+            if (ownershipWrite is null) continue;
             if (ProtocolRiskHelpers.HasAuthBefore(state, ownershipWrite.Offset)) continue;
+
+            bool dynamicKey = !ProtocolRiskHelpers.IsNftOwnershipWrite(ownershipWrite);
+            var tags = new List<string> { "nft", "nep11", "ownership-auth" };
+            if (dynamicKey) tags.Add("dynamic-storage-key");
 
             yield return MakeFinding(
                 title: "NEP-11 ownership or approval write lacks early authorization",
-                description: $"NEP-11 path writes an ownership/approval-like storage key at "
+                description: $"NEP-11 path writes an ownership/approval-like or dynamic storage key at "
                            + $"0x{ownershipWrite.Offset:X4} before an enforced witness, caller-hash, or signature check. "
                            + "NFT transfer, burn, and approval flows should prove owner/operator authority before changing "
                            + "token ownership or approvals.",
                 offset: ownershipWrite.Offset,
                 severity: Severity.High,
                 state: state,
-                tags: new[] { "nft", "nep11", "ownership-auth" });
+                tags: tags);
         }
     }
 }

@@ -38,7 +38,7 @@ directory; MSBuild auto-imports `Directory.Build.{props,targets}` sibling pairs.
 | `NeoSymFormat`                  | `markdown`    | `markdown` or `json`                         |
 | `NeoSymOutputDir`               | `$(OutputPath)neo-sym/` | Where to write the report          |
 | `NeoSymFailOnMaxSeverity`       | `high`        | Build fails when a finding meets/exceeds this severity |
-| `NeoSymUseSmt`                  | `false`       | Engage Z3-backed path pruning + finding validation     |
+| `NeoSymUseSmt`                  | `false`       | Engage SMT path pruning + finding validation           |
 
 To override, set the property in the contract's `.csproj` before importing the targets:
 
@@ -73,7 +73,7 @@ build will fail with exit 3 if any gate fires; CI logs surface the violation.
 ## What's analyzed
 
 `neo-sym analyze` runs the symbolic executor over the contract's emitted
-`.nef`, parses the manifest sidecar, then runs all 21 detectors:
+`.nef`, parses the manifest sidecar, then runs all 24 detectors:
 
 - Reentrancy (with audit-driven amplification scoring)
 - Access control (manifest `safe` flag respected)
@@ -94,6 +94,9 @@ build will fail with exit 3 if any gate fires; CI logs surface the violation.
 - Crypto verification bypass
 - Replay attack (missing nonce)
 - Taint-flow upgrade (caller-controlled NEF/manifest)
+- Public privileged DApp methods without early auth
+- DeFi slippage / oracle freshness gaps
+- NEP-11 ownership authorization gaps
 - Unknown instructions (coverage gap surface)
 
 With `--smt`: each finding is validated for path satisfiability, infeasible

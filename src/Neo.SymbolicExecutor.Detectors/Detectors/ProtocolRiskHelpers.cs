@@ -35,6 +35,11 @@ internal static class ProtocolRiskHelpers
         "timestamp", "updated", "updatedat", "height", "round", "deadline", "ttl", "expiry"
     };
 
+    private static readonly string[] DefiStateHints =
+    {
+        "pool", "reserve", "vault", "share", "liquidity", "amm", "route", "pair", "lp"
+    };
+
     private static readonly string[] NftKeyHints =
     {
         "owner", "approval", "approved", "token", "nft", "nep11"
@@ -45,9 +50,15 @@ internal static class ProtocolRiskHelpers
         var methods = context.Manifest?.Abi.Methods;
         if (methods is null || methods.Count == 0 || state.Path.Count == 0) return null;
 
-        int firstVisited = state.Path.Min();
+        var exactVisited = methods
+            .Where(m => state.Path.Contains(m.Offset))
+            .OrderByDescending(m => m.Offset)
+            .FirstOrDefault();
+        if (exactVisited is not null) return exactVisited;
+
+        int lastVisited = state.Path.Max();
         return methods
-            .Where(m => m.Offset <= firstVisited)
+            .Where(m => m.Offset <= lastVisited)
             .OrderByDescending(m => m.Offset)
             .FirstOrDefault();
     }
@@ -67,13 +78,16 @@ internal static class ProtocolRiskHelpers
     {
         foreach (var op in state.Telemetry.StorageOps)
         {
-            if (op.Kind is StorageOpKind.Put or StorageOpKind.Delete)
+            if (IsStateWrite(op))
                 yield return (op.Offset, "storage-write");
         }
 
         foreach (var call in state.Telemetry.ExternalCalls)
             yield return (call.Offset, "external-call");
     }
+
+    public static bool IsStateWrite(StorageOp op) =>
+        op.Kind is StorageOpKind.Put or StorageOpKind.Delete;
 
     public static bool IsTokenTransferCall(ExternalCall call) =>
         string.Equals(call.Method, "transfer", StringComparison.OrdinalIgnoreCase)
@@ -96,9 +110,20 @@ internal static class ProtocolRiskHelpers
             || FreshnessHints.Any(h => ContainsFolded(call.Method, h)));
     }
 
+    public static bool HasDefiStateSignal(ExecutionState state)
+    {
+        if (AnySymbolContains(state, DefiStateHints)) return true;
+        return state.Telemetry.StorageOps.Any(op => KeyContainsAny(op, DefiStateHints));
+    }
+
+    public static bool HasDynamicStateWrite(ExecutionState state) =>
+        state.Telemetry.StorageOps.Any(IsDynamicStateWrite);
+
+    public static bool IsDynamicStateWrite(StorageOp op) =>
+        IsStateWrite(op) && op.Key.AsConcreteBytes() is null;
+
     public static bool IsNftOwnershipWrite(StorageOp op) =>
-        op.Kind is StorageOpKind.Put or StorageOpKind.Delete
-        && KeyContainsAny(op, NftKeyHints);
+        IsStateWrite(op) && KeyContainsAny(op, NftKeyHints);
 
     public static bool KeyContainsAny(StorageOp op, IReadOnlyList<string> hints)
     {

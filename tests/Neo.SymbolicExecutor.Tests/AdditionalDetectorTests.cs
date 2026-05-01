@@ -276,6 +276,26 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void PublicPrivilegedMethod_MatchesMethodWhenDispatcherOffsetIsInPath()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Dapp","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"setOracle","parameters":[],"returntype":"Void","offset":256,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x000);
+        s.Path.Add(0x100);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x120, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("oracle")), SymbolicValue.Int(1), false, false));
+
+        new PublicPrivilegedMethodDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle();
+    }
+
+    [Fact]
     public void DefiSlippageOracle_FlagsSwapWithoutMinOutOrFreshOracleSignal()
     {
         var manifest = Nef.ContractManifest.FromJson("""
@@ -334,6 +354,60 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void DefiSlippageOracle_FlagsUnusuallyNamedReserveMutation()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"execute","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("reserve:token0")), SymbolicValue.Int(100), false, false));
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("defi-state");
+    }
+
+    [Fact]
+    public void DefiSlippageOracle_FlagsSwapWithDynamicStateKey()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Symbol(Sort.Bytes, "pool_key"), SymbolicValue.Int(100), false, false));
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("dynamic-storage-key");
+    }
+
+    [Fact]
     public void NftOwnershipAuthorization_FlagsUnauthedNep11OwnershipWrite()
     {
         var manifest = Nef.ContractManifest.FromJson("""
@@ -374,6 +448,45 @@ public class AdditionalDetectorTests
         new NftOwnershipAuthorizationDetector()
             .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
             .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NftOwnershipAuthorization_FlagsDynamicOwnershipKeyInNep11Transfer()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{"methods":[{"name":"transfer","parameters":[],"returntype":"Boolean","offset":768,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x300);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x330, StorageOpKind.Put,
+            SymbolicValue.Symbol(Sort.Bytes, "owner_key"), SymbolicValue.Bytes(new byte[20]), false, false));
+
+        new NftOwnershipAuthorizationDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("dynamic-storage-key");
+    }
+
+    [Fact]
+    public void NftOwnershipAuthorization_FlagsUnusuallyNamedNep11OwnershipMethod()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{"methods":[{"name":"moveToken","parameters":[],"returntype":"Boolean","offset":768,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x300);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x330, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("owner:token42")), SymbolicValue.Bytes(new byte[20]), false, false));
+
+        new NftOwnershipAuthorizationDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle();
     }
 
     [Fact]

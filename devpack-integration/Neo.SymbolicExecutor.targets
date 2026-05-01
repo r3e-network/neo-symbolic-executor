@@ -16,19 +16,22 @@
       <_NeoSymNefFile Include="$(OutputPath)sc/*.nef" />
     </ItemGroup>
 
-    <MakeDir Directories="$(NeoSymOutputDir)" Condition="'@(_NeoSymNefFile)' != ''" />
-
-    <Message Importance="High" Text="neo-sym: analyzing %(NefFile.Filename)%(NefFile.Extension)"
-             Condition="'@(_NeoSymNefFile)' != ''" />
-
     <PropertyGroup>
+      <_NeoSymOutputDirRaw Condition="'$(NeoSymOutputDir)' == ''">$(OutputPath)neo-sym/</_NeoSymOutputDirRaw>
+      <_NeoSymOutputDirRaw Condition="'$(NeoSymOutputDir)' != ''">$(NeoSymOutputDir)</_NeoSymOutputDirRaw>
+      <_NeoSymOutputDir>$([MSBuild]::EnsureTrailingSlash('$(_NeoSymOutputDirRaw)'))</_NeoSymOutputDir>
       <_NeoSymExtension Condition="'$(NeoSymFormat)' == 'json'">.json</_NeoSymExtension>
       <_NeoSymExtension Condition="'$(NeoSymFormat)' != 'json'">.md</_NeoSymExtension>
       <_NeoSymSmtFlag Condition="'$(NeoSymUseSmt)' == 'true'"> --smt</_NeoSymSmtFlag>
       <_NeoSymGateFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateFlag>
     </PropertyGroup>
 
-    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSmtFlag)$(_NeoSymGateFlag)"
+    <MakeDir Directories="$(_NeoSymOutputDir)" Condition="'@(_NeoSymNefFile)' != ''" />
+
+    <Message Importance="High" Text="neo-sym: analyzing %(_NeoSymNefFile.Filename)%(_NeoSymNefFile.Extension)"
+             Condition="'@(_NeoSymNefFile)' != ''" />
+
+    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSmtFlag)$(_NeoSymGateFlag)"
           ContinueOnError="false"
           Condition="'@(_NeoSymNefFile)' != ''"
           WorkingDirectory="$(MSBuildProjectDirectory)" />

@@ -20,10 +20,11 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
         {
             var method = ProtocolRiskHelpers.MethodForState(context, state);
             bool swapLike = method is not null && ProtocolRiskHelpers.IsSwapLikeMethodName(method.Name);
-            if (!swapLike) continue;
+            bool defiStateSignal = ProtocolRiskHelpers.HasDefiStateSignal(state);
+            if (!swapLike && !defiStateSignal) continue;
 
             bool externalTransfer = state.Telemetry.ExternalCalls.Any(ProtocolRiskHelpers.IsTokenTransferCall);
-            bool writesState = state.Telemetry.StorageOps.Any(o => o.Kind is StorageOpKind.Put or StorageOpKind.Delete);
+            bool writesState = state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite);
             if (!externalTransfer || !writesState) continue;
 
             bool hasSlippageSignal = ProtocolRiskHelpers.HasSlippageSignal(state);
@@ -40,16 +41,21 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             if (!hasSlippageSignal) missing.Add("min-out/slippage guard");
             if (!hasFreshnessSignal) missing.Add("oracle freshness/deadline signal");
 
+            string methodName = method?.Name ?? "protocol path";
+            var tags = new List<string> { "defi", "slippage", "oracle-freshness" };
+            if (defiStateSignal) tags.Add("defi-state");
+            if (ProtocolRiskHelpers.HasDynamicStateWrite(state)) tags.Add("dynamic-storage-key");
+
             yield return MakeFinding(
-                title: $"Swap-like method `{method!.Name}` lacks DeFi price-safety signals",
-                description: $"Swap-like method `{method.Name}` performs token transfer(s) and mutates state, "
+                title: $"DeFi-like method `{methodName}` lacks price-safety signals",
+                description: $"DeFi-like method `{methodName}` performs token transfer(s) and mutates state, "
                            + $"but this path lacks {string.Join(" and ", missing)}. DeFi flows should bound "
                            + "received amount and avoid stale or manipulable price inputs before updating reserves, "
                            + "vault shares, or balances.",
                 offset: offset,
                 severity: Severity.High,
                 state: state,
-                tags: new[] { "defi", "slippage", "oracle-freshness" });
+                tags: tags);
         }
     }
 }

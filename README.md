@@ -9,11 +9,11 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 |---|---|---|
 | Engine + decoder + types | ~4,600 | 11 smoke + 6 fuzz |
 | NEF + manifest parsers | ~400 | 5 |
-| 24 detectors + framework | ~2,700 | 26 |
+| 24 detectors + framework | ~2,800 | 31 |
 | Reports + gates + CLI | ~700 | 7 |
 | SMT-LIB layer | ~1,700 | 15 |
 | Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
-| **Total** | **~13,100** | **171 passing** |
+| **Total** | **~13,200** | **176 passing** |
 
 ## Layout
 
@@ -28,7 +28,7 @@ neo-symbolic-executor/
 │   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
 │   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
-├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 171 tests total
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 176 tests total
 └── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 
@@ -123,8 +123,8 @@ by `FuzzerRegressionTests`.
 - `replay_attack` — signature-gated state change without an apparent nonce
 - `taint_flow_upgrade` — `Contract.Update` with caller-supplied NEF / manifest
 - `public_privileged_method` — manifest-exposed mint/burn/withdraw/upgrade-like entrypoints without early auth
-- `defi_slippage_oracle` — swap-like token flows lacking min-out/slippage or oracle freshness signals
-- `nft_ownership_authorization` — NEP-11 ownership/approval writes before owner/operator authorization
+- `defi_slippage_oracle` — swap-like or reserve/vault-mutating token flows lacking min-out/slippage or oracle freshness signals
+- `nft_ownership_authorization` — NEP-11 ownership/approval or dynamic-key writes before owner/operator authorization
 - `unknown_instructions` — coverage gap surface (INFO)
 
 With `--smt`: each finding is validated for path satisfiability; infeasible findings are
@@ -148,7 +148,7 @@ finding in its XML doc comments. Examples baked in from day one:
 - 5 new detectors covering audit gaps: NEP-11, callback re-entry, replay, crypto bypass,
   taint-flow upgrade
 - 3 Neo protocol-risk detectors covering DApp privileged methods, DeFi slippage/oracle
-  safety, and NEP-11 ownership authorization
+  safety, NEP-11 ownership authorization, unusual method names, and dynamic storage keys
 
 ## License
 
