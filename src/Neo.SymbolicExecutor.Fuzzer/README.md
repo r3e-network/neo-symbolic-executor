@@ -29,6 +29,7 @@ unique crashes to a persistent corpus for triage.
 | `report-roundtrip` | Generated reports with varied finding text | JSON report shape round-trips through `JsonNode` |
 | `heap-invariants` | Heap-heavy engine scripts | Heap references remain valid and clone-safe |
 | `differential-neovm` | Bounded scripts against Neo.VM reference execution | Clean Neo.VM halts should not become all-fault symbolic runs |
+| `method-entry` | `SymbolicEngine.CreateMethodEntryState` over synthetic ABI methods | The CLI per-entrypoint analyze path produces no Running leftovers |
 
 ## Quick start
 

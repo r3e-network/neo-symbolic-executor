@@ -329,6 +329,10 @@ internal static class Program
         // — flags the narrow case where Neo.VM HALTs cleanly but our symbolic engine FAULTs
         // every path. SYSCALL/CALLT/CALLA scripts are skipped (we model a subset).
         new DifferentialNeoVmTarget(),
+        // Tier-3: per-manifest-entrypoint analysis. The CLI's `analyze` command iterates ABI
+        // methods and seeds args via SymbolicEngine.CreateMethodEntryState; this target
+        // exercises that code path with synthetic methods + offsets + parameter types.
+        new MethodEntryStateTarget(),
     };
 
     private static string KnownTargetsText() => FormatTargetNames(CreateTargets());
