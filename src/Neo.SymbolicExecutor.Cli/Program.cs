@@ -99,7 +99,16 @@ internal static class Program
         }
         try
         {
-            var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
+            var defaults = ExecutionOptions.Default;
+            var engineOptions = new ExecutionOptions
+            {
+                SmtBackend = smtBackend,
+                MaxPaths = opts.MaxPaths ?? defaults.MaxPaths,
+                MaxSteps = opts.MaxSteps ?? defaults.MaxSteps,
+                PerRunDeadline = opts.PerRunDeadlineMs is int ms
+                    ? System.TimeSpan.FromMilliseconds(ms)
+                    : defaults.PerRunDeadline,
+            };
             var execResult = RunAllManifestEntrypoints(program, manifest, engineOptions);
 
             var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
@@ -258,6 +267,11 @@ internal static class Program
               --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
               --smt-drop-unsat                        Drop findings whose path conditions are UNSAT.
 
+              # Engine budgets (per manifest entrypoint):
+              --max-paths <n>                         Cap on terminal paths (default 512).
+              --max-steps <n>                         Cap on symbolic steps (default 200000).
+              --per-run-deadline-ms <ms>              Wall-clock cap on a single entrypoint run.
+
               # Gate flags:
               --fail-on-max-severity <sev>            sev in info|low|medium|high|critical
               --fail-on-total-findings <count>
@@ -282,6 +296,9 @@ internal sealed class AnalyzeOptions
     public int SmtTimeoutMs { get; init; } = 5000;
     public int SmtBytesBound { get; init; } = 64;
     public bool SmtDropUnsat { get; init; }
+    public int? MaxPaths { get; init; }
+    public int? MaxSteps { get; init; }
+    public int? PerRunDeadlineMs { get; init; }
 
     public static AnalyzeOptions Parse(string[] args)
     {
@@ -302,6 +319,9 @@ internal sealed class AnalyzeOptions
         int smtTimeout = 5000;
         int smtBytes = 64;
         bool smtDrop = false;
+        int? maxPaths = null;
+        int? maxSteps = null;
+        int? perRunDeadlineMs = null;
 
         // Audit C# #22 fix: int.Parse on overflow throws System.OverflowException with a
         // generic message. Wrap in a helper that surfaces the option name and bad value.
@@ -339,6 +359,9 @@ internal sealed class AnalyzeOptions
                 case "--smt-timeout": smtTimeout = ParsePositiveInt(a, Next()); break;
                 case "--smt-bytes-bound": smtBytes = ParsePositiveInt(a, Next()); break;
                 case "--smt-drop-unsat": smtDrop = true; break;
+                case "--max-paths": maxPaths = ParsePositiveInt(a, Next()); break;
+                case "--max-steps": maxSteps = ParsePositiveInt(a, Next()); break;
+                case "--per-run-deadline-ms": perRunDeadlineMs = ParsePositiveInt(a, Next()); break;
                 case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
                 case "--fail-on-total-findings": totalCap = ParseNonNegativeInt(a, Next()); break;
                 case "--fail-on-weighted-score": wsCap = ParseNonNegativeInt(a, Next()); break;
@@ -386,6 +409,9 @@ internal sealed class AnalyzeOptions
             SmtTimeoutMs = smtTimeout,
             SmtBytesBound = smtBytes,
             SmtDropUnsat = smtDrop,
+            MaxPaths = maxPaths,
+            MaxSteps = maxSteps,
+            PerRunDeadlineMs = perRunDeadlineMs,
             GatePolicy = new GatePolicy
             {
                 FailOnMaxSeverity = maxSev,

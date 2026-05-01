@@ -25,6 +25,10 @@
       <_NeoSymSourceFlag Condition="'$(NeoSymSourceDir)' != ''"> --source &quot;$(NeoSymSourceDir)&quot;</_NeoSymSourceFlag>
       <_NeoSymSmtFlag Condition="'$(NeoSymUseSmt)' == 'true'"> --smt</_NeoSymSmtFlag>
       <_NeoSymGateFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateFlag>
+      <_NeoSymMaxPathsFlag Condition="'$(NeoSymMaxPaths)' != ''"> --max-paths $(NeoSymMaxPaths)</_NeoSymMaxPathsFlag>
+      <_NeoSymMaxStepsFlag Condition="'$(NeoSymMaxSteps)' != ''"> --max-steps $(NeoSymMaxSteps)</_NeoSymMaxStepsFlag>
+      <_NeoSymDeadlineFlag Condition="'$(NeoSymPerRunDeadlineMs)' != ''"> --per-run-deadline-ms $(NeoSymPerRunDeadlineMs)</_NeoSymDeadlineFlag>
+      <_NeoSymBudgetFlags>$(_NeoSymMaxPathsFlag)$(_NeoSymMaxStepsFlag)$(_NeoSymDeadlineFlag)</_NeoSymBudgetFlags>
     </PropertyGroup>
 
     <MakeDir Directories="$(_NeoSymOutputDir)" Condition="'@(_NeoSymNefFile)' != ''" />
@@ -32,7 +36,7 @@
     <Message Importance="High" Text="neo-sym: analyzing %(_NeoSymNefFile.Filename)%(_NeoSymNefFile.Extension)"
              Condition="'@(_NeoSymNefFile)' != ''" />
 
-    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymGateFlag)"
+    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)"
           ContinueOnError="false"
           Condition="'@(_NeoSymNefFile)' != ''"
           WorkingDirectory="$(MSBuildProjectDirectory)" />

@@ -166,7 +166,10 @@ public class ReviewFixesTests
 
         props.Should().Contain("<NeoSymSourceDir Condition=\"'$(NeoSymSourceDir)' == ''\">$(MSBuildProjectDirectory)</NeoSymSourceDir>");
         targets.Should().Contain("<_NeoSymSourceFlag Condition=\"'$(NeoSymSourceDir)' != ''\"> --source &quot;$(NeoSymSourceDir)&quot;</_NeoSymSourceFlag>");
-        targets.Should().Contain("$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymGateFlag)");
+        // The Exec command must keep --source first, then --smt, then engine budgets, then the
+        // gate flag last. Ordering matters because gate-failure exit codes only fire after the
+        // analysis itself succeeded.
+        targets.Should().Contain("$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)");
     }
 
     [Fact]

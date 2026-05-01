@@ -40,6 +40,9 @@ directory; MSBuild auto-imports `Directory.Build.{props,targets}` sibling pairs.
 | `NeoSymFailOnMaxSeverity`       | `high`        | Build fails when a finding meets/exceeds this severity |
 | `NeoSymUseSmt`                  | `false`       | Engage SMT path pruning + finding validation           |
 | `NeoSymSourceDir`               | `$(MSBuildProjectDirectory)` | C# source hint directory for protocol detectors |
+| `NeoSymMaxPaths`                | _(unset)_     | Per-entrypoint terminal-path cap (default 512)         |
+| `NeoSymMaxSteps`                | _(unset)_     | Per-entrypoint symbolic-step cap (default 200000)      |
+| `NeoSymPerRunDeadlineMs`        | _(unset)_     | Per-entrypoint wall-clock deadline in milliseconds      |
 
 To override, set the property in the contract's `.csproj` before importing the targets:
 
