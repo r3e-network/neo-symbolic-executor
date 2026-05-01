@@ -150,6 +150,38 @@ public class DetectorTests
     }
 
     [Fact]
+    public void AccessControl_DoesNotInheritSafetyFromCalledHelper()
+    {
+        // Per-method analysis seeds Pc = method.Offset, so state.Path[0] is the entry. A
+        // non-safe method that CALLs into a safe-flagged helper at a lower offset must NOT
+        // inherit the helper's safety — the entry method's findings are the ones that matter.
+        var s = NewState();
+        s.Path.Add(0xA0);   // entry: non-safe method `mint` at 0xA0
+        s.Path.Add(0xA1);
+        s.Path.Add(0x50);   // CALL down to safe helper `_initialize` at 0x50
+        s.Path.Add(0x51);
+        s.Telemetry.StorageOps.Add(new StorageOp(0xA5, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
+
+        var manifestJson = """
+        {
+          "name":"X","groups":[],"features":{},"supportedstandards":[],
+          "abi":{"methods":[
+            {"name":"mint","parameters":[],"returntype":"Boolean","offset":160,"safe":false},
+            {"name":"_initialize","parameters":[],"returntype":"Void","offset":80,"safe":true}
+          ],"events":[]},
+          "permissions":[],"trusts":[]
+        }
+        """;
+        var manifest = Nef.ContractManifest.FromJson(manifestJson);
+        var ctx = new AnalysisContext { States = new[] { s }, Manifest = manifest };
+
+        var findings = new AccessControlDetector().Analyze(ctx).ToList();
+        findings.Should().NotBeEmpty("the unsafe `mint` method should still surface its missing-auth finding");
+        findings[0].Tags.Should().Contain("missing-auth");
+    }
+
+    [Fact]
     public void Overflow_FlagsOverflowPossibleOps()
     {
         var s = NewState();

@@ -50,20 +50,19 @@ public sealed class AccessControlDetector : BaseDetector
                                         || callerChecks.Any(o => o < firstSensitive)
                                         || sigChecks.Any(o => o < firstSensitive);
 
-            // Audit C# #14 fix: state.Path[0] is always 0 (initial PC). The manifest's safe-method
-            // offsets are method body offsets, which never match 0 by accident. Match the entry
-            // offset against any method whose body covers that offset — i.e. the method whose
-            // Offset is the largest value <= state.Pc at entry. We approximate via state.Path
-            // (lowest offset >= a method's Offset).
+            // Identify the safe-flagged manifest method that owns this state. Per-method
+            // analysis seeds Pc = method.Offset, so the very first entry in state.Path IS
+            // the method's body offset. Using Path[0] is precise: a method that CALLs into a
+            // safe-flagged helper at a lower offset must NOT inherit the helper's safety
+            // (Path.Min would mis-attribute that case). For pre-per-method runs (where Path[0]
+            // is always 0 because Run() seeded from offset 0), no manifest method has Offset 0
+            // by accident, so this still evaluates to false on the dispatcher.
             bool isSafeView = false;
             var manifestMethods = context.Manifest?.Abi.Methods;
-            if (manifestMethods is not null && safeOffsets.Count > 0)
+            if (manifestMethods is not null && safeOffsets.Count > 0 && state.Path.Count > 0)
             {
-                // The state has visited many offsets; we infer "this state belongs to method X"
-                // by finding the safe method whose Offset is closest to (and <=) the lowest
-                // visited offset.
-                int firstVisited = state.Path.Count > 0 ? state.Path.Min() : 0;
-                isSafeView = manifestMethods.Any(m => m.Safe && m.Offset == firstVisited);
+                int entryOffset = state.Path[0];
+                isSafeView = manifestMethods.Any(m => m.Safe && m.Offset == entryOffset);
             }
 
             if (noAuthAtAll && !isSafeView)
