@@ -7,13 +7,13 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 
 | Component | LOC | Tests |
 |---|---|---|
-| Engine + decoder + types | ~3,500 | 11 smoke + 6 fuzz |
+| Engine + decoder + types | ~4,600 | 11 smoke + 6 fuzz |
 | NEF + manifest parsers | ~400 | 5 |
-| 21 detectors + framework | ~1,500 | 19 |
-| Reports + gates + CLI | ~600 | 7 |
-| Z3 SMT layer | ~400 | 6 (skipped when libz3 missing) |
-| Fuzzer (12 targets, multi-worker) | ~1,200 | 4 regression tests |
-| **Total** | **~7,600** | **68 passing + 5 skipped** |
+| 24 detectors + framework | ~2,700 | 26 |
+| Reports + gates + CLI | ~700 | 7 |
+| SMT-LIB layer | ~1,700 | 15 |
+| Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
+| **Total** | **~13,100** | **171 passing** |
 
 ## Layout
 
@@ -22,13 +22,13 @@ neo-symbolic-executor/
 ├── Neo.SymbolicExecutor.sln
 ├── Directory.Build.props
 ├── global.json                 — pin .NET 10
-├── NuGet.Config                — Neo MyGet feed
+├── NuGet.Config                — NuGet.org package source
 ├── src/
 │   ├── Neo.SymbolicExecutor/   — engine + decoder + IR + NEF/manifest parsers
-│   ├── Neo.SymbolicExecutor.Detectors/  — 21 detectors + reports + gates
-│   ├── Neo.SymbolicExecutor.Smt/        — Z3-backed translator + backend (optional)
+│   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
+│   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
-├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 69 tests total
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 171 tests total
 └── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 
@@ -55,9 +55,14 @@ neo-sym analyze contract.nef \
   --out report.md \
   --fail-on-max-severity high
 
-# With Z3 SMT layer (optional)
+# With SMT path validation (external z3 when available, portable fallback otherwise)
 neo-sym analyze contract.nef --manifest contract.manifest.json --smt --smt-drop-unsat
 ```
+
+If `z3` is on `PATH`, the SMT layer uses it for full SMT-LIB queries. Without `z3`, it falls
+back to a conservative in-process solver that proves scaled single-symbol linear constraints,
+bounded two-symbol affine constraints, symbol-offset equalities, and bounds, then returns `Unknown`
+for formulas it cannot prove safely.
 
 ## CLI exit codes
 
@@ -95,7 +100,7 @@ by `FuzzerRegressionTests`.
 
 ## Detectors
 
-21 detectors are wired in `DefaultDetectorSet`:
+24 detectors are wired in `DefaultDetectorSet`:
 
 - `reentrancy` — checks-effects-interactions with audit-driven amplification scoring
 - `access_control` — missing / unenforced / late authorization, with `manifest.safe` respect
@@ -117,6 +122,9 @@ by `FuzzerRegressionTests`.
 - `crypto_verification_bypass` — CheckSig / CheckMultisig result not consumed
 - `replay_attack` — signature-gated state change without an apparent nonce
 - `taint_flow_upgrade` — `Contract.Update` with caller-supplied NEF / manifest
+- `public_privileged_method` — manifest-exposed mint/burn/withdraw/upgrade-like entrypoints without early auth
+- `defi_slippage_oracle` — swap-like token flows lacking min-out/slippage or oracle freshness signals
+- `nft_ownership_authorization` — NEP-11 ownership/approval writes before owner/operator authorization
 - `unknown_instructions` — coverage gap surface (INFO)
 
 With `--smt`: each finding is validated for path satisfiability; infeasible findings are
@@ -139,6 +147,8 @@ finding in its XML doc comments. Examples baked in from day one:
   + access_control (audit detector audit #1, biggest precision win)
 - 5 new detectors covering audit gaps: NEP-11, callback re-entry, replay, crypto bypass,
   taint-flow upgrade
+- 3 Neo protocol-risk detectors covering DApp privileged methods, DeFi slippage/oracle
+  safety, and NEP-11 ownership authorization
 
 ## License
 
