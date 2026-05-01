@@ -71,8 +71,15 @@ while [ ! -f "$STOP_FILE" ]; do
   # futex_wait with no status updates while the in-engine watchdog (which fires at
   # MaxRuntime + 2 min, i.e. 24 h + 2 min) is too distant to help. If the log hasn't
   # been written for 5 min, force-kill so the wrapper relaunches a fresh chunk.
+  #
+  # Iter-3: also detect stuck-iteration cases where the StatusLoop keeps emitting status
+  # lines but the worker iteration count isn't advancing. The mtime check alone misses
+  # this because PrintStatus runs every 10 s even when workers are deadlocked. Compare
+  # consecutive `iters=N` values; if N has not increased in IDLE_LIMIT seconds, kill.
   IDLE_LIMIT=300
   (
+    last_iters=""
+    last_iters_change=$(date +%s)
     while kill -0 "$FUZZ_PID" 2>/dev/null; do
       sleep 30
       if [ -f "$LOGFILE" ]; then
@@ -82,6 +89,18 @@ while [ ! -f "$STOP_FILE" ]; do
           echo "[wrapper] log idle > ${IDLE_LIMIT}s — killing fuzzer to force restart"
           kill -KILL "$FUZZ_PID" 2>/dev/null || true
           break
+        fi
+        # Pull the most recent `iters=N,NNN,NNN` value (commas allowed) from the tail.
+        cur_iters=$(grep -oE 'iters=[0-9,]+' "$LOGFILE" 2>/dev/null | tail -n 1 | tr -d ',')
+        if [ -n "$cur_iters" ]; then
+          if [ "$cur_iters" != "$last_iters" ]; then
+            last_iters="$cur_iters"
+            last_iters_change=$now
+          elif [ $((now - last_iters_change)) -gt $IDLE_LIMIT ]; then
+            echo "[wrapper] iters frozen at $cur_iters > ${IDLE_LIMIT}s — killing fuzzer"
+            kill -KILL "$FUZZ_PID" 2>/dev/null || true
+            break
+          fi
         fi
       fi
     done

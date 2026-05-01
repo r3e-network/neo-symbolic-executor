@@ -143,8 +143,14 @@ public sealed class FuzzCampaign
     {
         while (!cancel.IsCancellationRequested)
         {
-            await Task.Delay(_opts.StatusInterval, cancel).ContinueWith(_ => { });
-            if (cancel.IsCancellationRequested) return;
+            try
+            {
+                await Task.Delay(_opts.StatusInterval, cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
             PrintStatus();
         }
     }
