@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
+using Neo.SymbolicExecutor.Nef;
 using NeoVm = Neo.VM;
 
 namespace Neo.SymbolicExecutor;
@@ -165,6 +166,45 @@ public sealed partial class SymbolicEngine
         state.Pc = 0;
         return state;
     }
+
+    /// <summary>
+    /// Build an entry state for analyzing a specific manifest method. Real DevPack contracts
+    /// dispatch on a string method name argument, so running from offset 0 with empty stack
+    /// faults at INITSLOT before any user code executes — the detectors see nothing. This
+    /// helper seeds the eval stack with one fresh symbolic value per declared parameter and
+    /// jumps directly to the method's body offset, so each per-method analysis produces real
+    /// telemetry. NeoVM INITSLOT pops args in stack order so arg[0] sits on top: we push in
+    /// reverse so positional order is preserved (param[0] -> Args[0]).
+    /// </summary>
+    public ExecutionState CreateMethodEntryState(int offset, IReadOnlyList<ContractParameterDefinition>? parameters)
+    {
+        var state = new ExecutionState
+        {
+            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
+        };
+        state.CallStack.Add(new CallFrame(returnPc: -1));
+        state.Pc = offset;
+        if (parameters is { Count: > 0 } pars)
+        {
+            for (int i = pars.Count - 1; i >= 0; i--)
+            {
+                var p = pars[i];
+                string symbolName = string.IsNullOrEmpty(p.Name) ? $"arg{i}" : $"arg_{p.Name}";
+                state.Push(SymbolicValue.Symbol(SortForParameterType(p.Type), symbolName));
+            }
+        }
+        return state;
+    }
+
+    private static Sort SortForParameterType(string type) => type switch
+    {
+        "Integer" => Sort.Int,
+        "Boolean" => Sort.Bool,
+        // ByteString, String, Hash160, Hash256, PublicKey, Signature, Array, Map, Struct,
+        // InteropInterface, Any, Void all flow through Sort.Bytes — the engine's coercion
+        // primitives (ConcreteInt, GetInteger, GetByteString) keep that conservative.
+        _ => Sort.Bytes,
+    };
 
     private IEnumerable<ExecutionState> StepBounded(ExecutionState state)
     {

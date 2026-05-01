@@ -475,6 +475,54 @@ public class ReviewFixesTests
             readme.Should().Contain($"`{targetName}`");
     }
 
+    [Fact]
+    public void Engine_CreateMethodEntryState_SeedsArgsAtMethodOffset()
+    {
+        // Realistic DevPack-shaped bytecode: a dispatcher prelude that reads stack arg 0 then
+        // jumps, plus a method body that takes 2 parameters via INITSLOT and adds them. Without
+        // method-entry seeding the engine starts at offset 0, faults at LDARG0 with no args, and
+        // never reaches the method body — exactly the production gap this regression locks down.
+        byte[] script =
+        {
+            // 0..2: dispatcher prelude (1 arg = method-name string)
+            (byte)NeoVm.OpCode.INITSLOT, 0x00, 0x01,
+            (byte)NeoVm.OpCode.LDARG0,
+            (byte)NeoVm.OpCode.DROP,
+            (byte)NeoVm.OpCode.RET,
+            // 6..end: method "add"(a, b) => a + b
+            (byte)NeoVm.OpCode.INITSLOT, 0x00, 0x02, // 0 locals, 2 args
+            (byte)NeoVm.OpCode.LDARG0,
+            (byte)NeoVm.OpCode.LDARG1,
+            (byte)NeoVm.OpCode.ADD,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var engine = new SymbolicEngine(program);
+        var add = new ContractMethodDescriptor
+        {
+            Name = "add",
+            Offset = 6,
+            Parameters = new[]
+            {
+                new ContractParameterDefinition("a", "Integer"),
+                new ContractParameterDefinition("b", "Integer"),
+            },
+        };
+
+        var state = engine.CreateMethodEntryState(add.Offset, add.Parameters);
+        var result = engine.Run(state);
+
+        result.FinalStates.Should().ContainSingle();
+        var halted = result.FinalStates.Single();
+        halted.Status.Should().Be(TerminalStatus.Halted);
+        halted.EvaluationStack.Should().ContainSingle();
+        halted.EvaluationStack.Single().Expression.Should()
+            .BeOfType<BinaryExpr>().Which.Op.Should().Be("+");
+        // Both symbolic args reach the body in declared order.
+        halted.EvaluationStack.Single().Expression.FreeSymbols().Should()
+            .BeEquivalentTo(new[] { "arg_a", "arg_b" });
+    }
+
     private static ExecutionState NewState(int pc)
     {
         var state = new ExecutionState { Pc = pc };

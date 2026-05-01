@@ -100,8 +100,7 @@ internal static class Program
         try
         {
             var engineOptions = new ExecutionOptions { SmtBackend = smtBackend };
-            var engine = new SymbolicEngine(program, engineOptions);
-            var execResult = engine.Run();
+            var execResult = RunAllManifestEntrypoints(program, manifest, engineOptions);
 
             var detectorEngine = new DetectorEngine(DefaultDetectorSet.All());
             var ctx = new AnalysisContext
@@ -159,6 +158,49 @@ internal static class Program
             return ScriptDecoder.Decode(nef.Script).WithTokens(nef.Tokens.ToImmutableArray());
         }
         return ScriptDecoder.Decode(bytes);
+    }
+
+    /// <summary>
+    /// When a manifest is available, run the engine once per declared ABI entrypoint and merge
+    /// the resulting final states. Without this the analyzer only ever runs from offset 0 with
+    /// an empty eval stack, which faults at the first INITSLOT/LDARG and surfaces no
+    /// telemetry for the detectors. With per-entrypoint runs, each method body is exercised
+    /// with one fresh symbolic value per declared parameter.
+    /// </summary>
+    private static ExecutionResult RunAllManifestEntrypoints(
+        NeoProgram program,
+        ContractManifest? manifest,
+        ExecutionOptions engineOptions)
+    {
+        if (manifest is null || manifest.Abi.Methods.Count == 0)
+            return new SymbolicEngine(program, engineOptions).Run();
+
+        var allStates = ImmutableArray.CreateBuilder<ExecutionState>();
+        int totalStatesExplored = 0;
+        int totalStepsExecuted = 0;
+        bool budgetExceeded = false;
+        string? budgetReason = null;
+        foreach (var method in manifest.Abi.Methods)
+        {
+            if (method.Offset < 0 || method.Offset >= program.Bytes.Length) continue;
+            var engine = new SymbolicEngine(program, engineOptions);
+            var entry = engine.CreateMethodEntryState(method.Offset, method.Parameters);
+            var r = engine.Run(entry);
+            allStates.AddRange(r.FinalStates);
+            totalStatesExplored += r.StatesExplored;
+            totalStepsExecuted += r.StepsExecuted;
+            if (r.BudgetExceeded)
+            {
+                budgetExceeded = true;
+                budgetReason ??= r.BudgetReason;
+            }
+        }
+        return new ExecutionResult(
+            allStates.ToImmutable(),
+            totalStatesExplored,
+            totalStepsExecuted,
+            budgetExceeded,
+            budgetReason);
     }
 
     private static int Version()
