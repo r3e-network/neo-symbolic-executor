@@ -268,6 +268,63 @@ public class ReviewFixesTests
         sourcePaths.Cast<string>().Should().Equal("Contract.cs", "src");
     }
 
+    [Fact]
+    public void SourceHints_LoadsProjectSourceFiles()
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "Contract.cs"), """
+                public bool execute()
+                {
+                    var amountOutMin = 1;
+                    return amountOutMin > 0;
+                }
+            """);
+
+            SourceHints.FromPaths(new[] { dir })
+                .MethodContainsAny("execute", new[] { "amountOutMin" })
+                .Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SourceHints_SkipsGeneratedAndDependencyDirectories()
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "Contract.cs"), """
+                public bool execute()
+                {
+                    storage.Put("opaque", amountIn);
+                    return true;
+                }
+            """);
+            string objDir = Path.Combine(dir, "obj");
+            Directory.CreateDirectory(objDir);
+            File.WriteAllText(Path.Combine(objDir, "Generated.cs"), """
+                public bool execute()
+                {
+                    var reserveAfter = pool.Reserve0 + amountIn;
+                    return reserveAfter > 0;
+                }
+            """);
+
+            SourceHints.FromPaths(new[] { dir })
+                .MethodContainsAny("execute", new[] { "reserve" })
+                .Should().BeFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("--seconds", "0")]
     [InlineData("--minutes", "-1")]
@@ -341,6 +398,13 @@ public class ReviewFixesTests
             dir = dir.Parent;
         dir.Should().NotBeNull("the test assembly should run under the repository tree");
         return File.ReadAllText(Path.Combine(dir!.FullName, relativePath));
+    }
+
+    private static string CreateTempDirectory()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "neo-sym-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
     }
 
     private static string[] FuzzerTargetNames()

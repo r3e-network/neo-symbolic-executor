@@ -19,6 +19,11 @@ public sealed class SourceHints
         "if", "for", "foreach", "while", "switch", "catch", "using", "lock", "return", "new"
     };
 
+    private static readonly HashSet<string> IgnoredSourceDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
+    };
+
     private readonly IReadOnlyDictionary<string, string> _methodBodies;
 
     private SourceHints(IReadOnlyDictionary<string, string> methodBodies)
@@ -40,8 +45,7 @@ public sealed class SourceHints
             }
             else if (Directory.Exists(path))
             {
-                foreach (string file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories)
-                             .OrderBy(p => p, StringComparer.Ordinal))
+                foreach (string file in EnumerateProjectSourceFiles(path).OrderBy(p => p, StringComparer.Ordinal))
                     texts.Add(File.ReadAllText(file));
             }
             else
@@ -51,6 +55,27 @@ public sealed class SourceHints
         }
 
         return FromText(string.Join(Environment.NewLine, texts));
+    }
+
+    private static IEnumerable<string> EnumerateProjectSourceFiles(string root)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+
+        while (pending.Count > 0)
+        {
+            string current = pending.Pop();
+
+            foreach (string file in Directory.EnumerateFiles(current, "*.cs"))
+                yield return file;
+
+            foreach (string directory in Directory.EnumerateDirectories(current))
+            {
+                string name = Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (!IgnoredSourceDirectories.Contains(name))
+                    pending.Push(directory);
+            }
+        }
     }
 
     public bool MethodContainsAny(string? methodName, IEnumerable<string> hints)
