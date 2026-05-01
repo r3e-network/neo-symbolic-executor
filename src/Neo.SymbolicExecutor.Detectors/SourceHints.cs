@@ -24,9 +24,11 @@ public sealed class SourceHints
         ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
     };
 
-    private readonly IReadOnlyDictionary<string, string> _methodBodies;
+    private sealed record MethodBody(int ParameterCount, string Body);
 
-    private SourceHints(IReadOnlyDictionary<string, string> methodBodies)
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<MethodBody>> _methodBodies;
+
+    private SourceHints(IReadOnlyDictionary<string, IReadOnlyList<MethodBody>> methodBodies)
     {
         _methodBodies = methodBodies;
     }
@@ -78,21 +80,43 @@ public sealed class SourceHints
         }
     }
 
-    public bool MethodContainsAny(string? methodName, IEnumerable<string> hints, bool includeStringLiterals = true)
+    public bool MethodContainsAny(string? methodName, IEnumerable<string> hints, bool includeStringLiterals = true) =>
+        MethodContainsAny(methodName, parameterCount: null, hints, includeStringLiterals);
+
+    public bool MethodContainsAny(
+        string? methodName,
+        int? parameterCount,
+        IEnumerable<string> hints,
+        bool includeStringLiterals = true)
     {
         if (methodName is null) return false;
-        if (!_methodBodies.TryGetValue(methodName, out string? body)) return false;
-        string searchableBody = includeStringLiterals ? body : MaskNonCodeText(body, maskStringAndCharLiterals: true);
-        string folded = Fold(searchableBody);
-        return hints.Any(h => folded.Contains(Fold(h), StringComparison.Ordinal));
+        if (!_methodBodies.TryGetValue(methodName, out var bodies)) return false;
+
+        var foldedHints = hints.Select(Fold).ToArray();
+        foreach (var methodBody in bodies)
+        {
+            if (parameterCount is int count && methodBody.ParameterCount != count)
+                continue;
+
+            string searchableBody = includeStringLiterals
+                ? methodBody.Body
+                : MaskNonCodeText(methodBody.Body, maskStringAndCharLiterals: true);
+            string folded = Fold(searchableBody);
+            if (foldedHints.Any(h => folded.Contains(h, StringComparison.Ordinal)))
+                return true;
+        }
+
+        return false;
     }
 
-    private static Dictionary<string, string> ExtractMethodBodies(string text)
+    private static Dictionary<string, IReadOnlyList<MethodBody>> ExtractMethodBodies(string text)
     {
         string textWithoutComments = MaskNonCodeText(text, maskStringAndCharLiterals: false);
         string structuralText = MaskNonCodeText(text, maskStringAndCharLiterals: true);
-        var methods = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (Match match in Regex.Matches(structuralText, @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\([^;{}]*\)\s*\{"))
+        var methods = new Dictionary<string, List<MethodBody>>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match match in Regex.Matches(
+                     structuralText,
+                     @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<parameters>[^;{}]*)\)\s*\{"))
         {
             string name = match.Groups["name"].Value;
             if (ControlKeywords.Contains(name)) continue;
@@ -102,10 +126,61 @@ public sealed class SourceHints
             int closeBrace = FindMatchingBrace(structuralText, openBrace);
             if (closeBrace < 0) continue;
 
-            methods[name] = textWithoutComments.Substring(openBrace, closeBrace - openBrace + 1);
+            if (!methods.TryGetValue(name, out var bodies))
+            {
+                bodies = new List<MethodBody>();
+                methods[name] = bodies;
+            }
+
+            bodies.Add(new MethodBody(
+                CountParameters(match.Groups["parameters"].Value),
+                textWithoutComments.Substring(openBrace, closeBrace - openBrace + 1)));
         }
 
-        return methods;
+        return methods.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlyList<MethodBody>)kvp.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static int CountParameters(string parameters)
+    {
+        string trimmed = parameters.Trim();
+        if (trimmed.Length == 0) return 0;
+
+        int count = 1;
+        int angleDepth = 0;
+        int parenthesisDepth = 0;
+        int bracketDepth = 0;
+        foreach (char c in trimmed)
+        {
+            switch (c)
+            {
+                case '<':
+                    angleDepth++;
+                    break;
+                case '>':
+                    if (angleDepth > 0) angleDepth--;
+                    break;
+                case '(':
+                    parenthesisDepth++;
+                    break;
+                case ')':
+                    if (parenthesisDepth > 0) parenthesisDepth--;
+                    break;
+                case '[':
+                    bracketDepth++;
+                    break;
+                case ']':
+                    if (bracketDepth > 0) bracketDepth--;
+                    break;
+                case ',' when angleDepth == 0 && parenthesisDepth == 0 && bracketDepth == 0:
+                    count++;
+                    break;
+            }
+        }
+
+        return count;
     }
 
     private static string MaskNonCodeText(string text, bool maskStringAndCharLiterals)

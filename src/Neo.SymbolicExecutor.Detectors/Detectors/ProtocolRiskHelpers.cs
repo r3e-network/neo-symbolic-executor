@@ -121,13 +121,18 @@ internal static class ProtocolRiskHelpers
         var method = MethodForState(context, state);
         return context.SourceHints?.MethodContainsAny(
             method?.Name,
+            method?.Parameters.Count,
             SwapNames.Concat(DefiStateHints).Concat(OracleHints)) == true;
     }
 
     public static bool HasSourceSlippageSignal(AnalysisContext context, ExecutionState state)
     {
         var method = MethodForState(context, state);
-        return context.SourceHints?.MethodContainsAny(method?.Name, SlippageHints, includeStringLiterals: false) == true;
+        return context.SourceHints?.MethodContainsAny(
+            method?.Name,
+            method?.Parameters.Count,
+            SlippageHints,
+            includeStringLiterals: false) == true;
     }
 
     public static bool HasSourceFreshnessSignal(AnalysisContext context, ExecutionState state)
@@ -135,6 +140,7 @@ internal static class ProtocolRiskHelpers
         var method = MethodForState(context, state);
         return context.SourceHints?.MethodContainsAny(
             method?.Name,
+            method?.Parameters.Count,
             FreshnessHints.Concat(OracleHints),
             includeStringLiterals: false) == true;
     }
@@ -142,7 +148,10 @@ internal static class ProtocolRiskHelpers
     public static bool HasNftSourceSignal(AnalysisContext context, ExecutionState state)
     {
         var method = MethodForState(context, state);
-        return context.SourceHints?.MethodContainsAny(method?.Name, NftKeyHints) == true;
+        return context.SourceHints?.MethodContainsAny(
+            method?.Name,
+            method?.Parameters.Count,
+            NftKeyHints) == true;
     }
 
     public static bool HasDynamicStateWrite(ExecutionState state) =>

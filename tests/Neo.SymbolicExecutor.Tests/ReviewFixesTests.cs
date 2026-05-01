@@ -375,6 +375,50 @@ public class ReviewFixesTests
             .Should().BeTrue();
     }
 
+    [Fact]
+    public void SourceHints_SearchesAllBodiesForDuplicateMethodNames()
+    {
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                var reserveAfter = pool.Reserve0 + amountIn;
+                return reserveAfter > 0;
+            }
+
+            public bool execute(BigInteger amountIn)
+            {
+                storage.Put("opaque", amountIn);
+                return true;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("execute", new[] { "reserveAfter" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void SourceHints_CanRestrictDuplicateMethodNamesByParameterCount()
+    {
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                var reserveAfter = pool.Reserve0 + amountIn;
+                return reserveAfter > 0;
+            }
+
+            public bool execute(BigInteger amountIn)
+            {
+                storage.Put("opaque", amountIn);
+                return true;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("execute", parameterCount: 0, hints: new[] { "reserveAfter" })
+            .Should().BeTrue();
+        sourceHints.MethodContainsAny("execute", parameterCount: 1, hints: new[] { "reserveAfter" })
+            .Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("--seconds", "0")]
     [InlineData("--minutes", "-1")]
