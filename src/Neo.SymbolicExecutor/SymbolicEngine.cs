@@ -152,20 +152,7 @@ public sealed partial class SymbolicEngine
         }
     }
 
-    private ExecutionState CreateInitialState()
-    {
-        // Audit fix (iter-2 wakeup-2 memory bomb): construct the Heap with the engine's budgets
-        // rather than letting it default to 1 MiB × 4096 objects. Without this plumbing a single
-        // pathological iteration could allocate ~3 GB before any cap fired, freezing all six
-        // workers on that iteration.
-        var state = new ExecutionState
-        {
-            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
-        };
-        state.CallStack.Add(new CallFrame(returnPc: -1));
-        state.Pc = 0;
-        return state;
-    }
+    private ExecutionState CreateInitialState() => BuildEntryState(pc: 0);
 
     /// <summary>
     /// Build an entry state for analyzing a specific manifest method. Real DevPack contracts
@@ -178,12 +165,7 @@ public sealed partial class SymbolicEngine
     /// </summary>
     public ExecutionState CreateMethodEntryState(int offset, IReadOnlyList<ContractParameterDefinition>? parameters)
     {
-        var state = new ExecutionState
-        {
-            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
-        };
-        state.CallStack.Add(new CallFrame(returnPc: -1));
-        state.Pc = offset;
+        var state = BuildEntryState(offset);
         if (parameters is { Count: > 0 } pars)
         {
             for (int i = pars.Count - 1; i >= 0; i--)
@@ -193,6 +175,21 @@ public sealed partial class SymbolicEngine
                 state.Push(SymbolicValue.Symbol(SortForParameterType(p.Type), symbolName));
             }
         }
+        return state;
+    }
+
+    // Audit fix (iter-2 wakeup-2 memory bomb): construct the Heap with the engine's budgets
+    // rather than letting it default to 1 MiB × 4096 objects. Without this plumbing a single
+    // pathological iteration could allocate ~3 GB before any cap fired, freezing all six
+    // workers on that iteration.
+    private ExecutionState BuildEntryState(int pc)
+    {
+        var state = new ExecutionState
+        {
+            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
+        };
+        state.CallStack.Add(new CallFrame(returnPc: -1));
+        state.Pc = pc;
         return state;
     }
 

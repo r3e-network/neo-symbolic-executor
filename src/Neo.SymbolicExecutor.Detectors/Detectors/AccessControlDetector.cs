@@ -23,12 +23,6 @@ public sealed class AccessControlDetector : BaseDetector
 
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {
-        // Build a view of safe methods from the manifest, if available.
-        var safeOffsets = context.Manifest?.Abi.Methods
-            .Where(m => m.Safe)
-            .Select(m => m.Offset)
-            .ToHashSet() ?? new HashSet<int>();
-
         foreach (var state in context.States)
         {
             var sensitiveOps = CollectSensitiveOps(context, state);
@@ -50,20 +44,11 @@ public sealed class AccessControlDetector : BaseDetector
                                         || callerChecks.Any(o => o < firstSensitive)
                                         || sigChecks.Any(o => o < firstSensitive);
 
-            // Identify the safe-flagged manifest method that owns this state. Per-method
-            // analysis seeds Pc = method.Offset, so the very first entry in state.Path IS
-            // the method's body offset. Using Path[0] is precise: a method that CALLs into a
-            // safe-flagged helper at a lower offset must NOT inherit the helper's safety
-            // (Path.Min would mis-attribute that case). For pre-per-method runs (where Path[0]
-            // is always 0 because Run() seeded from offset 0), no manifest method has Offset 0
-            // by accident, so this still evaluates to false on the dispatcher.
-            bool isSafeView = false;
-            var manifestMethods = context.Manifest?.Abi.Methods;
-            if (manifestMethods is not null && safeOffsets.Count > 0 && state.Path.Count > 0)
-            {
-                int entryOffset = state.Path[0];
-                isSafeView = manifestMethods.Any(m => m.Safe && m.Offset == entryOffset);
-            }
+            // Suppress findings when the entry method is manifest-declared safe. Delegating to
+            // ProtocolRiskHelpers.MethodForState keeps a single source of truth for the
+            // entry-method attribution rule (Path[0] under per-method analysis, fallback to
+            // highest-offset manifest visit for legacy run-from-0).
+            bool isSafeView = ProtocolRiskHelpers.MethodForState(context, state)?.Safe == true;
 
             if (noAuthAtAll && !isSafeView)
             {

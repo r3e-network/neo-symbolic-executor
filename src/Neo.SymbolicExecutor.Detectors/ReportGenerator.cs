@@ -31,6 +31,13 @@ public static class ReportGenerator
         WriteIndented = true,
     };
 
+    // Critical-first canonical ordering for severity-bucket emission. Used by both the markdown
+    // table and the JSON severity_counts dict so the two outputs agree on row/key order.
+    private static readonly Severity[] SeverityCanonicalOrder =
+    {
+        Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info,
+    };
+
     public static string ToJson(AnalysisReport report) =>
         BuildJson(report).ToJsonString(JsonOpts);
 
@@ -59,7 +66,7 @@ public static class ReportGenerator
         {
             sb.AppendLine("| Severity | Count |");
             sb.AppendLine("|---|---|");
-            foreach (var s in new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info })
+            foreach (var s in SeverityCanonicalOrder)
             {
                 int n = report.Risk.SeverityCounts.TryGetValue(s, out int x) ? x : 0;
                 if (n == 0) continue;
@@ -167,7 +174,7 @@ public static class ReportGenerator
         // even if upstream LINQ groupings ever reorder. Severity counts emit in canonical
         // critical-first order; detector dictionaries sort alphabetically by key.
         var sevCounts = new JsonObject();
-        foreach (var s in new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info })
+        foreach (var s in SeverityCanonicalOrder)
             if (risk.SeverityCounts.TryGetValue(s, out int n))
                 sevCounts[s.ToLowerString()] = n;
         var detMax = new JsonObject();

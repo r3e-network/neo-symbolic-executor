@@ -90,8 +90,10 @@ while [ ! -f "$STOP_FILE" ]; do
           kill -KILL "$FUZZ_PID" 2>/dev/null || true
           break
         fi
-        # Pull the most recent `iters=N,NNN,NNN` value (commas allowed) from the tail.
-        cur_iters=$(grep -oE 'iters=[0-9,]+' "$LOGFILE" 2>/dev/null | tail -n 1 | tr -d ',')
+        # Pull the most recent `iters=N,NNN,NNN` value (commas allowed) from the tail. Use
+        # tail first so the per-poll cost stays O(1) regardless of how large the log grows
+        # over a multi-day campaign.
+        cur_iters=$(tail -c 8192 "$LOGFILE" 2>/dev/null | grep -oE 'iters=[0-9,]+' | tail -n 1 | tr -d ',')
         if [ -n "$cur_iters" ]; then
           if [ "$cur_iters" != "$last_iters" ]; then
             last_iters="$cur_iters"

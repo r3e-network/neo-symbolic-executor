@@ -194,7 +194,6 @@ internal static class Program
         bool budgetExceeded = false;
         string? budgetReason = null;
         int skippedOutOfRange = 0;
-        int analyzed = 0;
         foreach (var method in manifest.Abi.Methods)
         {
             if (method.Offset < 0 || method.Offset >= program.Bytes.Length)
@@ -213,25 +212,25 @@ internal static class Program
                 budgetExceeded = true;
                 budgetReason ??= r.BudgetReason;
             }
-            analyzed++;
         }
 
         if (skippedOutOfRange > 0)
             Console.Error.WriteLine(
                 $"warning: skipped {skippedOutOfRange} manifest method(s) with offset outside script bytes — "
                 + "the manifest may be stale relative to the .nef.");
-        if (analyzed == 0)
+        if (skippedOutOfRange == manifest.Abi.Methods.Count)
+        {
             Console.Error.WriteLine(
                 "warning: manifest declared no in-range entrypoints; falling back to single run from offset 0.");
+            return new SymbolicEngine(program, engineOptions).Run();
+        }
 
-        return analyzed == 0
-            ? new SymbolicEngine(program, engineOptions).Run()
-            : new ExecutionResult(
-                allStates.ToImmutable(),
-                totalStatesExplored,
-                totalStepsExecuted,
-                budgetExceeded,
-                budgetReason);
+        return new ExecutionResult(
+            allStates.ToImmutable(),
+            totalStatesExplored,
+            totalStepsExecuted,
+            budgetExceeded,
+            budgetReason);
     }
 
     private static int Version()
