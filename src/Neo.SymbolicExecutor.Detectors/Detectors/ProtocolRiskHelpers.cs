@@ -127,13 +127,16 @@ internal static class ProtocolRiskHelpers
     public static bool HasSourceSlippageSignal(AnalysisContext context, ExecutionState state)
     {
         var method = MethodForState(context, state);
-        return context.SourceHints?.MethodContainsAny(method?.Name, SlippageHints) == true;
+        return context.SourceHints?.MethodContainsAny(method?.Name, SlippageHints, includeStringLiterals: false) == true;
     }
 
     public static bool HasSourceFreshnessSignal(AnalysisContext context, ExecutionState state)
     {
         var method = MethodForState(context, state);
-        return context.SourceHints?.MethodContainsAny(method?.Name, FreshnessHints.Concat(OracleHints)) == true;
+        return context.SourceHints?.MethodContainsAny(
+            method?.Name,
+            FreshnessHints.Concat(OracleHints),
+            includeStringLiterals: false) == true;
     }
 
     public static bool HasNftSourceSignal(AnalysisContext context, ExecutionState state)

@@ -325,6 +325,56 @@ public class ReviewFixesTests
         }
     }
 
+    [Fact]
+    public void SourceHints_IgnoresCommentsWhenMatchingHints()
+    {
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                // TODO: add reserve accounting and amountOutMin checks.
+                storage.Put("opaque", amountIn);
+                return true;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("execute", new[] { "reserve", "amountOutMin" })
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void SourceHints_PreservesStringLiteralsForStateHintsWhenAllowed()
+    {
+        var sourceHints = SourceHints.FromText("""
+            public bool doIt(UInt256 tokenId, UInt160 to)
+            {
+                storage.Put("owner:" + tokenId, to);
+                return true;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("doIt", new[] { "owner" })
+            .Should().BeTrue();
+        sourceHints.MethodContainsAny("doIt", new[] { "owner" }, includeStringLiterals: false)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void SourceHints_StringAndCommentBracesDoNotEndMethodBody()
+    {
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                var text = "{ not a block }";
+                /* } */
+                var reserveAfter = pool.Reserve0 + amountIn;
+                return reserveAfter > 0;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("execute", new[] { "reserveAfter" })
+            .Should().BeTrue();
+    }
+
     [Theory]
     [InlineData("--seconds", "0")]
     [InlineData("--minutes", "-1")]

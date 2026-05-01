@@ -13,7 +13,7 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | Reports + gates + CLI | ~750 | 9 |
 | SMT-LIB layer | ~1,700 | 15 |
 | Fuzzer (21 targets, multi-worker) | ~3,400 | 16 regressions + 6 fuzz |
-| **Total** | **~13,500** | **183 passing** |
+| **Total** | **~13,500** | **187 passing** |
 
 ## Layout
 
@@ -28,7 +28,7 @@ neo-symbolic-executor/
 │   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
 │   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
-├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 183 tests total
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 187 tests total
 └── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 

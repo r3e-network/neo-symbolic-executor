@@ -354,6 +354,42 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void DefiSlippageOracle_DoesNotTreatCommentsOrStringsAsSafetySignals()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap","parameters":[],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("pool:reserve0")), SymbolicValue.Int(100), false, false));
+        var sourceHints = SourceHints.FromText("""
+            public bool swap()
+            {
+                // TODO: add amountOutMin, deadline, and oracle freshness checks.
+                var note = "amountOutMin deadline oracle";
+                storage.Put("pool:reserve0", amountIn);
+                return true;
+            }
+        """);
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .Should().ContainSingle()
+            .Which.Tags.Should().Contain("defi-state");
+    }
+
+    [Fact]
     public void DefiSlippageOracle_FlagsUnusuallyNamedReserveMutation()
     {
         var manifest = Nef.ContractManifest.FromJson("""
