@@ -50,6 +50,17 @@ internal static class ProtocolRiskHelpers
         var methods = context.Manifest?.Abi.Methods;
         if (methods is null || methods.Count == 0 || state.Path.Count == 0) return null;
 
+        // Prefer the entry method: under per-method analysis, state.Path[0] is the offset we
+        // jumped to via CreateMethodEntryState. Without this short-circuit we'd attribute the
+        // state to whichever manifest method has the highest Offset reached (e.g. a CALL into
+        // a higher-offset manifest method), which mis-classifies privileged/swap/NFT-shaped
+        // entry methods that happen to dispatch to other manifest entries.
+        int entryOffset = state.Path[0];
+        var entry = methods.FirstOrDefault(m => m.Offset == entryOffset);
+        if (entry is not null) return entry;
+
+        // Fallback for states that did NOT enter via per-method seeding (e.g. legacy run from
+        // offset 0): pick the highest-offset manifest method visited along the path.
         var exactVisited = methods
             .Where(m => state.Path.Contains(m.Offset))
             .OrderByDescending(m => m.Offset)

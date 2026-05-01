@@ -296,6 +296,35 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void PublicPrivilegedMethod_AttributesEntryWhenItDispatchesToHigherOffsetMethod()
+    {
+        // Per-method analysis: state.Path[0] is the entry method's body offset. If a
+        // privileged entry method (`burn` at 0x100) CALLs a non-privileged manifest method
+        // at a higher offset (`getBalance` at 0x300, safe=true), MethodForState should
+        // attribute to the entry, not the highest-offset visited method. Otherwise the
+        // privileged-method finding gets silently re-categorized to the safe view method.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Dapp","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[
+               {"name":"burn","parameters":[],"returntype":"Void","offset":256,"safe":false},
+               {"name":"getBalance","parameters":[],"returntype":"Integer","offset":768,"safe":true}
+             ],"events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x100);  // entry: burn (privileged, unsafe)
+        s.Path.Add(0x101);
+        s.Path.Add(0x300);  // calls getBalance (safe view) - higher offset
+        s.Path.Add(0x301);
+        s.Telemetry.StorageOps.Add(new StorageOp(0x110, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("supply")), SymbolicValue.Int(1), false, false));
+
+        new PublicPrivilegedMethodDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest })
+            .Should().ContainSingle("the entry method `burn` is the privileged one regardless of dispatch into other manifest methods");
+    }
+
+    [Fact]
     public void DefiSlippageOracle_FlagsSwapWithoutMinOutOrFreshOracleSignal()
     {
         var manifest = Nef.ContractManifest.FromJson("""
