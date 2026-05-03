@@ -23,8 +23,19 @@ public sealed class ContractManifest
 
     public static ContractManifest FromJson(string json)
     {
-        var node = JsonNode.Parse(json) ?? throw new FormatException("Manifest is not valid JSON");
-        return FromJson(node);
+        JsonNode? node;
+        try
+        {
+            node = JsonNode.Parse(json);
+        }
+        catch (JsonException jex)
+        {
+            // Wrap the underlying parser's message so the CLI surfaces "manifest" as the failing
+            // input instead of leaking raw "input does not contain any JSON tokens" stack noise
+            // — the user has no way to know which sidecar file failed otherwise.
+            throw new FormatException($"Manifest is not valid JSON: {jex.Message}", jex);
+        }
+        return FromJson(node ?? throw new FormatException("Manifest is not valid JSON"));
     }
 
     public static ContractManifest FromJson(JsonNode node)
