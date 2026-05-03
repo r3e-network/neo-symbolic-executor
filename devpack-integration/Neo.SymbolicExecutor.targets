@@ -24,7 +24,9 @@
       <_NeoSymExtension Condition="'$(NeoSymFormat)' != 'json'">.md</_NeoSymExtension>
       <_NeoSymSourceFlag Condition="'$(NeoSymSourceDir)' != ''"> --source &quot;$(NeoSymSourceDir)&quot;</_NeoSymSourceFlag>
       <_NeoSymSmtFlag Condition="'$(NeoSymUseSmt)' == 'true'"> --smt</_NeoSymSmtFlag>
-      <_NeoSymGateFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateFlag>
+      <_NeoSymGateSeverityFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateSeverityFlag>
+      <_NeoSymGateBudgetFlag Condition="'$(NeoSymFailOnBudgetExceeded)' == 'true'"> --fail-on-budget-exceeded</_NeoSymGateBudgetFlag>
+      <_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)</_NeoSymGateFlag>
       <_NeoSymMaxPathsFlag Condition="'$(NeoSymMaxPaths)' != ''"> --max-paths $(NeoSymMaxPaths)</_NeoSymMaxPathsFlag>
       <_NeoSymMaxStepsFlag Condition="'$(NeoSymMaxSteps)' != ''"> --max-steps $(NeoSymMaxSteps)</_NeoSymMaxStepsFlag>
       <_NeoSymDeadlineFlag Condition="'$(NeoSymPerRunDeadlineMs)' != ''"> --per-run-deadline-ms $(NeoSymPerRunDeadlineMs)</_NeoSymDeadlineFlag>

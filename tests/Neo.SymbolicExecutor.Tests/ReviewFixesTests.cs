@@ -173,6 +173,20 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void DevPackTargets_WiresFailOnBudgetExceededIntoGateFlag()
+    {
+        // The CLI exposes --fail-on-budget-exceeded; the .targets file must surface it as an
+        // MSBuild property so DevPack contracts can opt CI builds into incomplete-coverage
+        // failures without wrapping the tool invocation by hand.
+        string targets = ReadRepoFile("devpack-integration/Neo.SymbolicExecutor.targets");
+
+        targets.Should().Contain(
+            "<_NeoSymGateBudgetFlag Condition=\"'$(NeoSymFailOnBudgetExceeded)' == 'true'\"> --fail-on-budget-exceeded</_NeoSymGateBudgetFlag>");
+        targets.Should().Contain(
+            "<_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)</_NeoSymGateFlag>");
+    }
+
+    [Fact]
     public void ReportJson_EscapesHtmlSensitiveFindingText()
     {
         var finding = new Finding(

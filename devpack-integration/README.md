@@ -43,6 +43,7 @@ directory; MSBuild auto-imports `Directory.Build.{props,targets}` sibling pairs.
 | `NeoSymMaxPaths`                | _(unset)_     | Per-entrypoint terminal-path cap (default 512)         |
 | `NeoSymMaxSteps`                | _(unset)_     | Per-entrypoint symbolic-step cap (default 200000)      |
 | `NeoSymPerRunDeadlineMs`        | _(unset)_     | Per-entrypoint wall-clock deadline in milliseconds      |
+| `NeoSymFailOnBudgetExceeded`    | _(unset)_     | Fail the build when analysis hits a budget cap (incomplete coverage) |
 
 To override, set the property in the contract's `.csproj` before importing the targets:
 
