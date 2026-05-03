@@ -117,6 +117,54 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void Permissions_FlagsPartialWildcardSpecificContractAnyMethod()
+    {
+        // Permission contract=specific, methods="*" — partial wildcard, severity Medium not High.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"X","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[],"events":[]},
+             "permissions":[{"contract":"0x1111111111111111111111111111111111111111","methods":"*"}],
+             "trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+        var f = new PermissionsDetector().Analyze(ctx).ToList();
+        f.Should().Contain(x => x.Severity == Severity.Medium && x.Tags.Contains("permissions-partial-wildcard"));
+        f.Should().NotContain(x => x.Tags.Contains("permissions-wildcard"));
+    }
+
+    [Fact]
+    public void Permissions_FlagsPartialWildcardAnyContractSpecificMethod()
+    {
+        // Permission contract="*", methods=[specific] — also partial wildcard.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"X","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[],"events":[]},
+             "permissions":[{"contract":"*","methods":["transfer"]}],
+             "trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+        var f = new PermissionsDetector().Analyze(ctx).ToList();
+        f.Should().Contain(x => x.Tags.Contains("permissions-partial-wildcard"));
+    }
+
+    [Fact]
+    public void Permissions_FlagsGroupWithEmptyPubKey()
+    {
+        // Audit detector audit #9 lineage: a group entry without a cryptographically-pinned
+        // pubkey is a permission-grant for any signer claiming membership.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"X",
+             "groups":[{"pubkey":"","signature":""}],
+             "features":{},"supportedstandards":[],
+             "abi":{"methods":[],"events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+        var f = new PermissionsDetector().Analyze(ctx).ToList();
+        f.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("group-misconfigured"));
+    }
+
+    [Fact]
     public void Nep17_FiresWhenStandardDeclaredButMethodMissing()
     {
         var manifest = Nef.ContractManifest.FromJson("""
