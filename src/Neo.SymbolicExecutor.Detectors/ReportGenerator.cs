@@ -31,6 +31,13 @@ public sealed record AnalysisMeta(
     /// </summary>
     public string Version { get; init; } = CurrentVersion;
 
+    /// <summary>
+    /// SMT solver diagnostics for SMT-engaged runs. Null when --smt was not passed. Surfaced
+    /// in JSON reports (the doc on <see cref="Smt.ISmtBackend.GetStats"/> claims this; this
+    /// field is what makes that claim true).
+    /// </summary>
+    public Smt.SmtStats? SmtStats { get; init; }
+
     public static readonly string CurrentVersion = ResolveAssemblyVersion();
 
     private static string ResolveAssemblyVersion()
@@ -77,6 +84,12 @@ public static class ReportGenerator
         if (report.Meta.BudgetExceeded)
             sb.AppendLine($"- **Budget exceeded:** {report.Meta.BudgetReason ?? "(unspecified)"}");
         sb.AppendLine($"- **SMT available:** {report.Meta.SmtAvailable} · **SMT engaged:** {report.Meta.SmtEngaged}");
+        if (report.Meta.SmtStats is { } stats)
+        {
+            sb.AppendLine(
+                $"- **SMT queries:** {stats.Queries}, cache_hits={stats.CacheHits}, "
+                + $"sat={stats.Sat}, unsat={stats.Unsat}, unknowns={stats.Unknowns}, timeouts={stats.Timeouts}");
+        }
         sb.AppendLine();
 
         // Risk profile.
@@ -175,24 +188,36 @@ public static class ReportGenerator
 
     private static JsonObject BuildJson(AnalysisReport report)
     {
-        var root = new JsonObject
+        var meta = new JsonObject
         {
-            ["meta"] = new JsonObject
+            ["tool"] = report.Meta.Tool,
+            ["version"] = report.Meta.Version,
+            ["states_explored"] = report.Meta.StatesExplored,
+            ["steps_executed"] = report.Meta.StepsExecuted,
+            ["budget_exceeded"] = report.Meta.BudgetExceeded,
+            ["budget_reason"] = report.Meta.BudgetReason,
+            ["smt_available"] = report.Meta.SmtAvailable,
+            ["smt_engaged"] = report.Meta.SmtEngaged,
+        };
+        if (report.Meta.SmtStats is { } s)
+        {
+            meta["smt_stats"] = new JsonObject
             {
-                ["tool"] = report.Meta.Tool,
-                ["version"] = report.Meta.Version,
-                ["states_explored"] = report.Meta.StatesExplored,
-                ["steps_executed"] = report.Meta.StepsExecuted,
-                ["budget_exceeded"] = report.Meta.BudgetExceeded,
-                ["budget_reason"] = report.Meta.BudgetReason,
-                ["smt_available"] = report.Meta.SmtAvailable,
-                ["smt_engaged"] = report.Meta.SmtEngaged,
-            },
+                ["queries"] = s.Queries,
+                ["cache_hits"] = s.CacheHits,
+                ["sat"] = s.Sat,
+                ["unsat"] = s.Unsat,
+                ["unknowns"] = s.Unknowns,
+                ["timeouts"] = s.Timeouts,
+            };
+        }
+        return new JsonObject
+        {
+            ["meta"] = meta,
             ["risk_profile"] = BuildRiskJson(report.Risk),
             ["gate_evaluation"] = BuildGateJson(report.Gate),
             ["findings"] = BuildFindingsJson(report.Findings),
         };
-        return root;
     }
 
     private static JsonObject BuildRiskJson(RiskProfile risk)

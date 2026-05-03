@@ -148,6 +148,43 @@ public class ReportTests
     }
 
     [Fact]
+    public void Json_IncludesSmtStatsWhenPresent()
+    {
+        // ISmtBackend.GetStats's doc says "Surfaced in JSON reports". The CLI now wires
+        // smtBackend?.GetStats() into AnalysisMeta.SmtStats and the report serializer
+        // emits a "smt_stats" object. Pin both ends of that contract.
+        var stats = new Smt.SmtStats(Queries: 10, CacheHits: 3, Unknowns: 1, Timeouts: 0, Sat: 5, Unsat: 4);
+        var meta = new AnalysisMeta(SmtAvailable: true, SmtEngaged: true) { SmtStats = stats };
+        var risk = RiskProfile.FromFindings(System.Array.Empty<Finding>());
+        var gate = new GatePolicy().Evaluate(System.Array.Empty<Finding>(), risk);
+        var report = new AnalysisReport(ImmutableArray<Finding>.Empty, risk, gate, meta);
+        string json = ReportGenerator.ToJson(report);
+
+        var node = JsonNode.Parse(json)!;
+        var smtNode = node["meta"]!["smt_stats"]!;
+        smtNode["queries"]!.GetValue<long>().Should().Be(10);
+        smtNode["cache_hits"]!.GetValue<long>().Should().Be(3);
+        smtNode["sat"]!.GetValue<long>().Should().Be(5);
+        smtNode["unsat"]!.GetValue<long>().Should().Be(4);
+        smtNode["unknowns"]!.GetValue<long>().Should().Be(1);
+        smtNode["timeouts"]!.GetValue<long>().Should().Be(0);
+
+        ReportGenerator.ToMarkdown(report).Should().Contain("**SMT queries:** 10");
+    }
+
+    [Fact]
+    public void Json_OmitsSmtStatsWhenAbsent()
+    {
+        // Non-SMT runs should not have a smt_stats key — keeps the report minimal.
+        var report = new AnalysisReport(ImmutableArray<Finding>.Empty,
+            RiskProfile.FromFindings(System.Array.Empty<Finding>()),
+            new GatePolicy().Evaluate(System.Array.Empty<Finding>(), RiskProfile.FromFindings(System.Array.Empty<Finding>())),
+            new AnalysisMeta());
+        var node = JsonNode.Parse(ReportGenerator.ToJson(report))!;
+        node["meta"]!.AsObject().ContainsKey("smt_stats").Should().BeFalse();
+    }
+
+    [Fact]
     public void AnalysisMeta_VersionFlowsFromAssembly_NotHardcoded()
     {
         // Production-readiness regression: AnalysisMeta.Version used to be a hardcoded "0.4.0"

@@ -133,7 +133,10 @@ internal static class Program
                 BudgetExceeded: execResult.BudgetExceeded,
                 BudgetReason: execResult.BudgetReason,
                 SmtAvailable: smtBackend?.IsAvailable ?? false,
-                SmtEngaged: smtBackend?.IsAvailable ?? false);
+                SmtEngaged: smtBackend?.IsAvailable ?? false)
+            {
+                SmtStats = smtBackend?.GetStats(),
+            };
             var report = new AnalysisReport(findings, risk, gate, meta);
 
             // Always emit the report before deciding on gate exit code so CI artifacts exist.
