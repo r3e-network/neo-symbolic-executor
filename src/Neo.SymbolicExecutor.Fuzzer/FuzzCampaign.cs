@@ -174,12 +174,24 @@ public sealed class FuzzCampaign
             memMb = GC.GetTotalMemory(false) / (1024 * 1024);
         }
 
+        // Status lines feed scripts/run-fuzzer-forever.sh's `iters=[0-9,]+` watchdog and human
+        // dashboards. Format with InvariantCulture so non-en-US build agents emit the same
+        // "iters=388,519,384" the wrapper expects (a tr-TR or de-DE locale would otherwise emit
+        // dot-separated thousands and break the regex). OrderBy targets with Ordinal so the
+        // per-target column order is byte-identical across runs.
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
         var sb = new System.Text.StringBuilder();
-        sb.Append($"[{elapsed:hh\\:mm\\:ss}] iters={total:N0} ({rate:F0}/s) " +
-                  $"mem={memMb}MB crashes={_stats.TotalCrashesNow} unique={_recorder.UniqueCrashes}");
-        foreach (var t in _opts.Targets.OrderBy(t => t.Name))
+        sb.Append('[').Append(elapsed.ToString("hh\\:mm\\:ss", inv)).Append("] ")
+          .Append("iters=").Append(total.ToString("N0", inv))
+          .Append(" (").Append(rate.ToString("F0", inv)).Append("/s) ")
+          .Append("mem=").Append(memMb.ToString(inv)).Append("MB ")
+          .Append("crashes=").Append(_stats.TotalCrashesNow.ToString(inv))
+          .Append(" unique=").Append(_recorder.UniqueCrashes.ToString(inv));
+        foreach (var t in _opts.Targets.OrderBy(t => t.Name, System.StringComparer.Ordinal))
         {
-            sb.Append($" | {t.Name}={_stats.IterationsFor(t.Name):N0}/{_stats.CrashesFor(t.Name)}");
+            sb.Append(" | ").Append(t.Name).Append('=')
+              .Append(_stats.IterationsFor(t.Name).ToString("N0", inv))
+              .Append('/').Append(_stats.CrashesFor(t.Name).ToString(inv));
         }
         Log(sb.ToString());
 
