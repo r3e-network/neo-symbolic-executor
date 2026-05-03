@@ -78,10 +78,12 @@ public static class ReportGenerator
         {
             sb.AppendLine("| Detector | Max severity | Avg confidence |");
             sb.AppendLine("|---|---|---|");
-            foreach (var (det, sev) in report.Risk.DetectorMaxSeverity.OrderByDescending(kv => (int)kv.Value).ThenBy(kv => kv.Key))
+            foreach (var (det, sev) in report.Risk.DetectorMaxSeverity
+                         .OrderByDescending(kv => (int)kv.Value)
+                         .ThenBy(kv => kv.Key, System.StringComparer.Ordinal))
             {
                 double conf = report.Risk.DetectorAverageConfidence.TryGetValue(det, out double c) ? c : 0;
-                sb.AppendLine($"| `{det}` | {sev.ToLowerString()} | {conf:0.00} |");
+                sb.AppendLine($"| `{det}` | {sev.ToLowerString()} | {conf.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} |");
             }
             sb.AppendLine();
         }
@@ -93,7 +95,7 @@ public static class ReportGenerator
         if (report.Gate.Policies.Count > 0)
         {
             sb.AppendLine("- **Active policies:**");
-            foreach (var (k, v) in report.Gate.Policies.OrderBy(kv => kv.Key))
+            foreach (var (k, v) in report.Gate.Policies.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
                 sb.AppendLine($"  - `{k}`: `{v}`");
         }
         if (!report.Gate.Passed)
@@ -118,12 +120,12 @@ public static class ReportGenerator
             sb.AppendLine();
             sb.AppendLine($"- **Severity:** `{f.Severity.ToLowerString()}`");
             sb.AppendLine($"- **Offset:** `0x{f.Offset:X4}`");
-            sb.AppendLine($"- **Confidence:** {f.Confidence:0.00}");
+            sb.AppendLine($"- **Confidence:** {f.Confidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}");
             sb.AppendLine($"- **Confidence rationale:** {f.ConfidenceReason}");
             if (f.PathSatisfiable.HasValue)
                 sb.AppendLine($"- **Path satisfiable:** {f.PathSatisfiable.Value}");
             if (f.Tags.Count > 0)
-                sb.AppendLine($"- **Tags:** {string.Join(", ", f.Tags.OrderBy(t => t).Select(t => $"`{t}`"))}");
+                sb.AppendLine($"- **Tags:** {string.Join(", ", f.Tags.OrderBy(t => t, System.StringComparer.Ordinal).Select(t => $"`{t}`"))}");
             sb.AppendLine();
             sb.AppendLine(f.Description);
             if (f.Witness is { Count: > 0 } w)
@@ -133,7 +135,7 @@ public static class ReportGenerator
                 sb.AppendLine();
                 sb.AppendLine("| Symbol | Concrete value |");
                 sb.AppendLine("|---|---|");
-                foreach (var (k, v) in w.OrderBy(kv => kv.Key))
+                foreach (var (k, v) in w.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
                     sb.AppendLine($"| `{k}` | `{FormatWitnessValue(v)}` |");
             }
         }
@@ -216,12 +218,12 @@ public static class ReportGenerator
         foreach (var f in findings)
         {
             var tags = new JsonArray();
-            foreach (var t in f.Tags.OrderBy(t => t)) tags.Add(t);
+            foreach (var t in f.Tags.OrderBy(t => t, System.StringComparer.Ordinal)) tags.Add(t);
             JsonObject? witness = null;
             if (f.Witness is { Count: > 0 } w)
             {
                 witness = new JsonObject();
-                foreach (var (k, v) in w.OrderBy(kv => kv.Key))
+                foreach (var (k, v) in w.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
                     witness[k] = FormatWitnessValue(v);
             }
             arr.Add(new JsonObject
@@ -243,9 +245,9 @@ public static class ReportGenerator
 
     private static string FormatWitnessValue(object v) => v switch
     {
-        System.Numerics.BigInteger bi => bi.ToString(),
+        System.Numerics.BigInteger bi => bi.ToString(System.Globalization.CultureInfo.InvariantCulture),
         bool b => b ? "true" : "false",
-        long l => l.ToString(),
+        long l => l.ToString(System.Globalization.CultureInfo.InvariantCulture),
         byte[] bytes => "0x" + System.Convert.ToHexString(bytes),
         _ => v?.ToString() ?? "<null>",
     };

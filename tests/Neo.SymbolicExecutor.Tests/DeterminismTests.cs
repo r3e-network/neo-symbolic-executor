@@ -83,4 +83,54 @@ public class DeterminismTests
         for (int i = 0; i < f1.Length; i++)
             f1[i].DedupeKey.Should().Be(f2[i].DedupeKey);
     }
+
+    [Fact]
+    public void Report_OutputIsByteIdenticalAcrossLocales()
+    {
+        // Guard against locale-sensitive OrderBy on tag/witness/policy/detector keys. Without
+        // explicit StringComparer.Ordinal, a Turkish locale (where dotted-I folds differently)
+        // would reorder keys like "if", "Init", "Inflate" and produce non-diffable output.
+        var findings = System.Collections.Immutable.ImmutableArray.Create(
+            new Detectors.Finding(
+                "ix_detector",
+                Severity.High,
+                "Identifier handling test",
+                "desc",
+                0x10,
+                0.8,
+                "test",
+                System.Collections.Immutable.ImmutableHashSet.Create(
+                    System.StringComparer.Ordinal,
+                    "if", "Init", "Inflate", "InNet", "iI", "Ii"),
+                Witness: System.Collections.Immutable.ImmutableDictionary.CreateRange(
+                    System.StringComparer.Ordinal,
+                    new[]
+                    {
+                        new System.Collections.Generic.KeyValuePair<string, object>("Iota", 1L),
+                        new System.Collections.Generic.KeyValuePair<string, object>("iota", 2L),
+                        new System.Collections.Generic.KeyValuePair<string, object>("Index", 3L),
+                        new System.Collections.Generic.KeyValuePair<string, object>("InIt", 4L),
+                    })));
+        var risk = Detectors.RiskProfile.FromFindings(findings);
+        var gate = new Detectors.GatePolicy().Evaluate(findings, risk);
+        var report = new Detectors.AnalysisReport(findings, risk, gate, new Detectors.AnalysisMeta());
+
+        string Render(System.Globalization.CultureInfo culture)
+        {
+            var prev = System.Globalization.CultureInfo.CurrentCulture;
+            try
+            {
+                System.Globalization.CultureInfo.CurrentCulture = culture;
+                return Detectors.ReportGenerator.ToJson(report) + "\n---\n" + Detectors.ReportGenerator.ToMarkdown(report);
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = prev;
+            }
+        }
+
+        string invariant = Render(System.Globalization.CultureInfo.InvariantCulture);
+        string turkish = Render(new System.Globalization.CultureInfo("tr-TR"));
+        turkish.Should().Be(invariant);
+    }
 }
