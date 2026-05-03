@@ -397,6 +397,36 @@ public class DetectorTests
         new TaintFlowUpgradeDetector().Analyze(Ctx(s)).Should().BeEmpty();
     }
 
+    [Fact]
+    public void GasExhaustion_FiresAtThreshold_NotBelow()
+    {
+        // Threshold is the boundary: GasCost == Threshold should fire (>= Threshold), one below should not.
+        var below = NewState();
+        below.Telemetry.GasCost = GasExhaustionDetector.Threshold - 1;
+        new GasExhaustionDetector().Analyze(Ctx(below)).Should().BeEmpty();
+
+        var atOrAbove = NewState();
+        atOrAbove.Telemetry.GasCost = GasExhaustionDetector.Threshold;
+        var findings = new GasExhaustionDetector().Analyze(Ctx(atOrAbove)).ToList();
+        findings.Should().HaveCount(1);
+        findings[0].Severity.Should().Be(Severity.Medium);
+        findings[0].Tags.Should().Contain("gas");
+    }
+
+    [Fact]
+    public void GasExhaustion_OneFindingPerHighCostState()
+    {
+        // Two states both over threshold should each produce a finding (no cross-state dedupe
+        // here — gas cost is per-path, and the report layer dedupes by (detector, title, offset)).
+        // Both findings share offset 0 / same title so the post-detector Dedupe collapses them
+        // to one — verify that reduction happens at the engine layer, not the detector.
+        var s1 = NewState();
+        s1.Telemetry.GasCost = GasExhaustionDetector.Threshold + 1;
+        var s2 = NewState();
+        s2.Telemetry.GasCost = GasExhaustionDetector.Threshold + 999;
+        new GasExhaustionDetector().Analyze(Ctx(s1, s2)).Should().HaveCount(2);
+    }
+
     private sealed class DummyDetector : BaseDetector
     {
         public override string Name => "dummy";
