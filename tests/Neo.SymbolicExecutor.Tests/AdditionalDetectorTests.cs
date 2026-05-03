@@ -588,6 +588,65 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void DefiSlippageOracle_ArityMatchesAbiMethod_OverloadCannotExonerateUnsafe()
+    {
+        // Production-readiness regression: under per-method analysis, the manifest entry method
+        // is the unsafe arity-1 swap(amountIn). Source has TWO overloads — the safe arity-2
+        // swap(amountIn, amountOutMin) DOES contain slippage hints, but those must not bleed to
+        // the arity-1 entry. Without arity-aware MethodContainsAny, the detector would scan
+        // both bodies and silently exonerate the unsafe overload by file order.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap",
+                                "parameters":[{"name":"amountIn","type":"Integer"}],
+                                "returntype":"Boolean","offset":256,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        // Per-method analysis seeds Path[0] with the entry method's offset.
+        s.Path.Add(256);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x270,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x280, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("reserve")),
+            SymbolicValue.Int(100), false, false));
+        // Source: the SAFE overload has BOTH slippage AND freshness/oracle hints; the UNSAFE one
+        // (matching the ABI arity) has neither. Without arity disambiguation the detector would
+        // see both signals satisfied (`hasSlippageSignal && hasFreshnessSignal`) and skip the
+        // finding entirely — exonerating the unsafe path. With arity disambiguation, only the
+        // arity-1 body is searched and both signals come up false.
+        var sourceHints = SourceHints.FromText("""
+            public bool swap(BigInteger amountIn, BigInteger amountOutMin, BigInteger deadline)
+            {
+                require(amountOut >= amountOutMin, "slippage");
+                require(timestamp <= deadline, "deadline");
+                require(oracle.fresh, "stale price");
+                return true;
+            }
+
+            public bool swap(BigInteger amountIn)
+            {
+                storage.Put("reserve", amountIn);
+                return true;
+            }
+        """);
+
+        var findings = new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .ToList();
+
+        findings.Should().NotBeEmpty(
+            "the unsafe arity-1 swap entry must still trigger — the safe arity-2 overload's slippage hint must not exonerate it");
+        findings[0].Tags.Should().Contain("slippage");
+    }
+
+    [Fact]
     public void NftOwnershipAuthorization_FlagsUnauthedNep11OwnershipWrite()
     {
         var manifest = Nef.ContractManifest.FromJson("""
