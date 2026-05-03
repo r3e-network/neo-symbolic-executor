@@ -14,7 +14,7 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | SMT-LIB layer | ~1,700 | 15 |
 | Fuzzer (22 targets, multi-worker) | ~3,500 | 16 regressions + 6 fuzz |
 | End-to-end vulnerability showcase | — | 25 |
-| **Total** | **~13,600** | **220 passing** |
+| **Total** | **~13,600** | **221 passing** |
 
 The CLI's `analyze` command runs the engine once per manifest ABI entrypoint, seeding the eval
 stack with one fresh symbolic value per declared parameter. Without a manifest the engine runs
@@ -79,6 +79,11 @@ for formulas it cannot prove safely.
 | 1    | Analyzer error (parse failure, etc.)     |
 | 2    | Bad arguments                            |
 | 3    | Gate violation (analysis ok, gate fired) |
+
+Budget-aware gating: pass `--fail-on-budget-exceeded` to make the gate fire (exit 3)
+when the engine hit `--max-paths`, `--max-steps`, or `--per-run-deadline-ms` on any
+manifest entrypoint. Useful in CI to flag analyses that would otherwise pass silently
+with incomplete coverage.
 
 ## DevPack integration
 
