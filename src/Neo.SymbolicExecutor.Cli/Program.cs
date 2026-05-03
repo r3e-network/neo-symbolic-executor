@@ -238,8 +238,10 @@ internal static class Program
 
     private static int Version()
     {
-        var asm = typeof(SymbolicEngine).Assembly.GetName();
-        Console.WriteLine($"neo-sym {asm.Version}");
+        // Use the same resolved version that flows into report metadata so `neo-sym version`
+        // and report.meta.version are byte-identical (avoids confusing users who see "0.4.0.0"
+        // from the CLI but "0.4.0" in the JSON report).
+        Console.WriteLine($"neo-sym {AnalysisMeta.CurrentVersion}");
         return 0;
     }
 

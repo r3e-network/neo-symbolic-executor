@@ -185,6 +185,21 @@ public class ReportTests
     }
 
     [Fact]
+    public void AnalysisMeta_CurrentVersionMatchesAssemblyInfo()
+    {
+        // Surface the static (one cached read at type init) and confirm it equals the
+        // assembly's stripped InformationalVersion. The CLI's `neo-sym version` command also
+        // reads CurrentVersion, so this test lock-steps both surfaces.
+        var asmInfo = typeof(AnalysisMeta).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Single().InformationalVersion;
+        int plus = asmInfo.IndexOf('+');
+        if (plus >= 0) asmInfo = asmInfo[..plus];
+        AnalysisMeta.CurrentVersion.Should().Be(asmInfo);
+    }
+
+    [Fact]
     public void AnalysisMeta_VersionFlowsFromAssembly_NotHardcoded()
     {
         // Production-readiness regression: AnalysisMeta.Version used to be a hardcoded "0.4.0"
