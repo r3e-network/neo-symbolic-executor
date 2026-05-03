@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,13 +17,37 @@ public sealed record AnalysisReport(
 
 public sealed record AnalysisMeta(
     string Tool = "Neo.SymbolicExecutor",
-    string Version = "0.4.0",
     int StatesExplored = 0,
     int StepsExecuted = 0,
     bool BudgetExceeded = false,
     string? BudgetReason = null,
     bool SmtAvailable = false,
-    bool SmtEngaged = false);
+    bool SmtEngaged = false)
+{
+    /// <summary>
+    /// Default-resolved at type init from this assembly's InformationalVersion attribute, so a
+    /// bump of NeoSymExecVersion in Directory.Build.props automatically flows into report
+    /// metadata. Tests/callers may still override via the init-only setter.
+    /// </summary>
+    public string Version { get; init; } = CurrentVersion;
+
+    public static readonly string CurrentVersion = ResolveAssemblyVersion();
+
+    private static string ResolveAssemblyVersion()
+    {
+        var asm = typeof(AnalysisMeta).Assembly;
+        string? info = asm.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (info is not null)
+        {
+            // The MSBuild-emitted InformationalVersion includes a "+<commit-sha>" suffix when
+            // SourceLink runs; strip it so reports show "0.4.0", not "0.4.0+abcdef…".
+            int plus = info.IndexOf('+');
+            if (plus >= 0) info = info[..plus];
+            if (info.Length > 0) return info;
+        }
+        return asm.GetName().Version?.ToString(3) ?? "unknown";
+    }
+}
 
 public static class ReportGenerator
 {

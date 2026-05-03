@@ -109,6 +109,26 @@ public class ReportTests
     }
 
     [Fact]
+    public void AnalysisMeta_VersionFlowsFromAssembly_NotHardcoded()
+    {
+        // Production-readiness regression: AnalysisMeta.Version used to be a hardcoded "0.4.0"
+        // default. Bumping NeoSymExecVersion in Directory.Build.props would silently leave
+        // reports stale. Now the default reads InformationalVersion from this assembly so the
+        // two stay in lockstep.
+        var meta = new AnalysisMeta();
+        var asmVersion = typeof(AnalysisMeta).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Single().InformationalVersion;
+        int plus = asmVersion.IndexOf('+');
+        if (plus >= 0) asmVersion = asmVersion[..plus];
+
+        meta.Version.Should().Be(asmVersion);
+        meta.Version.Should().NotBeEmpty();
+        meta.Version.Should().NotContain("+", "the SourceLink commit suffix should be stripped");
+    }
+
+    [Fact]
     public void Json_IncludesAllSections()
     {
         var findings = ImmutableArray.Create(F("a", Severity.High, "x", 0x10));
