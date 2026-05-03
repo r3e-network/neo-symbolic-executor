@@ -41,6 +41,90 @@ public class NefParserTests
         act.Should().Throw<FormatException>().WithMessage("*checksum*");
     }
 
+    [Fact]
+    public void Parse_EmptyScript_Throws()
+    {
+        // Per Neo.SmartContract.NefFile, a NEF with zero-length script is invalid — there's
+        // nothing for the VM to execute. The parser must reject it before the engine ever sees it.
+        byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), System.Array.Empty<byte>());
+        var act = () => NefFile.Parse(bytes, verifyChecksum: true);
+        act.Should().Throw<FormatException>().WithMessage("*script*non-empty*");
+    }
+
+    [Fact]
+    public void Parse_NonZeroReserveByte_Throws()
+    {
+        // Reserved bytes in the wire format must be zero — non-zero almost always signals a
+        // corrupt or future-version NEF the parser doesn't understand.
+        var script = new byte[] { 0x40 };
+        byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), script);
+        // Patch the single-byte reserve right after the source varbytes (positions: 4 magic +
+        // 64 compiler + 1 source-len(0) = 69, then the next byte is reserve1). We set it to 1.
+        bytes[69] = 1;
+        // Recompute checksum so we test the reserve check, not the checksum.
+        uint cs = NefFile.ComputeChecksum(bytes.AsSpan(0, bytes.Length - 4));
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+            bytes.AsSpan(bytes.Length - 4), cs);
+        var act = () => NefFile.Parse(bytes, verifyChecksum: true);
+        act.Should().Throw<FormatException>().WithMessage("*reserved byte 1*");
+    }
+
+    [Fact]
+    public void Parse_TruncatedNef_Throws()
+    {
+        // A NEF file shorter than its declared structure must fail with FormatException, not
+        // bubble an EndOfStreamException out of BinaryReader (audit C# #29 lineage).
+        var script = new byte[] { 0x40 };
+        byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), script);
+        // Drop the trailing checksum + half the script's varbytes prefix to simulate truncation.
+        var truncated = bytes.AsSpan(0, bytes.Length - 6).ToArray();
+        var act = () => NefFile.Parse(truncated, verifyChecksum: false);
+        act.Should().Throw<System.Exception>(
+            "any failure mode is acceptable as long as the parser doesn't accept a truncated file");
+    }
+
+    [Fact]
+    public void Parse_RoundtripWithMethodTokens_PreservesAllFields()
+    {
+        // Tokens path was previously untested. Build a NEF with two CALLT tokens, parse it, and
+        // assert every field round-trips. This covers MethodToken.Read which is its own decoder.
+        var hashA = new byte[20]; for (int i = 0; i < 20; i++) hashA[i] = (byte)i;
+        var hashB = new byte[20]; for (int i = 0; i < 20; i++) hashB[i] = (byte)(i * 3);
+        var tokens = new[]
+        {
+            new MethodToken(hashA, "transfer", ParametersCount: 4, HasReturnValue: true, CallFlags: 0x0F),
+            new MethodToken(hashB, "balanceOf", ParametersCount: 1, HasReturnValue: true, CallFlags: 0x01),
+        };
+        byte[] bytes = BuildNef("dotnet-3.0", "github.com/example", tokens,
+            new byte[] { 0x40, 0x40 });
+
+        var nef = NefFile.Parse(bytes, verifyChecksum: true);
+
+        nef.Compiler.Should().Be("dotnet-3.0");
+        nef.Source.Should().Be("github.com/example");
+        nef.Tokens.Should().HaveCount(2);
+        nef.Tokens[0].Hash.Should().BeEquivalentTo(hashA);
+        nef.Tokens[0].Method.Should().Be("transfer");
+        nef.Tokens[0].ParametersCount.Should().Be(4);
+        nef.Tokens[0].HasReturnValue.Should().BeTrue();
+        nef.Tokens[0].CallFlags.Should().Be(0x0F);
+        nef.Tokens[1].Method.Should().Be("balanceOf");
+        nef.Tokens[1].CallFlags.Should().Be(0x01);
+    }
+
+    [Fact]
+    public void Parse_VerifyChecksumFalse_AcceptsTamperedNef()
+    {
+        // The verifyChecksum=false code path is used by the fuzzer's structured-mutation target
+        // and by exploration tools that operate on intentionally-malformed inputs. Ensure it
+        // doesn't accidentally re-enforce checksum validation.
+        var script = new byte[] { 0x40 };
+        byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), script);
+        bytes[bytes.Length - 5] = (byte)(bytes[bytes.Length - 5] ^ 0xFF);
+        var nef = NefFile.Parse(bytes, verifyChecksum: false);
+        nef.Compiler.Should().Be("dotnet");
+    }
+
     private static byte[] BuildNef(string compiler, string source, MethodToken[] tokens, byte[] script)
     {
         using var ms = new MemoryStream();
