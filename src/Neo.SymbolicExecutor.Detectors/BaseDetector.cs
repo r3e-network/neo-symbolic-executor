@@ -20,7 +20,6 @@ public sealed class AnalysisContext
 {
     public required IReadOnlyList<ExecutionState> States { get; init; }
     public Nef.ContractManifest? Manifest { get; init; }
-    public Nef.NefFile? Nef { get; init; }
     public SourceHints? SourceHints { get; init; }
     public NativeContractRegistry Natives { get; init; } = NativeContractRegistry.Default;
     public Smt.ISmtBackend? SmtBackend { get; init; }
