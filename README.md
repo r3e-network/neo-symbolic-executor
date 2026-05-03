@@ -85,6 +85,62 @@ when the engine hit `--max-paths`, `--max-steps`, or `--per-run-deadline-ms` on 
 manifest entrypoint. Useful in CI to flag analyses that would otherwise pass silently
 with incomplete coverage.
 
+## JSON output schema
+
+`--format json` emits a stable, byte-deterministic document — CI consumers can SHA-256 it
+as an artifact key. Top-level shape:
+
+```jsonc
+{
+  "meta": {
+    "tool": "Neo.SymbolicExecutor",
+    "version": "0.4.0",                  // assembly InformationalVersion (no commit suffix)
+    "states_explored": 168,
+    "steps_executed": 12340,
+    "budget_exceeded": false,
+    "budget_reason": null,
+    "smt_available": true,
+    "smt_engaged": true,
+    "smt_stats": {                       // present iff --smt was passed
+      "queries": 42, "cache_hits": 12,
+      "sat": 18, "unsat": 8, "unknowns": 4, "timeouts": 0
+    }
+  },
+  "risk_profile": {
+    "overall_max_severity": "high",      // info|low|medium|high|critical
+    "total_findings": 7,
+    "weighted_score": 73,
+    "confidence_weighted_score": 58,
+    "severity_counts":            { "critical": 1, "high": 2, "medium": 3, "low": 1 },
+    "detector_max_severity":      { "access_control": "high", "reentrancy": "critical" },
+    "detector_average_confidence":{ "access_control": 0.85,   "reentrancy": 0.72 }
+  },
+  "gate_evaluation": {
+    "passed": false,
+    "policies":   { "fail-on-max-severity": "high" },
+    "violations": [ "max severity high >= threshold high" ]
+  },
+  "findings": [
+    {
+      "detector": "reentrancy",
+      "severity": "critical",
+      "title": "External call before state write",
+      "description": "...",
+      "offset": 256,
+      "confidence": 0.85,
+      "confidence_reason": "path uncertainty=2, base 0.95 -> 0.81",
+      "tags": [ "checks-effects-interactions" ],
+      "path_satisfiable": true,           // null when --smt not engaged
+      "witness": { "amount": "1000" }     // null absent SAT witness
+    }
+  ]
+}
+```
+
+Severity-keyed dicts emit critical-first; detector-keyed dicts emit ordinal-sorted. Both
+JSON and Markdown render numerics with InvariantCulture so reports diff cleanly across
+machine locales.
+
 ## DevPack integration
 
 See `devpack-integration/README.md` — provides MSBuild `.props` + `.targets`
