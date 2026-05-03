@@ -307,6 +307,96 @@ public class DetectorTests
         findings.Should().BeEmpty();
     }
 
+    [Fact]
+    public void Timestamp_FlagsRuntimeGetTimeReadAsInfo()
+    {
+        // TimestampDetector previously had no direct unit test (only listed in DefaultDetectorSet).
+        var s = NewState();
+        s.Telemetry.TimeAccesses.Add(0x42);
+        var findings = new TimestampDetector().Analyze(Ctx(s)).ToList();
+        findings.Should().HaveCount(1);
+        findings[0].Severity.Should().Be(Severity.Info);
+        findings[0].Offset.Should().Be(0x42);
+        findings[0].Tags.Should().Contain("timestamp");
+    }
+
+    [Fact]
+    public void Timestamp_NoFinding_WhenNoTimeAccess()
+    {
+        var s = NewState();
+        new TimestampDetector().Analyze(Ctx(s)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void UnknownInstructions_DedupesAcrossStates()
+    {
+        // Same offset reached on two different paths must produce one finding — without the
+        // (kind, offset) HashSet guard, a per-state walk would emit one finding per state.
+        var s1 = NewState();
+        s1.Telemetry.UnknownOpcodes.Add(0x10);
+        var s2 = NewState();
+        s2.Telemetry.UnknownOpcodes.Add(0x10);
+        var s3 = NewState();
+        s3.Telemetry.UnknownOpcodes.Add(0x20);
+        var findings = new UnknownInstructionsDetector().Analyze(Ctx(s1, s2, s3)).ToList();
+        findings.Should().HaveCount(2);
+        findings.Select(f => f.Offset).Should().BeEquivalentTo(new[] { 0x10, 0x20 });
+    }
+
+    [Fact]
+    public void UnknownInstructions_SeparateBucketsForOpcodeAndSyscall()
+    {
+        // Dedupe key is (kind, offset) so an unknown opcode at 0x10 and an unknown syscall at
+        // 0x10 produce distinct findings — the coverage-gap signal must point at both surfaces
+        // independently.
+        var s = NewState();
+        s.Telemetry.UnknownOpcodes.Add(0x10);
+        s.Telemetry.UnknownSyscalls.Add(0x10);
+        var findings = new UnknownInstructionsDetector().Analyze(Ctx(s)).ToList();
+        findings.Should().HaveCount(2);
+        findings.Should().Contain(f => f.Title.Contains("opcode"));
+        findings.Should().Contain(f => f.Title.Contains("syscall"));
+    }
+
+    [Fact]
+    public void TaintFlowUpgrade_FiresWhenUpdateArgFlowsFromMethodParameter()
+    {
+        // Critical detector for malicious admin / caller-controlled NEF replacement.
+        var s = NewState();
+        var taintedNef = SymbolicValue.Symbol(Sort.Bytes, "newNef").WithTaint("arg_newNef");
+        var call = new ExternalCall { Offset = 0x80, Method = "update" };
+        call.Args.Add(taintedNef);
+        s.Telemetry.ExternalCalls.Add(call);
+        var findings = new TaintFlowUpgradeDetector().Analyze(Ctx(s)).ToList();
+        findings.Should().HaveCount(1);
+        findings[0].Severity.Should().Be(Severity.Critical);
+        findings[0].Tags.Should().Contain("taint-flow");
+    }
+
+    [Fact]
+    public void TaintFlowUpgrade_NoFinding_WhenUpdateArgIsConcrete()
+    {
+        // A hard-coded NEF blob being passed to update() is NOT a taint-flow finding even though
+        // it's an upgrade — the upgradeability detector covers that, not this one.
+        var s = NewState();
+        var call = new ExternalCall { Offset = 0x80, Method = "update" };
+        call.Args.Add(SymbolicValue.Bytes(new byte[] { 1, 2, 3 }));
+        s.Telemetry.ExternalCalls.Add(call);
+        new TaintFlowUpgradeDetector().Analyze(Ctx(s)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TaintFlowUpgrade_NoFinding_WhenCallIsNotUpdate()
+    {
+        // Tainted args to a non-upgrade method must not trip this detector.
+        var s = NewState();
+        var taintedNef = SymbolicValue.Symbol(Sort.Bytes, "newNef").WithTaint("arg_newNef");
+        var call = new ExternalCall { Offset = 0x80, Method = "transfer" };
+        call.Args.Add(taintedNef);
+        s.Telemetry.ExternalCalls.Add(call);
+        new TaintFlowUpgradeDetector().Analyze(Ctx(s)).Should().BeEmpty();
+    }
+
     private sealed class DummyDetector : BaseDetector
     {
         public override string Name => "dummy";
