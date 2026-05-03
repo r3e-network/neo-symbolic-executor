@@ -56,19 +56,22 @@ public abstract class BaseDetector : IDetector
         double penalty = System.Math.Min(uncertainty / 8.0, 0.4);
         double conf = baseConf * (1.0 - penalty);
 
+        // Reasons surface in JSON/Markdown reports, so format with InvariantCulture for
+        // byte-identical CI output across machine locales (Turkish would emit "0,80").
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
         string reason;
         if (state is null)
         {
-            reason = $"static rule (base {baseConf:0.00})";
+            reason = $"static rule (base {baseConf.ToString("0.00", inv)})";
         }
         else if (state.Telemetry.Truncated)
         {
             conf *= 0.5;
-            reason = $"path uncertainty={uncertainty}, base {baseConf:0.00}, halved due to truncated exploration";
+            reason = $"path uncertainty={uncertainty}, base {baseConf.ToString("0.00", inv)}, halved due to truncated exploration";
         }
         else
         {
-            reason = $"path uncertainty={uncertainty}, base {baseConf:0.00} -> {conf:0.00}";
+            reason = $"path uncertainty={uncertainty}, base {baseConf.ToString("0.00", inv)} -> {conf.ToString("0.00", inv)}";
         }
 
         return new Finding(

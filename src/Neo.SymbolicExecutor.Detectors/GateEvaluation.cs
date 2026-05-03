@@ -63,10 +63,12 @@ public sealed class GatePolicy
 
         if (MinConfidence is { } floor)
         {
+            // Gate violation strings render into JSON/Markdown reports — keep them locale-stable.
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
             foreach (var f in findings)
             {
                 if (floor.TryGetValue(f.Severity, out double minConf) && f.Confidence < minConf)
-                    violations.Add($"{f.Detector} finding at 0x{f.Offset:X4} confidence {f.Confidence:0.00} < floor {minConf:0.00}");
+                    violations.Add($"{f.Detector} finding at 0x{f.Offset:X4} confidence {f.Confidence.ToString("0.00", inv)} < floor {minConf.ToString("0.00", inv)}");
             }
         }
 
@@ -78,17 +80,29 @@ public sealed class GatePolicy
 
     private ImmutableDictionary<string, string> SerializePolicies()
     {
+        // Policy strings render into JSON/Markdown — InvariantCulture keeps int/double output
+        // identical regardless of host locale.
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
         var b = ImmutableDictionary.CreateBuilder<string, string>();
         if (FailOnMaxSeverity is { } a) b["fail-on-max-severity"] = a.ToLowerString();
-        if (FailOnTotalFindings is { } b1) b["fail-on-total-findings"] = b1.ToString();
-        if (FailOnWeightedScore is { } w) b["fail-on-weighted-score"] = w.ToString();
-        if (FailOnConfidenceWeightedScore is { } cw) b["fail-on-confidence-weighted-score"] = cw.ToString();
+        if (FailOnTotalFindings is { } b1) b["fail-on-total-findings"] = b1.ToString(inv);
+        if (FailOnWeightedScore is { } w) b["fail-on-weighted-score"] = w.ToString(inv);
+        if (FailOnConfidenceWeightedScore is { } cw) b["fail-on-confidence-weighted-score"] = cw.ToString(inv);
         if (FailOnSeverityCount is { Count: > 0 } sc)
-            b["fail-on-severity-count"] = string.Join(",", sc.Select(kv => $"{kv.Key.ToLowerString()}={kv.Value}"));
+            b["fail-on-severity-count"] = string.Join(
+                ",",
+                sc.OrderBy(kv => (int)kv.Key)
+                  .Select(kv => $"{kv.Key.ToLowerString()}={kv.Value.ToString(inv)}"));
         if (FailOnDetectorSeverity is { Count: > 0 } ds)
-            b["fail-on-detector-severity"] = string.Join(",", ds.Select(kv => $"{kv.Key}={kv.Value.ToLowerString()}"));
+            b["fail-on-detector-severity"] = string.Join(
+                ",",
+                ds.OrderBy(kv => kv.Key, System.StringComparer.Ordinal)
+                  .Select(kv => $"{kv.Key}={kv.Value.ToLowerString()}"));
         if (MinConfidence is { Count: > 0 } mc)
-            b["min-confidence"] = string.Join(",", mc.Select(kv => $"{kv.Key.ToLowerString()}={kv.Value:0.00}"));
+            b["min-confidence"] = string.Join(
+                ",",
+                mc.OrderBy(kv => (int)kv.Key)
+                  .Select(kv => $"{kv.Key.ToLowerString()}={kv.Value.ToString("0.00", inv)}"));
         if (FailOnBudgetExceeded) b["fail-on-budget-exceeded"] = "true";
         return b.ToImmutable();
     }

@@ -112,7 +112,21 @@ public class DeterminismTests
                         new System.Collections.Generic.KeyValuePair<string, object>("InIt", 4L),
                     })));
         var risk = Detectors.RiskProfile.FromFindings(findings);
-        var gate = new Detectors.GatePolicy().Evaluate(findings, risk);
+        // Force the gate to render numeric policy strings + a confidence-floor violation —
+        // both go through string-formatting paths that previously leaked CurrentCulture.
+        var gate = new Detectors.GatePolicy
+        {
+            FailOnTotalFindings = 10,
+            MinConfidence = new System.Collections.Generic.Dictionary<Severity, double>
+            {
+                [Severity.High] = 0.95,
+            },
+            FailOnSeverityCount = new System.Collections.Generic.Dictionary<Severity, int>
+            {
+                [Severity.Info] = 1,
+                [Severity.High] = 5,
+            },
+        }.Evaluate(findings, risk);
         var report = new Detectors.AnalysisReport(findings, risk, gate, new Detectors.AnalysisMeta());
 
         string Render(System.Globalization.CultureInfo culture)
