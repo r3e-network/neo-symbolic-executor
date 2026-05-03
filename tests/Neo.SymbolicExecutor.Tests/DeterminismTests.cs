@@ -147,4 +147,54 @@ public class DeterminismTests
         string turkish = Render(new System.Globalization.CultureInfo("tr-TR"));
         turkish.Should().Be(invariant);
     }
+
+    [Fact]
+    public void DetectorEngine_DedupedFindingsOrderIsLocaleStable()
+    {
+        // DetectorEngine.Run's central sort uses ThenBy(f => f.Detector) — without an explicit
+        // Ordinal comparer, a Turkish locale would reorder detector names that differ only in
+        // dotted-I casing (e.g. "Init" vs "init" vs "iNit"), producing different finding order in
+        // CI artifacts.
+        var detectors = new Detectors.IDetector[]
+        {
+            new StubDetector("Init", Severity.High),
+            new StubDetector("init", Severity.High),
+            new StubDetector("iNit", Severity.High),
+            new StubDetector("ABC", Severity.Critical),
+            new StubDetector("abc", Severity.Medium),
+        };
+        var engine = new Detectors.DetectorEngine(detectors);
+        var ctx = new Detectors.AnalysisContext { States = System.Array.Empty<ExecutionState>() };
+
+        var prev = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+            string invariant = string.Join(",", engine.Run(ctx).Select(f => f.Detector));
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("tr-TR");
+            string turkish = string.Join(",", engine.Run(ctx).Select(f => f.Detector));
+            turkish.Should().Be(invariant);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = prev;
+        }
+    }
+
+    private sealed class StubDetector : Detectors.IDetector
+    {
+        public string Name { get; }
+        public Severity DefaultSeverity { get; }
+        public double DefaultConfidence => 0.8;
+
+        public StubDetector(string name, Severity sev) { Name = name; DefaultSeverity = sev; }
+
+        public System.Collections.Generic.IEnumerable<Detectors.Finding> Analyze(Detectors.AnalysisContext context) =>
+            new[]
+            {
+                new Detectors.Finding(
+                    Name, DefaultSeverity, $"finding from {Name}", "desc", 0x10, 0.8, "test",
+                    System.Collections.Immutable.ImmutableHashSet<string>.Empty),
+            };
+    }
 }

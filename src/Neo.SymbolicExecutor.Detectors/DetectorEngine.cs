@@ -102,9 +102,11 @@ public sealed class DetectorEngine
                 Tags = existing.Tags.Union(f.Tags),
             };
         }
+        // Findings render directly into JSON/Markdown reports; sort with Ordinal so a non-en-US
+        // CI agent never reorders them by locale-specific casing rules.
         return byKey.Values
             .OrderByDescending(f => (int)f.Severity)
-            .ThenBy(f => f.Detector)
+            .ThenBy(f => f.Detector, System.StringComparer.Ordinal)
             .ThenBy(f => f.Offset)
             .ToImmutableArray();
     }
