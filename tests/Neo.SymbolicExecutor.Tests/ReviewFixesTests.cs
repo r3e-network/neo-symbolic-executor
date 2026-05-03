@@ -393,6 +393,46 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void SourceHints_CharLiteralBraceDoesNotEndMethodBody()
+    {
+        // FindCharLiteralEnd handles 'X' literals so an embedded } in a char literal
+        // doesn't prematurely close the method body. Without this guard, the regex would
+        // see the brace at the } in '}' and stop the body extraction early, missing
+        // everything after.
+        var sourceHints = SourceHints.FromText("""
+            public bool execute()
+            {
+                char close = '}';
+                var reserveAfter = pool.Reserve0;
+                return close == '}' && reserveAfter > 0;
+            }
+        """);
+
+        sourceHints.MethodContainsAny("execute", new[] { "reserveAfter" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void SourceHints_RawStringBraceDoesNotEndMethodBody()
+    {
+        // C# 11 raw string literals: """..."""  — the parser must recognize these and treat
+        // any embedded braces as opaque text. FindRawStringEnd handles this.
+        var sourceHints = SourceHints.FromText("\n"
+            + "public bool execute()\n"
+            + "{\n"
+            + "    var template = \"\"\"\n"
+            + "        { embedded brace } in raw string\n"
+            + "        { another } here\n"
+            + "    \"\"\";\n"
+            + "    var reserveAfter = pool.Reserve0;\n"
+            + "    return reserveAfter > 0;\n"
+            + "}\n");
+
+        sourceHints.MethodContainsAny("execute", new[] { "reserveAfter" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void SourceHints_SearchesAllBodiesForDuplicateMethodNames()
     {
         var sourceHints = SourceHints.FromText("""
