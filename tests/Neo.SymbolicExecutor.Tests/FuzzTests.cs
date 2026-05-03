@@ -149,6 +149,64 @@ public class FuzzTests
     }
 
     [Fact]
+    public void TelemetryClone_AllCollectionFieldsAreDeepCopied_NoCrossTalk()
+    {
+        // Reflective regression: Telemetry.Clone manually copies each field. Adding a new
+        // collection field without updating Clone is a silent crash-class bug — exactly the
+        // audit-C1 lesson. This test discovers every collection-typed property via reflection,
+        // mutates the original, and asserts the clone is unchanged.
+        var t1 = new Telemetry();
+        var collectionProps = typeof(Telemetry)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(p => typeof(System.Collections.ICollection).IsAssignableFrom(p.PropertyType))
+            .ToList();
+        collectionProps.Should().NotBeEmpty("Telemetry must declare some collection-typed fields");
+
+        // Seed every collection on t1 with one entry so Clone can be verified element-by-element.
+        SeedTelemetry(t1);
+        int[] originalCounts = collectionProps
+            .Select(p => ((System.Collections.ICollection)p.GetValue(t1)!).Count)
+            .ToArray();
+
+        var t2 = t1.Clone();
+
+        // Mutate every collection on the original; clone counts must be unchanged.
+        SeedTelemetry(t1);  // double-seed = double the counts on t1
+        int[] cloneCounts = collectionProps
+            .Select(p => ((System.Collections.ICollection)p.GetValue(t2)!).Count)
+            .ToArray();
+        for (int i = 0; i < collectionProps.Count; i++)
+        {
+            cloneCounts[i].Should().Be(
+                originalCounts[i],
+                $"Telemetry.{collectionProps[i].Name} must be deep-copied — clone count {cloneCounts[i]} != pre-mutation count {originalCounts[i]}");
+        }
+    }
+
+    private static void SeedTelemetry(Telemetry t)
+    {
+        // Every collection field gets one (repeatable) representative entry.
+        t.StorageOps.Add(new StorageOp(0x10, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
+        t.ExternalCalls.Add(new ExternalCall { Offset = 0x20, Method = "m", HasReturnValue = true });
+        t.ArithmeticOps.Add(new ArithmeticOp(0x30, "ADD",
+            SymbolicValue.Int(1), SymbolicValue.Int(2), OverflowPossible: false, DivisorMaybeZero: false, Checked: false));
+        t.WitnessChecks.Add(0x40);
+        t.WitnessChecksEnforced.Add(0x40);
+        t.CallerHashChecks.Add(0x50);
+        t.SignatureChecks.Add(0x60);
+        t.TimeAccesses.Add(0x70);
+        t.RandomnessAccesses.Add(0x80);
+        t.EventsEmitted.Add(0x90);
+        t.LoopsDetected.Add(0xA0);
+        t.IteratorLoops.Add(0xB0);
+        t.ExceptionsThrown.Add(0xC0);
+        t.UnknownSyscalls.Add(0xD0);
+        t.UnknownOpcodes.Add(0xE0);
+        t.SmtUnknownOffsets.Add(0xF0);
+    }
+
+    [Fact]
     public void Heap_RandomAllocsCloneIsolated()
     {
         // Property: after Heap.Clone(), mutating the clone's objects must not affect the original.
