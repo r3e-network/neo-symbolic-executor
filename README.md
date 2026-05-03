@@ -34,7 +34,7 @@ neo-symbolic-executor/
 │   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
 │   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
-├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions, 190 tests total
+├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions
 └── devpack-integration/        — MSBuild .props/.targets for DevPack contracts
 ```
 
