@@ -9,12 +9,23 @@ using System.Text.Json.Nodes;
 
 namespace Neo.SymbolicExecutor.Detectors;
 
+/// <summary>
+/// Top-level analysis output. Bundles the deduplicated findings, the rolled-up
+/// <see cref="Detectors.RiskProfile"/>, the result of the configured gate policy, and the run
+/// metadata. Pass to <see cref="ReportGenerator.ToJson"/> or <see cref="ReportGenerator.ToMarkdown"/>
+/// to render. The shape is stable across releases — JSON consumers can rely on the field names.
+/// </summary>
 public sealed record AnalysisReport(
     ImmutableArray<Finding> Findings,
     RiskProfile Risk,
     GateEvaluation Gate,
     AnalysisMeta Meta);
 
+/// <summary>
+/// Per-run diagnostics that travel alongside the findings. Tool name + version identify the
+/// analyzer build; the budget fields explain why analysis stopped (if it stopped early); SMT
+/// fields describe whether and how the SMT layer participated.
+/// </summary>
 public sealed record AnalysisMeta(
     string Tool = "Neo.SymbolicExecutor",
     int StatesExplored = 0,
@@ -56,6 +67,18 @@ public sealed record AnalysisMeta(
     }
 }
 
+/// <summary>
+/// Renders an <see cref="AnalysisReport"/> to deterministic JSON or Markdown.
+///
+/// Determinism guarantees:
+///   - All dictionary iterations sort keys with <see cref="System.StringComparer.Ordinal"/> so
+///     output is byte-identical across machines and locales.
+///   - All numeric formatting uses <see cref="System.Globalization.CultureInfo.InvariantCulture"/>.
+///   - Severity bucket emission follows a critical-first canonical order shared by JSON and
+///     Markdown so the two outputs always agree on row/key ordering.
+///
+/// CI consumers can rely on a SHA-256 of the JSON output as a stable artifact key.
+/// </summary>
 public static class ReportGenerator
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
