@@ -28,6 +28,12 @@ public sealed class AccessControlDetector : BaseDetector
             var sensitiveOps = CollectSensitiveOps(context, state);
             if (sensitiveOps.Count == 0) continue;
 
+            // Suppress all findings when the entry method is manifest-declared safe. Delegating to
+            // ProtocolRiskHelpers.MethodForState keeps a single source of truth for the
+            // entry-method attribution rule (Path[0] under per-method analysis, fallback to
+            // highest-offset manifest visit for legacy run-from-0).
+            if (ProtocolRiskHelpers.MethodForState(context, state)?.Safe == true) continue;
+
             int firstSensitive = sensitiveOps.Min(op => op.Offset);
             var witnessChecks = state.Telemetry.WitnessChecks;
             var enforced = state.Telemetry.WitnessChecksEnforced;
@@ -44,13 +50,7 @@ public sealed class AccessControlDetector : BaseDetector
                                         || callerChecks.Any(o => o < firstSensitive)
                                         || sigChecks.Any(o => o < firstSensitive);
 
-            // Suppress findings when the entry method is manifest-declared safe. Delegating to
-            // ProtocolRiskHelpers.MethodForState keeps a single source of truth for the
-            // entry-method attribution rule (Path[0] under per-method analysis, fallback to
-            // highest-offset manifest visit for legacy run-from-0).
-            bool isSafeView = ProtocolRiskHelpers.MethodForState(context, state)?.Safe == true;
-
-            if (noAuthAtAll && !isSafeView)
+            if (noAuthAtAll)
             {
                 yield return MakeFinding(
                     title: "Sensitive operation lacks authorization check",
@@ -61,7 +61,7 @@ public sealed class AccessControlDetector : BaseDetector
                     state: state,
                     tags: new[] { "missing-auth" });
             }
-            else if (witnessUnenforced && !isSafeView)
+            else if (witnessUnenforced)
             {
                 yield return MakeFinding(
                     title: "Authorization check is unenforced (fail-open)",
@@ -72,7 +72,7 @@ public sealed class AccessControlDetector : BaseDetector
                     state: state,
                     tags: new[] { "unenforced-witness" });
             }
-            else if (!authBeforeSensitive && !isSafeView)
+            else if (!authBeforeSensitive)
             {
                 yield return MakeFinding(
                     title: "Authorization check happens after sensitive operation",
