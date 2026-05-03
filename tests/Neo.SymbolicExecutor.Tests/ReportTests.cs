@@ -41,6 +41,45 @@ public class ReportTests
     }
 
     [Fact]
+    public void GatePolicy_ViolationStringsUseLowercaseSeverity()
+    {
+        // All severity-bearing violation strings must use the canonical lowercase form so they
+        // diff cleanly against JSON-rendered severity_counts keys (which always lowercase). Prior
+        // to normalization, max-severity and detector-severity violations leaked PascalCase
+        // ("High"/"Critical") while severity-count violations used lowercase — inconsistent.
+        var findings = new[]
+        {
+            F("reentrancy", Severity.Critical, "x", 0x10),
+            F("overflow", Severity.High, "y", 0x20),
+        };
+        var risk = RiskProfile.FromFindings(findings);
+        var policy = new GatePolicy
+        {
+            FailOnMaxSeverity = Severity.Medium,
+            FailOnSeverityCount = new System.Collections.Generic.Dictionary<Severity, int>
+            {
+                [Severity.High] = 1,
+            },
+            FailOnDetectorSeverity = new System.Collections.Generic.Dictionary<string, Severity>
+            {
+                ["reentrancy"] = Severity.High,
+            },
+        };
+        var eval = policy.Evaluate(findings, risk);
+
+        // No violation string should contain the PascalCase severity names — they all flow into
+        // CI artifacts that scripts may match against.
+        foreach (var v in eval.Violations)
+        {
+            v.Should().NotContain("Critical");
+            v.Should().NotContain("High");
+            v.Should().NotContain("Medium");
+            v.Should().NotContain("Low");
+        }
+        eval.Violations.Should().Contain(v => v.Contains("critical"));
+    }
+
+    [Fact]
     public void GatePolicy_FailsOnBudgetExceeded()
     {
         // Empty findings: a clean run that hit the budget cap is still incomplete and should

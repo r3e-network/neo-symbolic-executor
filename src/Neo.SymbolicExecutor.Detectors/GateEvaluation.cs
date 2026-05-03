@@ -31,7 +31,7 @@ public sealed class GatePolicy
         // when there are no findings — a no-finding run cannot exceed any severity threshold.
         if (FailOnMaxSeverity is Severity sev && profile.TotalFindings > 0
             && profile.OverallMaxSeverity >= sev)
-            violations.Add($"max severity {profile.OverallMaxSeverity} >= threshold {sev}");
+            violations.Add($"max severity {profile.OverallMaxSeverity.ToLowerString()} >= threshold {sev.ToLowerString()}");
 
         if (FailOnTotalFindings is int totalCap && profile.TotalFindings >= totalCap)
             violations.Add($"total findings {profile.TotalFindings} >= threshold {totalCap}");
@@ -57,7 +57,7 @@ public sealed class GatePolicy
             foreach (var (d, capSev) in detCap)
             {
                 if (profile.DetectorMaxSeverity.TryGetValue(d, out var actual) && actual >= capSev)
-                    violations.Add($"detector {d} max severity {actual} >= threshold {capSev}");
+                    violations.Add($"detector {d} max severity {actual.ToLowerString()} >= threshold {capSev.ToLowerString()}");
             }
         }
 
