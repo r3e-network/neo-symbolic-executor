@@ -141,8 +141,13 @@ by `FuzzerRegressionTests`.
 
 With `--source <file-or-dir>`, protocol detectors use method-local C# source hints to recover
 intent that NEF bytecode does not preserve, such as reserve, amount-out, deadline, owner, and
-approval naming. With `--smt`, each finding is validated for path satisfiability; infeasible
-findings are dropped (or downgraded), and SAT findings include a concrete witness reproducer.
+approval naming. The source matcher is lexical and dependency-free (no Roslyn) and disambiguates
+overloads by parameter arity, so a privileged ABI method can no longer be silently exonerated by
+a benign same-named overload elsewhere in the project. Generated and dependency directories
+(`bin`, `obj`, `.git`, `.vs`, `.omx`, `node_modules`, `packages`) are skipped during enumeration.
+
+With `--smt`, each finding is validated for path satisfiability; infeasible findings are dropped
+(or downgraded), and SAT findings include a concrete witness reproducer.
 
 ## Audit traceability
 
@@ -161,9 +166,11 @@ finding in its XML doc comments. Examples baked in from day one:
   + access_control (audit detector audit #1, biggest precision win)
 - 5 new detectors covering audit gaps: NEP-11, callback re-entry, replay, crypto bypass,
   taint-flow upgrade
-- 3 Neo protocol-risk detectors covering DApp privileged methods, DeFi slippage/oracle
-  safety, NEP-11 ownership authorization, unusual method names, dynamic storage keys, and
-  method-local source hints
+- 3 Neo protocol-risk detectors:
+  - `public_privileged_method` — manifest-exposed mint/burn/withdraw/upgrade-like entrypoints without early auth
+  - `defi_slippage_oracle` — swap/vault token flows lacking min-out/slippage or oracle freshness signals
+  - `nft_ownership_authorization` — NEP-11 ownership/approval writes before owner/operator authorization
+- Method-local C# source hints (lexical + arity-aware) used by the protocol-risk detectors
 
 ## License
 
