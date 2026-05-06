@@ -24,15 +24,23 @@ public sealed class SourceHints
         ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
     };
 
+    // ReDoS guard. The patterns are linear in input size by construction (no nested
+    // quantifiers over overlapping alternatives), but defending against a future regex tweak
+    // costs nothing: a regex that takes longer than this on any plausible source input is
+    // already a bug. The fuzzer's per-iteration budget is 500ms, so this is well below that.
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     private static readonly Regex DisplayNameAttribute = new(
         @"\[\s*(?:System\.ComponentModel\.)?DisplayName\s*\(\s*""(?<alias>[^""\r\n]+)""\s*\)\s*\]",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        RegexTimeout);
 
     // Type-declaration keywords that disqualify an upstream [DisplayName] from binding to the
     // next method — e.g. a class-level DisplayName must not alias the first method below it.
     private static readonly Regex BlockingDeclaration = new(
         @"\b(?:class|struct|interface|enum|namespace|record)\b",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        RegexTimeout);
 
     // The parameter group forbids '(' and ')' so attribute applications like
     // [DisplayName("transfer")] do not swallow the following method signature into one
@@ -41,7 +49,8 @@ public sealed class SourceHints
     // expressions (e.g. casts) won't be matched, but those don't appear in DevPack contracts.
     private static readonly Regex MethodDeclaration = new(
         @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<parameters>[^;(){}]*)\)\s*\{",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        RegexTimeout);
 
     private sealed record MethodBody(int ParameterCount, string Body);
 
