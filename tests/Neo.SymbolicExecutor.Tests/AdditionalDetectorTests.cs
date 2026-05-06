@@ -508,6 +508,52 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void DefiSlippageOracle_SourceSafetyHintsResolveDisplayNameAlias()
+    {
+        // End-to-end: the ABI manifest exposes the method under "swap", but the C# source
+        // method is named DoSwap and aliased via [DisplayName("swap")]. The body contains
+        // amountOutMin + deadline, so the detector must locate the body by ABI name and
+        // suppress the finding. Without the alias resolution shipped in 1718ba4 the lookup
+        // would miss the body and a false-positive defi-slippage finding would surface.
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Pool","groups":[],"features":{},"supportedstandards":[],
+             "abi":{"methods":[{"name":"swap","parameters":[{"name":"amountIn","type":"Integer"}],"returntype":"Boolean","offset":512,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var s = NewState();
+        s.Path.Add(0x200);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x220,
+            Method = "transfer",
+            TargetHash = SymbolicValue.Bytes(new byte[20]),
+            HasReturnValue = true,
+        });
+        s.Telemetry.StorageOps.Add(new StorageOp(0x240, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("pool:reserve0")), SymbolicValue.Int(100), false, false));
+        var sourceHints = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            public class Pool
+            {
+                [DisplayName("swap")]
+                public bool DoSwap(BigInteger amountIn)
+                {
+                    var amountOutMin = 1;
+                    var deadlineHeight = Runtime.Time;
+                    storage.Put("pool:reserve0", amountIn);
+                    return amountOutMin > 0 && deadlineHeight > 0;
+                }
+            }
+        """);
+
+        new DefiSlippageOracleDetector()
+            .Analyze(new AnalysisContext { States = new[] { s }, Manifest = manifest, SourceHints = sourceHints })
+            .Should().BeEmpty("the safe DoSwap body must resolve via the [DisplayName] alias");
+    }
+
+    [Fact]
     public void DefiSlippageOracle_FlagsUnusuallyNamedReserveMutation()
     {
         var manifest = Nef.ContractManifest.FromJson("""
