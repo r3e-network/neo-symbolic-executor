@@ -169,7 +169,7 @@ public class ReviewFixesTests
         // The Exec command must keep --source first, then --smt, then engine budgets, then the
         // gate flag last. Ordering matters because gate-failure exit codes only fire after the
         // analysis itself succeeded.
-        targets.Should().Contain("$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)");
+        targets.Should().Contain("$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymSmtDropUnsatFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)");
     }
 
     [Fact]
@@ -184,6 +184,19 @@ public class ReviewFixesTests
             "<_NeoSymGateBudgetFlag Condition=\"'$(NeoSymFailOnBudgetExceeded)' == 'true'\"> --fail-on-budget-exceeded</_NeoSymGateBudgetFlag>");
         targets.Should().Contain(
             "<_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)</_NeoSymGateFlag>");
+    }
+
+    [Fact]
+    public void DevPackTargets_WiresSmtDropUnsatIntoCommandLine()
+    {
+        // The CLI exposes --smt-drop-unsat; without an MSBuild property, DevPack consumers had
+        // to pass it manually. Now NeoSymSmtDropUnsat=true bound to NeoSymUseSmt=true threads
+        // through into the analyze command line.
+        string targets = ReadRepoFile("devpack-integration/Neo.SymbolicExecutor.targets");
+
+        targets.Should().Contain(
+            "<_NeoSymSmtDropUnsatFlag Condition=\"'$(NeoSymUseSmt)' == 'true' And '$(NeoSymSmtDropUnsat)' == 'true'\"> --smt-drop-unsat</_NeoSymSmtDropUnsatFlag>");
+        targets.Should().Contain("$(_NeoSymSmtDropUnsatFlag)");
     }
 
     [Fact]

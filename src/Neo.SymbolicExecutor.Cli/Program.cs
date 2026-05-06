@@ -25,6 +25,12 @@ internal static class Program
             PrintUsage();
             return 0;
         }
+        // --verbose / NEO_SYM_VERBOSE preserves stack traces on the error path. Off by default
+        // because end-user error output should be one short line; on for triage.
+        bool verbose = args.Contains("--verbose")
+            || string.Equals(Environment.GetEnvironmentVariable("NEO_SYM_VERBOSE"), "1", StringComparison.Ordinal);
+        if (verbose)
+            args = args.Where(a => a != "--verbose").ToArray();
         try
         {
             return args[0] switch
@@ -39,11 +45,13 @@ internal static class Program
         catch (ArgumentException aex)
         {
             Console.Error.WriteLine($"error: {aex.Message}");
+            if (verbose) Console.Error.WriteLine(aex);
             return 2;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
+            if (verbose) Console.Error.WriteLine(ex);
             return 1;
         }
     }
@@ -282,6 +290,10 @@ internal static class Program
               neo-sym explore <path>                  Symbolic exploration without detectors.
               neo-sym analyze <path> [options]        Run detectors and emit a report.
               neo-sym version
+
+            Global options:
+              --verbose                               Print full stack trace on error
+                                                      (also enabled by NEO_SYM_VERBOSE=1).
 
             analyze options:
               --manifest <path.manifest.json>         Manifest sidecar (enables ABI detectors).

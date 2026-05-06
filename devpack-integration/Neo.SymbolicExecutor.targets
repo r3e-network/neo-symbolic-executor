@@ -24,6 +24,7 @@
       <_NeoSymExtension Condition="'$(NeoSymFormat)' != 'json'">.md</_NeoSymExtension>
       <_NeoSymSourceFlag Condition="'$(NeoSymSourceDir)' != ''"> --source &quot;$(NeoSymSourceDir)&quot;</_NeoSymSourceFlag>
       <_NeoSymSmtFlag Condition="'$(NeoSymUseSmt)' == 'true'"> --smt</_NeoSymSmtFlag>
+      <_NeoSymSmtDropUnsatFlag Condition="'$(NeoSymUseSmt)' == 'true' And '$(NeoSymSmtDropUnsat)' == 'true'"> --smt-drop-unsat</_NeoSymSmtDropUnsatFlag>
       <_NeoSymGateSeverityFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateSeverityFlag>
       <_NeoSymGateBudgetFlag Condition="'$(NeoSymFailOnBudgetExceeded)' == 'true'"> --fail-on-budget-exceeded</_NeoSymGateBudgetFlag>
       <_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)</_NeoSymGateFlag>
@@ -38,7 +39,7 @@
     <Message Importance="High" Text="neo-sym: analyzing %(_NeoSymNefFile.Filename)%(_NeoSymNefFile.Extension)"
              Condition="'@(_NeoSymNefFile)' != ''" />
 
-    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)"
+    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymSmtDropUnsatFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)"
           ContinueOnError="false"
           Condition="'@(_NeoSymNefFile)' != ''"
           WorkingDirectory="$(MSBuildProjectDirectory)" />

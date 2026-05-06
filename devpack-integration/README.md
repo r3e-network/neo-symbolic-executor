@@ -39,6 +39,7 @@ directory; MSBuild auto-imports `Directory.Build.{props,targets}` sibling pairs.
 | `NeoSymOutputDir`               | `$(OutputPath)neo-sym/` | Where to write the report          |
 | `NeoSymFailOnMaxSeverity`       | `high`        | Build fails when a finding meets/exceeds this severity |
 | `NeoSymUseSmt`                  | `false`       | Engage SMT path pruning + finding validation           |
+| `NeoSymSmtDropUnsat`            | `false`       | When SMT is on, drop UNSAT findings entirely instead of downgrading |
 | `NeoSymSourceDir`               | `$(MSBuildProjectDirectory)` | C# source hint directory for protocol detectors |
 | `NeoSymMaxPaths`                | _(unset)_     | Per-entrypoint terminal-path cap (default 512)         |
 | `NeoSymMaxSteps`                | _(unset)_     | Per-entrypoint symbolic-step cap (default 200000)      |
