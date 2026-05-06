@@ -233,9 +233,11 @@ public sealed class SourceHints
         string trimmed = parameters.Trim();
         if (trimmed.Length == 0) return 0;
 
+        // The MethodDeclaration regex forbids '(' and ')' in the captured parameter group, so
+        // only generic and array depth need to be tracked here to avoid splitting on commas
+        // inside Func<int, int> or int[,] declarations.
         int count = 1;
         int angleDepth = 0;
-        int parenthesisDepth = 0;
         int bracketDepth = 0;
         foreach (char c in trimmed)
         {
@@ -247,19 +249,13 @@ public sealed class SourceHints
                 case '>':
                     if (angleDepth > 0) angleDepth--;
                     break;
-                case '(':
-                    parenthesisDepth++;
-                    break;
-                case ')':
-                    if (parenthesisDepth > 0) parenthesisDepth--;
-                    break;
                 case '[':
                     bracketDepth++;
                     break;
                 case ']':
                     if (bracketDepth > 0) bracketDepth--;
                     break;
-                case ',' when angleDepth == 0 && parenthesisDepth == 0 && bracketDepth == 0:
+                case ',' when angleDepth == 0 && bracketDepth == 0:
                     count++;
                     break;
             }
