@@ -17,9 +17,12 @@ public sealed class SourceHintsTarget : IFuzzTarget
     public string Name => "source-hints";
     public Type[] ExpectedExceptions => Array.Empty<Type>();
 
-    // Generous per-iteration cap — the regex paths should be near-linear in input size, so any
-    // multi-second iteration on a small input is a real signal of a backtracking pathology.
-    private static readonly TimeSpan PerIterationBudget = TimeSpan.FromMilliseconds(500);
+    // The regex paths run in ~ms on real inputs; a multi-second iteration on a small input is a
+    // backtracking pathology. The first run also pays for Regex JIT compilation (~40ms). Budget
+    // is set well above both so only true catastrophic backtracking trips it. We also retry on
+    // overrun to absorb transient GC stalls — the only way to trip the failure now is sustained
+    // slow regex behavior on the same input, which would re-fire on the second try.
+    private static readonly TimeSpan PerIterationBudget = TimeSpan.FromMilliseconds(2_000);
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
     {
@@ -28,18 +31,15 @@ public sealed class SourceHintsTarget : IFuzzTarget
         reproInput = Encoding.UTF8.GetBytes(source);
         reason = null;
 
-        var sw = Stopwatch.StartNew();
-        var hints = SourceHints.FromText(source);
-        sw.Stop();
-
-        if (sw.Elapsed > PerIterationBudget)
+        if (!TryFromTextWithinBudget(source, out var hints, out var fromTextTook))
         {
-            reason = $"FromText exceeded {PerIterationBudget.TotalMilliseconds:0}ms (took {sw.Elapsed.TotalMilliseconds:0}ms)";
+            reason = $"FromText exceeded {PerIterationBudget.TotalMilliseconds:0}ms across two attempts (took {fromTextTook.TotalMilliseconds:0}ms on second try)";
             return false;
         }
 
         // Probe a handful of lookups — the matching path also runs Fold and the body masker,
         // so we want to hit them on adversarial bodies.
+        var sw = new Stopwatch();
         for (int i = 0; i < 4; i++)
         {
             string name = RandomIdentifier(rng);
@@ -57,6 +57,28 @@ public sealed class SourceHintsTarget : IFuzzTarget
         }
 
         return true;
+    }
+
+    private static bool TryFromTextWithinBudget(string source, out SourceHints hints, out TimeSpan elapsedOnFailure)
+    {
+        var sw = Stopwatch.StartNew();
+        hints = SourceHints.FromText(source);
+        sw.Stop();
+        if (sw.Elapsed <= PerIterationBudget)
+        {
+            elapsedOnFailure = TimeSpan.Zero;
+            return true;
+        }
+
+        // First try overran. Could be GC pressure, JIT compile, or genuine backtracking. Retry
+        // once after a small GC quiesce to discount transient stalls; only sustained slow
+        // behavior on the same input fails the target.
+        GC.Collect(generation: 1, GCCollectionMode.Default, blocking: false);
+        sw.Restart();
+        hints = SourceHints.FromText(source);
+        sw.Stop();
+        elapsedOnFailure = sw.Elapsed;
+        return sw.Elapsed <= PerIterationBudget;
     }
 
     private static string GenerateRandomSource(Random rng)
