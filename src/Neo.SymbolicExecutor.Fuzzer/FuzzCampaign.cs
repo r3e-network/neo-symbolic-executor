@@ -201,10 +201,30 @@ public sealed class FuzzCampaign
         {
             Log($"[fuzz] memory {memMb}MB exceeds cap {_opts.MaxMemoryMb}MB — exiting for fresh restart");
             _memoryCapBreached = true;
+            _consecutiveBreaches++;
+
+            // Defense in depth: under sustained memory pressure the GC can stall workers
+            // mid-RunOnce so deeply that the per-target _memoryCapBreached check never fires
+            // — observed in a 19h chunk that spent 40 min above the cap at ~5% throughput
+            // before the wrapper's idle-watchdog could kill it. After roughly a full minute
+            // (HardExitAfterBreaches × StatusInterval) of continuous breach, terminate so the
+            // wrapper can spawn a fresh chunk immediately. Exit code 137 mirrors the SIGKILL
+            // pattern the wrapper already handles.
+            if (_consecutiveBreaches >= HardExitAfterBreaches)
+            {
+                Log($"[fuzz] memory cap held for {_consecutiveBreaches} status ticks — hard exit");
+                Environment.Exit(137);
+            }
+        }
+        else
+        {
+            _consecutiveBreaches = 0;
         }
     }
 
     private volatile bool _memoryCapBreached;
+    private int _consecutiveBreaches;
+    private const int HardExitAfterBreaches = 6;
 
     private void Log(string s) => (_opts.Log ?? Console.WriteLine)(s);
 }
