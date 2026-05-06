@@ -655,6 +655,20 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Readme_DocumentsEveryDefaultDetector()
+    {
+        // The repo root README enumerates every detector from DefaultDetectorSet; without a
+        // meta-test the two drift the moment a new detector is wired in. Each name must appear
+        // as `name` (the canonical Markdown-code form) somewhere in the README. Catches both
+        // adds (missing in README) and rare renames (orphan in README still flags via the new
+        // detector being absent).
+        var detectorNames = Detectors.DefaultDetectorSet.All().Select(d => d.Name).ToList();
+        string readme = ReadRepoFile("README.md");
+        foreach (string name in detectorNames)
+            readme.Should().Contain($"`{name}`", $"detector {name} should appear in README");
+    }
+
+    [Fact]
     public void Engine_CreateMethodEntryState_SeedsArgsAtMethodOffset()
     {
         // Realistic DevPack-shaped bytecode: a dispatcher prelude that reads stack arg 0 then
