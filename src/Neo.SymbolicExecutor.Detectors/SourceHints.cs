@@ -24,6 +24,25 @@ public sealed class SourceHints
         ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
     };
 
+    private static readonly Regex DisplayNameAttribute = new(
+        @"\[\s*(?:System\.ComponentModel\.)?DisplayName\s*\(\s*""(?<alias>[^""\r\n]+)""\s*\)\s*\]",
+        RegexOptions.Compiled);
+
+    // Type-declaration keywords that disqualify an upstream [DisplayName] from binding to the
+    // next method — e.g. a class-level DisplayName must not alias the first method below it.
+    private static readonly Regex BlockingDeclaration = new(
+        @"\b(?:class|struct|interface|enum|namespace|record)\b",
+        RegexOptions.Compiled);
+
+    // The parameter group forbids '(' and ')' so attribute applications like
+    // [DisplayName("transfer")] do not swallow the following method signature into one
+    // greedy match (which would record name="DisplayName" with the real signature as params).
+    // This is strict enough for Neo contract ABI shapes; default values with parenthesised
+    // expressions (e.g. casts) won't be matched, but those don't appear in DevPack contracts.
+    private static readonly Regex MethodDeclaration = new(
+        @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<parameters>[^;(){}]*)\)\s*\{",
+        RegexOptions.Compiled);
+
     private sealed record MethodBody(int ParameterCount, string Body);
 
     private readonly IReadOnlyDictionary<string, IReadOnlyList<MethodBody>> _methodBodies;
@@ -113,10 +132,20 @@ public sealed class SourceHints
     {
         string textWithoutComments = MaskNonCodeText(text, maskStringAndCharLiterals: false);
         string structuralText = MaskNonCodeText(text, maskStringAndCharLiterals: true);
+
+        // [DisplayName("foo")] aliases a method's ABI name — Neo DevPack contracts use this
+        // when the C# identifier differs from the manifest entrypoint name. Without aliasing,
+        // SourceHints lookups by ABI name would miss the implementation body. We scan
+        // textWithoutComments so the literal alias survives (structuralText masks string
+        // literals away). Tracked in source order so the assignment loop below can advance an
+        // index pointer instead of re-scanning per method.
+        var displayNameAttrs = new List<(int End, string Alias)>();
+        foreach (Match dn in DisplayNameAttribute.Matches(textWithoutComments))
+            displayNameAttrs.Add((dn.Index + dn.Length, dn.Groups["alias"].Value));
+
         var methods = new Dictionary<string, List<MethodBody>>(StringComparer.OrdinalIgnoreCase);
-        foreach (Match match in Regex.Matches(
-                     structuralText,
-                     @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<parameters>[^;{}]*)\)\s*\{"))
+        int attrCursor = 0;
+        foreach (Match match in MethodDeclaration.Matches(structuralText))
         {
             string name = match.Groups["name"].Value;
             if (ControlKeywords.Contains(name)) continue;
@@ -126,21 +155,54 @@ public sealed class SourceHints
             int closeBrace = FindMatchingBrace(structuralText, openBrace);
             if (closeBrace < 0) continue;
 
-            if (!methods.TryGetValue(name, out var bodies))
+            var body = new MethodBody(
+                CountParameters(match.Groups["parameters"].Value),
+                textWithoutComments.Substring(openBrace, closeBrace - openBrace + 1));
+            AddMethodBody(methods, name, body);
+
+            // Consume any DisplayName attributes that precede this method declaration. The
+            // cursor only moves forward, so each attribute binds to at most one method.
+            string? alias = null;
+            int aliasEnd = -1;
+            while (attrCursor < displayNameAttrs.Count
+                   && displayNameAttrs[attrCursor].End <= match.Index)
             {
-                bodies = new List<MethodBody>();
-                methods[name] = bodies;
+                alias = displayNameAttrs[attrCursor].Alias;
+                aliasEnd = displayNameAttrs[attrCursor].End;
+                attrCursor++;
             }
 
-            bodies.Add(new MethodBody(
-                CountParameters(match.Groups["parameters"].Value),
-                textWithoutComments.Substring(openBrace, closeBrace - openBrace + 1)));
+            // Reject the alias if a type declaration (class/struct/interface/etc.) sits
+            // between the attribute and the method — in that case the attribute targets the
+            // type, not this method. structuralText has comments and string literals masked
+            // so the keyword check is not fooled by them.
+            if (alias is not null
+                && BlockingDeclaration.Match(structuralText, aliasEnd, match.Index - aliasEnd).Success)
+            {
+                alias = null;
+            }
+
+            if (alias is not null && !string.Equals(alias, name, StringComparison.Ordinal))
+                AddMethodBody(methods, alias, body);
         }
 
         return methods.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<MethodBody>)kvp.Value,
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AddMethodBody(
+        Dictionary<string, List<MethodBody>> methods,
+        string name,
+        MethodBody body)
+    {
+        if (!methods.TryGetValue(name, out var bodies))
+        {
+            bodies = new List<MethodBody>();
+            methods[name] = bodies;
+        }
+        bodies.Add(body);
     }
 
     private static int CountParameters(string parameters)

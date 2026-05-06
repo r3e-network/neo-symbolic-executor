@@ -476,6 +476,84 @@ public class ReviewFixesTests
             .Should().BeFalse();
     }
 
+    [Fact]
+    public void SourceHints_DisplayNameAttribute_AliasesMethodToAbiName()
+    {
+        // Real Neo DevPack pattern: the C# method is named DoTransfer but exposed in the
+        // manifest under a different ABI name via [DisplayName("transfer")]. Without alias
+        // resolution, our protocol-risk detectors would look up "transfer" and miss the body.
+        var hints = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            public class FooContract
+            {
+                [DisplayName("transfer")]
+                public static bool DoTransfer(byte[] from, byte[] to, int amount)
+                {
+                    int amountOutMin = 0;
+                    return amountOutMin >= 0;
+                }
+            }
+        """);
+
+        // ABI name resolves via the alias.
+        hints.MethodContainsAny("transfer", parameterCount: 3, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+        // C# identifier still resolves directly.
+        hints.MethodContainsAny("DoTransfer", parameterCount: 3, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void SourceHints_DisplayNameOnClass_DoesNotAliasFollowingMethod()
+    {
+        // A [DisplayName("X")] on a class declaration must not alias the next method to "X" —
+        // the attribute targets the class itself. Without the blocking-declaration check
+        // we would silently mis-bind. This regression-tests the precision of alias scoping.
+        var hints = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            [DisplayName("ClassAlias")]
+            public class FooContract
+            {
+                public static bool TransferImpl(byte[] from, byte[] to, int amount)
+                {
+                    int amountOutMin = 0;
+                    return amountOutMin >= 0;
+                }
+            }
+        """);
+
+        hints.MethodContainsAny("ClassAlias", parameterCount: 3, hints: new[] { "amountOutMin" })
+            .Should().BeFalse();
+        hints.MethodContainsAny("TransferImpl", parameterCount: 3, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void SourceHints_DisplayNameAttribute_DoesNotLeakToSubsequentMethod()
+    {
+        // The alias must bind to exactly one method (the first one after the attribute) and
+        // never leak to later methods that have no DisplayName of their own. Walk-with-cursor
+        // semantics guarantee at-most-one consumption per attribute.
+        var hints = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            public class FooContract
+            {
+                [DisplayName("aliased")]
+                public static void First(int x) { int firstMarker = x; }
+
+                public static void Second(int x) { int secondMarker = x; }
+            }
+        """);
+
+        hints.MethodContainsAny("aliased", parameterCount: 1, hints: new[] { "firstMarker" })
+            .Should().BeTrue();
+        hints.MethodContainsAny("aliased", parameterCount: 1, hints: new[] { "secondMarker" })
+            .Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("--seconds", "0")]
     [InlineData("--minutes", "-1")]

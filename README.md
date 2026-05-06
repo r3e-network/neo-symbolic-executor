@@ -15,7 +15,7 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | Fuzzer (22 targets, multi-worker) | ~3,500 |
 | **Total** | **~13,600** |
 
-**Tests:** 256 xUnit cases passing (smoke + audit-regression + per-detector + parser
+**Tests:** 259 xUnit cases passing (smoke + audit-regression + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation regressions).
 
@@ -202,8 +202,10 @@ With `--source <file-or-dir>`, protocol detectors use method-local C# source hin
 intent that NEF bytecode does not preserve, such as reserve, amount-out, deadline, owner, and
 approval naming. The source matcher is lexical and dependency-free (no Roslyn) and disambiguates
 overloads by parameter arity, so a privileged ABI method can no longer be silently exonerated by
-a benign same-named overload elsewhere in the project. Generated and dependency directories
-(`bin`, `obj`, `.git`, `.vs`, `.omx`, `node_modules`, `packages`) are skipped during enumeration.
+a benign same-named overload elsewhere in the project. `[DisplayName("foo")]` attributes on
+methods are recognised, so an ABI-named entrypoint resolves to its underlying C# implementation
+even when the source identifier differs. Generated and dependency directories (`bin`, `obj`,
+`.git`, `.vs`, `.omx`, `node_modules`, `packages`) are skipped during enumeration.
 
 With `--smt`, each finding is validated for path satisfiability; infeasible findings are dropped
 (or downgraded), and SAT findings include a concrete witness reproducer.
