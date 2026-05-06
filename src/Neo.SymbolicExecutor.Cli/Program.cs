@@ -155,8 +155,19 @@ internal static class Program
                 "markdown" or "md" => ReportGenerator.ToMarkdown(report),
                 _ => throw new InvalidOperationException($"validated format '{opts.Format}' unexpectedly reached report generation"),
             };
-            if (opts.OutputPath is null) Console.WriteLine(output);
-            else File.WriteAllText(opts.OutputPath, output);
+            if (opts.OutputPath is null)
+            {
+                Console.WriteLine(output);
+            }
+            else
+            {
+                // Auto-create the parent directory so users can pass `--out reports/foo.json`
+                // without first mkdir-ing reports/. The DevPack targets file already MakeDirs
+                // its output dir; this just brings the standalone CLI to parity.
+                string? parent = Path.GetDirectoryName(opts.OutputPath);
+                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                File.WriteAllText(opts.OutputPath, output);
+            }
 
             if (!gate.Passed)
             {
