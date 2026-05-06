@@ -322,6 +322,11 @@ public static class ReportGenerator
         bool b => b ? "true" : "false",
         long l => l.ToString(System.Globalization.CultureInfo.InvariantCulture),
         byte[] bytes => "0x" + System.Convert.ToHexString(bytes),
+        // Defensive: any future numeric witness type (int/double/decimal/DateTime/etc.)
+        // implements IFormattable and so flows through the invariant path. Without this arm
+        // an int witness would render via the locale-sensitive default ToString() and a
+        // tr-TR machine could emit "1.234" as "1,234" — same class of bug fixed in 32b9c61.
+        IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
         _ => v?.ToString() ?? "<null>",
     };
 }

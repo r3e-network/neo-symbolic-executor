@@ -110,6 +110,12 @@ public class DeterminismTests
                         new System.Collections.Generic.KeyValuePair<string, object>("iota", 2L),
                         new System.Collections.Generic.KeyValuePair<string, object>("Index", 3L),
                         new System.Collections.Generic.KeyValuePair<string, object>("InIt", 4L),
+                        // Non-(BigInteger|long|bool|byte[]) numeric witnesses must still render
+                        // via InvariantCulture. Without the IFormattable arm in
+                        // FormatWitnessValue these would emit "1,5" / "1,234" under tr-TR and
+                        // break the locale-stability invariant.
+                        new System.Collections.Generic.KeyValuePair<string, object>("Iratio", 1.5),
+                        new System.Collections.Generic.KeyValuePair<string, object>("InTval", 1234),
                     })));
         var risk = Detectors.RiskProfile.FromFindings(findings);
         // Force the gate to render numeric policy strings + a confidence-floor violation —
