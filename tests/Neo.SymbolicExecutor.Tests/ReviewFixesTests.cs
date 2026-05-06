@@ -549,6 +549,40 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void SourceHints_DisplayNameAttribute_BindsThroughInterleavedAttributes()
+    {
+        // Real Neo DevPack pattern stacks several attributes — DisplayName, Safe, others —
+        // around a method. The alias must still bind to the next method declaration regardless
+        // of attribute order or whether non-DisplayName attributes sit between the alias and
+        // the method.
+        var hintsBeforeSafe = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            public class Foo
+            {
+                [DisplayName("transfer")]
+                [Safe]
+                public bool DoTransfer(int x) { int amountOutMin = 0; }
+            }
+        """);
+        hintsBeforeSafe.MethodContainsAny("transfer", parameterCount: 1, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+
+        var hintsAfterSafe = SourceHints.FromText("""
+            using System.ComponentModel;
+
+            public class Foo
+            {
+                [Safe]
+                [DisplayName("transfer")]
+                public bool DoTransfer(int x) { int amountOutMin = 0; }
+            }
+        """);
+        hintsAfterSafe.MethodContainsAny("transfer", parameterCount: 1, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void SourceHints_DisplayNameAttribute_DoesNotLeakAcrossFiles()
     {
         // Per-file scoping: a [DisplayName] in file A must not bind to the first method in
