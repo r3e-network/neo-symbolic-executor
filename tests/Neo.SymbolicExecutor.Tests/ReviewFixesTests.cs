@@ -531,6 +531,50 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void SourceHints_DisplayNameAttribute_DoesNotLeakAcrossFiles()
+    {
+        // Per-file scoping: a [DisplayName] in file A must not bind to the first method in
+        // file B even though SourceHints.FromPaths processes them together. Concatenating
+        // files before scanning would silently mis-bind. We use a stray-attribute layout in
+        // FileA (which a careless paste could leave), and FileB starts with a method that
+        // would have absorbed the alias under naive concatenation.
+        string dir = CreateTempDirectory();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "A.cs"), """
+                using System.ComponentModel;
+
+                public class A
+                {
+                    public static void Done() { }
+                }
+
+                [DisplayName("zombie")]
+            """);
+            File.WriteAllText(Path.Combine(dir, "B.cs"), """
+                using System.ComponentModel;
+
+                public class B
+                {
+                    public static void Other(int marker) { var leakedMarker = marker; }
+                }
+            """);
+
+            var hints = SourceHints.FromPaths(new[] { dir });
+            // The stray FileA attribute should NOT alias FileB's Other method.
+            hints.MethodContainsAny("zombie", parameterCount: 1, hints: new[] { "leakedMarker" })
+                .Should().BeFalse();
+            // Sanity: Other resolves under its own name and the marker is found.
+            hints.MethodContainsAny("Other", parameterCount: 1, hints: new[] { "leakedMarker" })
+                .Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void SourceHints_DisplayNameAttribute_DoesNotLeakToSubsequentMethod()
     {
         // The alias must bind to exactly one method (the first one after the attribute) and

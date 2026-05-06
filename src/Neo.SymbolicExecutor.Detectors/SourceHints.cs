@@ -57,25 +57,48 @@ public sealed class SourceHints
 
     public static SourceHints FromPaths(IEnumerable<string> paths)
     {
-        var texts = new List<string>();
+        // Scan each source file independently and merge the resulting method dictionaries.
+        // Concatenating files first would let attribute scopes (e.g. [DisplayName]) and
+        // unmatched braces leak across file boundaries, leading to wrong aliases or stray
+        // method bodies.
+        var merged = new Dictionary<string, List<MethodBody>>(StringComparer.OrdinalIgnoreCase);
+        foreach (string source in EnumerateSourceTexts(paths))
+        {
+            foreach (var entry in ExtractMethodBodies(source))
+            {
+                if (!merged.TryGetValue(entry.Key, out var bodies))
+                {
+                    bodies = new List<MethodBody>();
+                    merged[entry.Key] = bodies;
+                }
+                bodies.AddRange(entry.Value);
+            }
+        }
+
+        return new(merged.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlyList<MethodBody>)kvp.Value,
+            StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> EnumerateSourceTexts(IEnumerable<string> paths)
+    {
         foreach (string path in paths)
         {
             if (File.Exists(path))
             {
-                texts.Add(File.ReadAllText(path));
+                yield return File.ReadAllText(path);
             }
             else if (Directory.Exists(path))
             {
                 foreach (string file in EnumerateProjectSourceFiles(path).OrderBy(p => p, StringComparer.Ordinal))
-                    texts.Add(File.ReadAllText(file));
+                    yield return File.ReadAllText(file);
             }
             else
             {
                 throw new ArgumentException($"source path does not exist: {path}");
             }
         }
-
-        return FromText(string.Join(Environment.NewLine, texts));
     }
 
     private static IEnumerable<string> EnumerateProjectSourceFiles(string root)
