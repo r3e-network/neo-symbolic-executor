@@ -549,6 +549,24 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void SourceHints_DisplayNameAttribute_AcceptsFullyQualifiedName()
+    {
+        // Some contracts skip the `using System.ComponentModel;` and apply the attribute as
+        // [System.ComponentModel.DisplayName("foo")]. The regex's optional namespace prefix
+        // handles this; lock it down so a future regex tweak that drops the prefix arm fails
+        // loudly instead of silently regressing the alias path.
+        var hints = SourceHints.FromText("""
+            public class Foo
+            {
+                [System.ComponentModel.DisplayName("transfer")]
+                public bool DoTransfer(int x) { int amountOutMin = 0; }
+            }
+        """);
+        hints.MethodContainsAny("transfer", parameterCount: 1, hints: new[] { "amountOutMin" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void SourceHints_DisplayNameAttribute_BindsThroughInterleavedAttributes()
     {
         // Real Neo DevPack pattern stacks several attributes — DisplayName, Safe, others —

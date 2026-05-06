@@ -15,7 +15,7 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | Fuzzer (23 targets, multi-worker) | ~3,600 |
 | **Total** | **~13,600** |
 
-**Tests:** 264 xUnit cases passing (smoke + audit-regression + per-detector + parser
+**Tests:** 265 xUnit cases passing (smoke + audit-regression + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation regressions).
 
