@@ -640,7 +640,7 @@ public class ReviewFixesTests
         }
 
         string help = output.ToString();
-        targetNames.Should().HaveCount(22);
+        targetNames.Should().HaveCount(23);
         foreach (string targetName in targetNames)
             help.Should().Contain(targetName);
     }

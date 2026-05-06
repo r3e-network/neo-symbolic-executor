@@ -12,7 +12,7 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 | 24 detectors + framework | ~3,000 |
 | Reports + gates + CLI | ~750 |
 | SMT-LIB layer | ~1,700 |
-| Fuzzer (22 targets, multi-worker) | ~3,500 |
+| Fuzzer (23 targets, multi-worker) | ~3,600 |
 | **Total** | **~13,600** |
 
 **Tests:** 260 xUnit cases passing (smoke + audit-regression + per-detector + parser

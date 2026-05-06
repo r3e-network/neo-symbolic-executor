@@ -333,6 +333,10 @@ internal static class Program
         // methods and seeds args via SymbolicEngine.CreateMethodEntryState; this target
         // exercises that code path with synthetic methods + offsets + parameter types.
         new MethodEntryStateTarget(),
+        // Tier-3: SourceHints lexical scanner. Exercises arity-aware overload disambiguation,
+        // [DisplayName] alias resolution, and the brace/string masker on adversarial fragments
+        // to flush regex hangs (catastrophic backtracking) and uncaught exceptions.
+        new SourceHintsTarget(),
     };
 
     private static string KnownTargetsText() => FormatTargetNames(CreateTargets());
