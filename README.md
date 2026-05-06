@@ -106,7 +106,11 @@ as an artifact key. Top-level shape:
     "smt_engaged": true,
     "smt_stats": {                       // present iff --smt was passed
       "queries": 42, "cache_hits": 12,
-      "sat": 18, "unsat": 8, "unknowns": 4, "timeouts": 0
+      "sat": 18, "unsat": 8, "unknowns": 4, "timeouts": 0,
+      "opaque_translations": 0           // count of expressions translated as
+                                         // unconstrained aux symbols (sound
+                                         // over-approximation; >0 means SAT/UNSAT
+                                         // verdicts may have lost precision)
     }
   },
   "risk_profile": {

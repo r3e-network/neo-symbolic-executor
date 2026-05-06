@@ -36,7 +36,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
     private readonly int _timeoutMs;
     private readonly int _bytesBound;
     private readonly PortableSmtSolver _portableSolver = new();
-    private long _queries, _cacheHits, _unknowns, _timeouts, _sat, _unsat;
+    private long _queries, _cacheHits, _unknowns, _timeouts, _sat, _unsat, _opaqueTranslations;
     private readonly Dictionary<string, SmtOutcome> _queryCache = new(StringComparer.Ordinal);
 
     public bool IsAvailable { get; }
@@ -106,6 +106,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         if (hi.HasValue) assertions.Add($"(bvsle {targetAtom} {SmtLibTranslator.Bv(hi.Value)})");
 
         var run = RunQuery(BuildScript(translator, assertions, _timeoutMs, new[] { targetName }));
+        _opaqueTranslations += translator.OpaqueTranslations;
         if (run.Outcome != SmtOutcome.Sat) return null;
         return TryReadValueForName(run.Output, targetName, out var raw) && TryParseBitVec(raw, out var value)
             ? value
@@ -127,6 +128,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         var assertions = conditions.Select(translator.TranslateBool).ToArray();
         var names = translator.UserSymbols.Keys.ToArray();
         var run = RunQuery(BuildScript(translator, assertions, _timeoutMs, names));
+        _opaqueTranslations += translator.OpaqueTranslations;
         if (run.Outcome != SmtOutcome.Sat) return null;
 
         var witness = new Dictionary<string, object>();
@@ -141,13 +143,16 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         return witness;
     }
 
-    public SmtStats GetStats() => new(_queries, _cacheHits, _unknowns, _timeouts, _sat, _unsat);
+    public SmtStats GetStats() =>
+        new(_queries, _cacheHits, _unknowns, _timeouts, _sat, _unsat, _opaqueTranslations);
 
     private SmtOutcome RunExternalSatisfiabilityQuery(IReadOnlyList<Expression> conditions)
     {
         var translator = new SmtLibTranslator();
         var assertions = conditions.Select(translator.TranslateBool).ToArray();
-        return RunQuery(BuildScript(translator, assertions, _timeoutMs)).Outcome;
+        var outcome = RunQuery(BuildScript(translator, assertions, _timeoutMs)).Outcome;
+        _opaqueTranslations += translator.OpaqueTranslations;
+        return outcome;
     }
 
     private SmtOutcome RunPortableSatisfiabilityQuery(IReadOnlyList<Expression> conditions)

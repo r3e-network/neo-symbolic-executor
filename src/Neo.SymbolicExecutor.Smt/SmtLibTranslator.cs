@@ -13,11 +13,22 @@ namespace Neo.SymbolicExecutor.Smt.Z3;
 /// </summary>
 internal sealed class SmtLibTranslator
 {
+    private const string OpaquePrefixInt = "__opaque_int";
+    private const string OpaquePrefixBool = "__opaque_bool";
+
     private readonly Dictionary<string, Sort> _userSymbols = new();
     private readonly Dictionary<string, Sort> _auxSymbols = new();
     private int _nextAux;
+    private int _opaqueTranslations;
 
     public IReadOnlyDictionary<string, Sort> UserSymbols => _userSymbols;
+
+    /// <summary>
+    /// Count of times the translator emitted an opaque (unconstrained) aux symbol because the
+    /// expression node had no faithful SMT-LIB encoding. Read by <see cref="Z3Backend"/> after
+    /// each query and accumulated into <see cref="SmtStats.OpaqueTranslations"/>.
+    /// </summary>
+    public int OpaqueTranslations => _opaqueTranslations;
 
     public string TranslateBool(Expression e) => e switch
     {
@@ -28,7 +39,7 @@ internal sealed class SmtLibTranslator
         UnaryExpr ue when ue.Sort == Sort.Bool => TranslateBoolUnary(ue),
         TernaryExpr te when te.Sort == Sort.Bool => TranslateBoolTernary(te),
         Symbol s when s.Sort == Sort.Bool => UserSymbol(s.Name, Sort.Bool),
-        _ => AuxSymbol("__opaque_bool", Sort.Bool),
+        _ => AuxSymbol(OpaquePrefixBool, Sort.Bool),
     };
 
     public string TranslateInt(Expression e) => e switch
@@ -40,7 +51,7 @@ internal sealed class SmtLibTranslator
         UnaryExpr ue when ue.Sort == Sort.Int => TranslateIntUnary(ue),
         TernaryExpr te when te.Sort == Sort.Int => TranslateIntTernary(te),
         Symbol s when s.Sort == Sort.Int => UserSymbol(s.Name, Sort.Int),
-        _ => AuxSymbol("__opaque_int", Sort.Int),
+        _ => AuxSymbol(OpaquePrefixInt, Sort.Int),
     };
 
     public string NewAuxInt(string prefix, out string name)
@@ -85,7 +96,7 @@ internal sealed class SmtLibTranslator
         "<=" => $"(bvsle {TranslateInt(e.Left)} {TranslateInt(e.Right)})",
         ">" => $"(bvsgt {TranslateInt(e.Left)} {TranslateInt(e.Right)})",
         ">=" => $"(bvsge {TranslateInt(e.Left)} {TranslateInt(e.Right)})",
-        _ => AuxSymbol("__opaque_bool", Sort.Bool),
+        _ => AuxSymbol(OpaquePrefixBool, Sort.Bool),
     };
 
     private string TranslateBoolUnary(UnaryExpr e) => e.Op switch
@@ -93,13 +104,13 @@ internal sealed class SmtLibTranslator
         "not" => $"(not {TranslateBool(e.Operand)})",
         "nz" => $"(not (= {TranslateInt(e.Operand)} {Bv(0)}))",
         "tobool" => TranslateBool(e.Operand),
-        _ => AuxSymbol("__opaque_bool", Sort.Bool),
+        _ => AuxSymbol(OpaquePrefixBool, Sort.Bool),
     };
 
     private string TranslateBoolTernary(TernaryExpr e) => e.Op switch
     {
         "within" => $"(and (bvsle {TranslateInt(e.B)} {TranslateInt(e.A)}) (bvslt {TranslateInt(e.A)} {TranslateInt(e.C)}))",
-        _ => AuxSymbol("__opaque_bool", Sort.Bool),
+        _ => AuxSymbol(OpaquePrefixBool, Sort.Bool),
     };
 
     private string TranslateEq(Expression a, Expression b)
@@ -108,7 +119,7 @@ internal sealed class SmtLibTranslator
             return $"(= {TranslateInt(a)} {TranslateInt(b)})";
         if (a.Sort == Sort.Bool && b.Sort == Sort.Bool)
             return $"(= {TranslateBool(a)} {TranslateBool(b)})";
-        return AuxSymbol("__opaque_bool", Sort.Bool);
+        return AuxSymbol(OpaquePrefixBool, Sort.Bool);
     }
 
     private string TranslateIntBinary(BinaryExpr e) => e.Op switch
@@ -125,7 +136,7 @@ internal sealed class SmtLibTranslator
         ">>" => $"(bvashr {TranslateInt(e.Left)} {TranslateInt(e.Right)})",
         "min" => IntMin(e.Left, e.Right),
         "max" => IntMax(e.Left, e.Right),
-        _ => AuxSymbol("__opaque_int", Sort.Int),
+        _ => AuxSymbol(OpaquePrefixInt, Sort.Int),
     };
 
     private string TranslateIntUnary(UnaryExpr e) => e.Op switch
@@ -134,13 +145,13 @@ internal sealed class SmtLibTranslator
         "abs" => IntAbs(e.Operand),
         "sign" => IntSign(e.Operand),
         "~" => $"(bvnot {TranslateInt(e.Operand)})",
-        _ => AuxSymbol("__opaque_int", Sort.Int),
+        _ => AuxSymbol(OpaquePrefixInt, Sort.Int),
     };
 
     private string TranslateIntTernary(TernaryExpr e) => e.Op switch
     {
         "modmul" => $"(bvsmod (bvmul {TranslateInt(e.A)} {TranslateInt(e.B)}) {TranslateInt(e.C)})",
-        _ => AuxSymbol("__opaque_int", Sort.Int),
+        _ => AuxSymbol(OpaquePrefixInt, Sort.Int),
     };
 
     private string IntAbs(Expression e)
@@ -180,6 +191,8 @@ internal sealed class SmtLibTranslator
     {
         var name = NextAuxName(prefix);
         _auxSymbols[name] = sort;
+        if (prefix == OpaquePrefixInt || prefix == OpaquePrefixBool)
+            _opaqueTranslations++;
         return Atom(name);
     }
 

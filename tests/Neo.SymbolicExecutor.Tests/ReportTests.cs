@@ -153,7 +153,9 @@ public class ReportTests
         // ISmtBackend.GetStats's doc says "Surfaced in JSON reports". The CLI now wires
         // smtBackend?.GetStats() into AnalysisMeta.SmtStats and the report serializer
         // emits a "smt_stats" object. Pin both ends of that contract.
-        var stats = new Smt.SmtStats(Queries: 10, CacheHits: 3, Unknowns: 1, Timeouts: 0, Sat: 5, Unsat: 4);
+        var stats = new Smt.SmtStats(
+            Queries: 10, CacheHits: 3, Unknowns: 1, Timeouts: 0, Sat: 5, Unsat: 4,
+            OpaqueTranslations: 7);
         var meta = new AnalysisMeta(SmtAvailable: true, SmtEngaged: true) { SmtStats = stats };
         var risk = RiskProfile.FromFindings(System.Array.Empty<Finding>());
         var gate = new GatePolicy().Evaluate(System.Array.Empty<Finding>(), risk);
@@ -168,8 +170,12 @@ public class ReportTests
         smtNode["unsat"]!.GetValue<long>().Should().Be(4);
         smtNode["unknowns"]!.GetValue<long>().Should().Be(1);
         smtNode["timeouts"]!.GetValue<long>().Should().Be(0);
+        smtNode["opaque_translations"]!.GetValue<long>().Should().Be(7);
 
-        ReportGenerator.ToMarkdown(report).Should().Contain("**SMT queries:** 10");
+        var md = ReportGenerator.ToMarkdown(report);
+        md.Should().Contain("**SMT queries:** 10");
+        md.Should().Contain("SMT precision warning");
+        md.Should().Contain("7 expression(s)");
     }
 
     [Fact]

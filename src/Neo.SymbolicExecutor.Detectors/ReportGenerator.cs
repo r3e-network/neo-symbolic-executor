@@ -112,6 +112,10 @@ public static class ReportGenerator
             sb.AppendLine(
                 $"- **SMT queries:** {stats.Queries}, cache_hits={stats.CacheHits}, "
                 + $"sat={stats.Sat}, unsat={stats.Unsat}, unknowns={stats.Unknowns}, timeouts={stats.Timeouts}");
+            if (stats.OpaqueTranslations > 0)
+                sb.AppendLine(
+                    $"- **SMT precision warning:** {stats.OpaqueTranslations} expression(s) were "
+                    + "translated as unconstrained aux symbols (sound over-approximation; SAT/UNSAT verdicts may have lost precision).");
         }
         sb.AppendLine();
 
@@ -232,6 +236,7 @@ public static class ReportGenerator
                 ["unsat"] = s.Unsat,
                 ["unknowns"] = s.Unknowns,
                 ["timeouts"] = s.Timeouts,
+                ["opaque_translations"] = s.OpaqueTranslations,
             };
         }
         return new JsonObject

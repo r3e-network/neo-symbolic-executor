@@ -63,4 +63,10 @@ public sealed record SmtStats(
     long Unknowns,
     long Timeouts,
     long Sat,
-    long Unsat);
+    long Unsat,
+    // Number of times the SMT-LIB translator replaced an unsupported expression node with a
+    // fresh unconstrained aux variable (e.g. bytes-typed predicates, modpow, ashr without an
+    // integer encoding). Sound — the constraint set is over-approximated, never under — but a
+    // non-zero value means SAT/UNSAT outcomes for queries on this run lost precision. Surfaced
+    // in JSON reports so consumers can tell when SMT verdicts depend on opacified subterms.
+    long OpaqueTranslations = 0);
