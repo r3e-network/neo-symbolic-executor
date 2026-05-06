@@ -61,6 +61,26 @@ public sealed class SourceHints
         _methodBodies = methodBodies;
     }
 
+    /// <summary>
+    /// Number of distinct method names indexed (counting each name once even if it has
+    /// multiple overload bodies). Surfaced for CLI diagnostics — a value of 0 after passing
+    /// <c>--source</c> usually means the path didn't contain any matching .cs files.
+    /// </summary>
+    public int MethodNameCount => _methodBodies.Count;
+
+    /// <summary>
+    /// Total number of method bodies indexed across every name (each overload counted).
+    /// </summary>
+    public int MethodBodyCount
+    {
+        get
+        {
+            int total = 0;
+            foreach (var bodies in _methodBodies.Values) total += bodies.Count;
+            return total;
+        }
+    }
+
     public static SourceHints FromText(string text) =>
         new(ExtractMethodBodies(text ?? string.Empty));
 

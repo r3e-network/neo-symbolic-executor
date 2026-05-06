@@ -531,6 +531,24 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void SourceHints_ExposesIndexedMethodAndBodyCountsForDiagnostics()
+    {
+        // Two method names — one with two overloads, one with one body — for a total of
+        // 3 bodies under 2 distinct names. The CLI surfaces these counters on stderr so users
+        // who pass --source can confirm their path resolved to actual .cs content.
+        var hints = SourceHints.FromText("""
+            public void First(int x) { }
+            public void First() { }
+            public void Second() { }
+        """);
+        hints.MethodNameCount.Should().Be(2);
+        hints.MethodBodyCount.Should().Be(3);
+
+        SourceHints.FromText(string.Empty).MethodNameCount.Should().Be(0);
+        SourceHints.FromText(string.Empty).MethodBodyCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SourceHints_DisplayNameAttribute_DoesNotLeakAcrossFiles()
     {
         // Per-file scoping: a [DisplayName] in file A must not bind to the first method in

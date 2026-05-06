@@ -86,6 +86,15 @@ internal static class Program
         SourceHints? sourceHints = opts.SourcePaths.Count > 0
             ? SourceHints.FromPaths(opts.SourcePaths)
             : null;
+        if (sourceHints is not null)
+        {
+            // Diagnostic stderr line so users who pass --source know the scan actually picked up
+            // method bodies. A 0 here usually means the path resolved to a directory with no .cs
+            // files, or that everything was filtered by the generated/dependency-dir skiplist.
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            Console.Error.WriteLine(
+                $"neo-sym: source hints loaded — {sourceHints.MethodNameCount.ToString(inv)} method name(s), {sourceHints.MethodBodyCount.ToString(inv)} body/bodies indexed");
+        }
 
         if (opts.DanglingSmtFlags.Count > 0)
             Console.Error.WriteLine(
