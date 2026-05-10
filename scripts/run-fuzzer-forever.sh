@@ -28,6 +28,12 @@ COV_DIR="$CORPUS/coverage-corpus"
 
 mkdir -p "$CORPUS" "$LOGDIR" "$COV_DIR"
 
+# Mirror the wrapper's own stdout/stderr (its `[wrapper] ...` diagnostics, plus any
+# error from `set -euo pipefail`) into a persistent log. Otherwise the typical
+# `nohup ... > /dev/null` invocation discards every signal-handler note, every chunk
+# exit code, and every set-e abort — leaving no trail when the wrapper itself dies.
+exec > >(tee -a "$LOGDIR/wrapper.log") 2>&1
+
 # Iter-2 wakeup-3: persist the coverage-guided corpus across daily restarts. The fuzzer's
 # CoverageGuidedEngineTarget reads this env var; if set, it loads any prior saved interesting
 # inputs on startup and writes new ones to disk. Without this, each chunk restart loses the
