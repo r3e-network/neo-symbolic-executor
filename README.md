@@ -9,13 +9,13 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 |---|---|
 | Engine + decoder + types | ~4,900 |
 | NEF + manifest parsers | ~400 |
-| 28 detectors + framework | ~3,300 |
-| Reports + gates + CLI | ~750 |
+| 33 detectors + framework | ~3,800 |
+| Reports + gates + CLI | ~800 |
 | SMT-LIB layer | ~1,700 |
 | Fuzzer (23 targets, multi-worker) | ~3,600 |
-| **Total** | **~13,900** |
+| **Total** | **~14,500** |
 
-**Tests:** 280 xUnit cases passing (smoke + audit-regression + per-detector + parser
+**Tests:** 297 xUnit cases passing (smoke + audit-regression + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation regressions).
 
@@ -176,7 +176,7 @@ by `FuzzerRegressionTests`.
 
 ## Detectors
 
-28 detectors are wired in `DefaultDetectorSet`:
+33 detectors are wired in `DefaultDetectorSet`:
 
 - `reentrancy` — checks-effects-interactions with audit-driven amplification scoring
 - `access_control` — missing / unenforced / late authorization, with `manifest.safe` respect
@@ -205,6 +205,11 @@ by `FuzzerRegressionTests`.
 - `unsafe_deserialization` — `StdLib.deserialize` / `jsonDeserialize` on values derived from method arguments, storage, iterator yields, or prior external-call returns
 - `unprotected_deploy` — `_deploy(data, update)` does not branch on the `update` flag, so contract upgrades re-run initialization (admin reset, re-mint) — see audit Iter-3
 - `nep17_amount_validation` — NEP-17 `transfer` mutates state without first constraining the `amount` argument (negative-amount mint via balance debit/credit role flip)
+- `signature_malleability` — raw ECDSA signature bytes used as a storage dedup key without low-S normalization
+- `nep17_zero_address` — NEP-17 `transfer` mutates state without checking `from` / `to` against UInt160.Zero
+- `nep17_transfer_to_self` — NEP-17 `transfer` body uses both `from` and `to` as storage keys without short-circuiting the from==to case (stale-state debit/credit)
+- `oracle_response_validation` — `onOracleResponse`-shaped callback mutates state without branching on the `code` (OracleResponseCode) argument
+- `toctou_storage` — Storage.Get-then-call-then-Storage.Put pattern where the write value depends on the prior read (lost-update window across the external call)
 - `unknown_instructions` — coverage gap surface (INFO)
 
 With `--source <file-or-dir>`, protocol detectors use method-local C# source hints to recover

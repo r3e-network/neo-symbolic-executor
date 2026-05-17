@@ -91,6 +91,31 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void Upgradeability_HighWhenCallerHashChecked()
+    {
+        // Precision fix: a contract that gates `update` with `GetCallingScriptHash() == ADMIN`
+        // is legitimately auth-gated; severity should downgrade from Critical to High. Prior
+        // implementation omitted CallerHashChecks from the predicate and flagged Critical.
+        var s = NewState();
+        s.Telemetry.CallerHashChecks.Add(0x05);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall { Offset = 0x10, Method = "update", HasReturnValue = false });
+        var f = new UpgradeabilityDetector().Analyze(Ctx(s)).ToList();
+        f.Should().ContainSingle();
+        f[0].Severity.Should().Be(Severity.High);
+    }
+
+    [Fact]
+    public void Upgradeability_HighWhenSignatureChecked()
+    {
+        var s = NewState();
+        s.Telemetry.SignatureChecks.Add(0x05);
+        s.Telemetry.ExternalCalls.Add(new ExternalCall { Offset = 0x10, Method = "update", HasReturnValue = false });
+        var f = new UpgradeabilityDetector().Analyze(Ctx(s)).ToList();
+        f.Should().ContainSingle();
+        f[0].Severity.Should().Be(Severity.High);
+    }
+
+    [Fact]
     public void Permissions_FlagsFullWildcard()
     {
         var manifest = Nef.ContractManifest.FromJson("""

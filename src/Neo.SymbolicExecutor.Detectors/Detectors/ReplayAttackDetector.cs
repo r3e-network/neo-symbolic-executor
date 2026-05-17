@@ -26,7 +26,11 @@ public sealed class ReplayAttackDetector : BaseDetector
     {
         foreach (var state in context.States)
         {
-            // Auth via signature?
+            // Intentionally narrower than ProtocolRiskHelpers.HasAnyEnforcedAuth: WitnessChecks
+            // are per-transaction bound (Neo wallet signs the actual tx) and not replayable, so
+            // including them here would over-report on every CheckWitness-gated method. Only
+            // signature checks (CheckSig/CheckMultisig over caller-supplied bytes) and caller-
+            // hash checks (off-chain identity claims) are replay-relevant.
             if (state.Telemetry.SignatureChecks.Count == 0
                 && state.Telemetry.CallerHashChecks.Count == 0) continue;
 

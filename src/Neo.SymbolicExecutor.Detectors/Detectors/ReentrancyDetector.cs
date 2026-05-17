@@ -56,10 +56,9 @@ public sealed class ReentrancyDetector : BaseDetector
             if (preWriteCalls.Any(c => c.CallFlagsDynamic || c.CallFlags == CallFlags.All)) amp++;
             if (state.Telemetry.MaxCallStackDepth >= 8) amp++;
 
-            // Severity policy.
-            bool authEnforced = state.Telemetry.WitnessChecksEnforced.Count > 0
-                                || state.Telemetry.CallerHashChecks.Count > 0
-                                || state.Telemetry.SignatureChecks.Count > 0;
+            // Severity policy. Use the shared HasAnyEnforcedAuth helper so this stays in sync
+            // with UpgradeabilityDetector and any future severity-downgrading detector.
+            bool authEnforced = ProtocolRiskHelpers.HasAnyEnforcedAuth(state);
             Severity severity = amp switch
             {
                 >= 1 => Severity.Critical,                                  // amplified -> always critical

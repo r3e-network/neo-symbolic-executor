@@ -22,7 +22,19 @@ public sealed class Telemetry
     public List<int> TimeAccesses { get; } = new();
     public List<int> RandomnessAccesses { get; } = new();
     public List<int> EventsEmitted { get; } = new();
+    /// <summary>
+    /// Set of back-edge target offsets — populated at JMP*/branch sites when the resolved target
+    /// is a lower offset than the current PC. Each entry is a *loop-header offset*, not the
+    /// jumping instruction.
+    /// </summary>
     public HashSet<int> LoopsDetected { get; } = new();
+    /// <summary>
+    /// Set of PCs where the per-offset visit cap fired. Distinct from <see cref="LoopsDetected"/>
+    /// because a cap-hit PC is not necessarily a back-edge target — any opcode revisited beyond
+    /// the cap (e.g. an unrolled tight switch tail) ends up here. The DOS detector consumes both
+    /// as evidence of a loop-shaped truncation.
+    /// </summary>
+    public HashSet<int> VisitCapsHit { get; } = new();
     public HashSet<int> IteratorLoops { get; } = new();
     public List<int> ExceptionsThrown { get; } = new();
     public List<int> UnknownSyscalls { get; } = new();
@@ -49,6 +61,7 @@ public sealed class Telemetry
         copy.RandomnessAccesses.AddRange(RandomnessAccesses);
         copy.EventsEmitted.AddRange(EventsEmitted);
         foreach (var l in LoopsDetected) copy.LoopsDetected.Add(l);
+        foreach (var v in VisitCapsHit) copy.VisitCapsHit.Add(v);
         foreach (var l in IteratorLoops) copy.IteratorLoops.Add(l);
         copy.ExceptionsThrown.AddRange(ExceptionsThrown);
         copy.UnknownSyscalls.AddRange(UnknownSyscalls);

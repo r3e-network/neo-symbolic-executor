@@ -72,6 +72,7 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
         clone.Telemetry.RandomnessAccesses.Add(0xDDDD);
         clone.Telemetry.EventsEmitted.Add(0xEEEE);
         clone.Telemetry.LoopsDetected.Add(0xFFFF);
+        clone.Telemetry.VisitCapsHit.Add(0x7777);
         clone.Telemetry.IteratorLoops.Add(0x1111);
         clone.Telemetry.ExceptionsThrown.Add(0x2222);
         clone.Telemetry.UnknownSyscalls.Add(0x3333);
@@ -130,6 +131,7 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
         private readonly int RandCount;
         private readonly int EventCount;
         private readonly int LoopsCount;
+        private readonly int VisitCapsCount;
         private readonly int ItLoopsCount;
         private readonly int ExceptCount;
         private readonly int UnSysCount;
@@ -165,6 +167,7 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             RandCount = s.Telemetry.RandomnessAccesses.Count;
             EventCount = s.Telemetry.EventsEmitted.Count;
             LoopsCount = s.Telemetry.LoopsDetected.Count;
+            VisitCapsCount = s.Telemetry.VisitCapsHit.Count;
             ItLoopsCount = s.Telemetry.IteratorLoops.Count;
             ExceptCount = s.Telemetry.ExceptionsThrown.Count;
             UnSysCount = s.Telemetry.UnknownSyscalls.Count;
@@ -208,6 +211,7 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             if (s.Telemetry.RandomnessAccesses.Count != RandCount) { reason = Bad("Telemetry.RandomnessAccesses", RandCount, s.Telemetry.RandomnessAccesses.Count); return false; }
             if (s.Telemetry.EventsEmitted.Count != EventCount) { reason = Bad("Telemetry.EventsEmitted", EventCount, s.Telemetry.EventsEmitted.Count); return false; }
             if (s.Telemetry.LoopsDetected.Count != LoopsCount) { reason = Bad("Telemetry.LoopsDetected", LoopsCount, s.Telemetry.LoopsDetected.Count); return false; }
+            if (s.Telemetry.VisitCapsHit.Count != VisitCapsCount) { reason = Bad("Telemetry.VisitCapsHit", VisitCapsCount, s.Telemetry.VisitCapsHit.Count); return false; }
             if (s.Telemetry.IteratorLoops.Count != ItLoopsCount) { reason = Bad("Telemetry.IteratorLoops", ItLoopsCount, s.Telemetry.IteratorLoops.Count); return false; }
             if (s.Telemetry.ExceptionsThrown.Count != ExceptCount) { reason = Bad("Telemetry.ExceptionsThrown", ExceptCount, s.Telemetry.ExceptionsThrown.Count); return false; }
             if (s.Telemetry.UnknownSyscalls.Count != UnSysCount) { reason = Bad("Telemetry.UnknownSyscalls", UnSysCount, s.Telemetry.UnknownSyscalls.Count); return false; }

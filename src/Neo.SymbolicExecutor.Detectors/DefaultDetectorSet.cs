@@ -46,6 +46,12 @@ public static class DefaultDetectorSet
         new UnsafeDeserializationDetector(),
         new UnprotectedDeployDetector(),
         new Nep17AmountValidationDetector(),
+        // Iter-4 coverage pass: crypto, NEP-17 edge cases, oracle hygiene, TOCTOU.
+        new SignatureMalleabilityDetector(),
+        new Nep17ZeroAddressDetector(),
+        new Nep17TransferToSelfDetector(),
+        new OracleResponseValidationDetector(),
+        new ToctouStorageDetector(),
     };
 
     public static IReadOnlyList<IDetector> All() => _instances;

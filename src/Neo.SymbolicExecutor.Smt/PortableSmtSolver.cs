@@ -171,9 +171,6 @@ internal sealed class PortableSmtSolver
                 return true;
             }
 
-            if (term.Coefficient.IsZero)
-                return false;
-
             var domain = GetIntDomain(term.Symbol).Clone();
             if (lo.HasValue && !ApplyScaledRelation(domain, term.Coefficient, RelationOp.GreaterOrEqual, lo.Value - term.Constant))
                 return true;
@@ -200,7 +197,11 @@ internal sealed class PortableSmtSolver
                 values[name] = value;
             }
 
-            for (var i = 0; i < _equalities.Count + _affineEqualities.Count + 1; i++)
+            // Bound matches PropagateEqualities (line 377). The asymmetric absence of
+            // `_ints.Count` here was a latent bug — the witness loop could terminate one or
+            // more rounds early on dense chains involving many symbol domains.
+            int maxRounds = MaxPropagationRounds();
+            for (var i = 0; i < maxRounds; i++)
             {
                 foreach (var equality in _equalities)
                 {
@@ -372,9 +373,17 @@ internal sealed class PortableSmtSolver
             return PropagateEqualities();
         }
 
+        /// <summary>
+        /// Upper bound on propagation/witness fixup rounds. One round propagates one hop
+        /// across the equality chain; with N equalities + N affines + N domains the longest
+        /// chain that can require sequential propagation is bounded by their sum + 1.
+        /// </summary>
+        private int MaxPropagationRounds() =>
+            _equalities.Count + _affineEqualities.Count + _ints.Count + 1;
+
         private bool PropagateEqualities()
         {
-            for (var i = 0; i < _equalities.Count + _affineEqualities.Count + _ints.Count + 1; i++)
+            for (var i = 0; i < MaxPropagationRounds(); i++)
             {
                 foreach (var equality in _equalities)
                 {
@@ -443,6 +452,16 @@ internal sealed class PortableSmtSolver
             var right = GetIntDomain(equality.Right);
             if (left.Exact.HasValue && right.Exact.HasValue)
                 return left.Exact.Value != right.Exact.Value + equality.Offset;
+            // Disjoint-range precision: `left == right + offset` is UNSAT when the bounds prove
+            // the intervals cannot overlap. Previously we only returned true on Exact/Exact;
+            // strengthening to the bounds case is a pure precision win (Unsupported -> UNSAT)
+            // with no soundness risk — we still return false when bounds are missing or overlap.
+            if (left.Lower.HasValue && right.Upper.HasValue
+                && left.Lower.Value > right.Upper.Value + equality.Offset)
+                return true;
+            if (left.Upper.HasValue && right.Lower.HasValue
+                && left.Upper.Value < right.Lower.Value + equality.Offset)
+                return true;
             return false;
         }
 

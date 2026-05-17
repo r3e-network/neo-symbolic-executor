@@ -85,6 +85,22 @@ internal static class ProtocolRiskHelpers
         || state.Telemetry.CallerHashChecks.Any(o => o < offset)
         || state.Telemetry.SignatureChecks.Any(o => o < offset);
 
+    /// <summary>
+    /// True iff the state has any enforced authorization signal on this path: a witness check
+    /// whose result gates the path (<see cref="Telemetry.WitnessChecksEnforced"/>), a caller-hash
+    /// check (<see cref="Telemetry.CallerHashChecks"/>), or a signature verification
+    /// (<see cref="Telemetry.SignatureChecks"/>). Detectors use this to downgrade severity when
+    /// a sensitive operation is gated by *some* form of authentication, even if the specific
+    /// detector only cares about one type of risk. Note that
+    /// <see cref="ReplayAttackDetector"/> intentionally uses a narrower predicate
+    /// (signature/caller only) because witness checks are per-transaction bound and not
+    /// off-chain replayable.
+    /// </summary>
+    public static bool HasAnyEnforcedAuth(ExecutionState state) =>
+        state.Telemetry.WitnessChecksEnforced.Count > 0
+        || state.Telemetry.CallerHashChecks.Count > 0
+        || state.Telemetry.SignatureChecks.Count > 0;
+
     public static IEnumerable<(int Offset, string Kind)> SensitiveOps(ExecutionState state)
     {
         foreach (var op in state.Telemetry.StorageOps)

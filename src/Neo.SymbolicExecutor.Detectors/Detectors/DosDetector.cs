@@ -45,11 +45,16 @@ public sealed class DosDetector : BaseDetector
                     tags: new[] { "iterator-dos" });
             }
 
-            // Loop with no concrete bound: very heuristic — we treat any back-edge that survived
-            // visit-cap truncation as suspect.
-            if (state.Telemetry.Truncated && state.Telemetry.LoopsDetected.Count > 0)
+            // Loop with no concrete bound. Two evidence channels: a recorded back-edge
+            // (LoopsDetected) or a visit-cap hit (VisitCapsHit). Either signals a loop-shaped
+            // truncation; reporting the cap-hit PC is more accurate when present because that's
+            // the exact opcode the engine couldn't advance past.
+            if (state.Telemetry.Truncated
+                && (state.Telemetry.VisitCapsHit.Count > 0 || state.Telemetry.LoopsDetected.Count > 0))
             {
-                int firstLoop = MinOf(state.Telemetry.LoopsDetected);
+                int firstLoop = state.Telemetry.VisitCapsHit.Count > 0
+                    ? MinOf(state.Telemetry.VisitCapsHit)
+                    : MinOf(state.Telemetry.LoopsDetected);
                 yield return MakeFinding(
                     title: "Loop appears unbounded under symbolic exploration",
                     description: $"Loop body at 0x{firstLoop:X4} hit the visit cap during exploration; "

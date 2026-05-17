@@ -43,8 +43,10 @@ public sealed class UpgradeabilityDetector : BaseDetector
                 .ToList();
             if (sensitive.Count == 0) continue;
 
-            bool authEnforced = state.Telemetry.WitnessChecksEnforced.Count > 0
-                                 || state.Telemetry.SignatureChecks.Count > 0;
+            // Precision fix: the prior predicate omitted CallerHashChecks, so a contract that
+            // gates `update` with `GetCallingScriptHash() == ADMIN` was flagged Critical
+            // instead of High. Caller-hash auth is a legitimate Neo upgrade-gating pattern.
+            bool authEnforced = ProtocolRiskHelpers.HasAnyEnforcedAuth(state);
 
             foreach (var call in sensitive)
             {

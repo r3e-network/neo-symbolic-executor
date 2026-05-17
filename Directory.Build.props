@@ -11,7 +11,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
-    <NeoSymExecVersion>0.5.0</NeoSymExecVersion>
+    <NeoSymExecVersion>0.6.0</NeoSymExecVersion>
     <NeoCorePackageVersion>3.9.0</NeoCorePackageVersion>
     <Authors>Neo Symbolic Executor Contributors</Authors>
     <Company>Neo Symbolic Executor</Company>

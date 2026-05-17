@@ -129,6 +129,17 @@ internal static class Program
                 PerRunDeadline = opts.PerRunDeadlineMs is int ms
                     ? System.TimeSpan.FromMilliseconds(ms)
                     : defaults.PerRunDeadline,
+                MaxQueuedStates = opts.MaxQueuedStates ?? defaults.MaxQueuedStates,
+                MaxVisitsPerOffset = opts.MaxVisitsPerOffset ?? defaults.MaxVisitsPerOffset,
+                MaxConcretizations = opts.MaxConcretizations ?? defaults.MaxConcretizations,
+                MaxStackSize = opts.MaxStackSize ?? defaults.MaxStackSize,
+                MaxInvocationStackDepth = opts.MaxInvocationStackDepth ?? defaults.MaxInvocationStackDepth,
+                MaxTryDepth = opts.MaxTryDepth ?? defaults.MaxTryDepth,
+                MaxItemSize = opts.MaxItemSize ?? defaults.MaxItemSize,
+                MaxCollectionSize = opts.MaxCollectionSize ?? defaults.MaxCollectionSize,
+                MaxHeapObjects = opts.MaxHeapObjects ?? defaults.MaxHeapObjects,
+                MaxShiftCount = opts.MaxShiftCount ?? defaults.MaxShiftCount,
+                MaxPowExponent = opts.MaxPowExponent ?? defaults.MaxPowExponent,
             };
             var execResult = RunAllManifestEntrypoints(program, manifest, engineOptions);
 
@@ -315,6 +326,17 @@ internal static class Program
               --max-paths <n>                         Cap on terminal paths (default 512).
               --max-steps <n>                         Cap on symbolic steps (default 200000).
               --per-run-deadline-ms <ms>              Wall-clock cap on a single entrypoint run.
+              --max-queued-states <n>                 Cap on worklist size; primary path-explosion escape valve (default 4096; 0 disables).
+              --max-visits-per-offset <n>             Cap revisits of the same PC (default 16; cuts tight symbolic loops).
+              --max-concretizations <n>               Cap SMT concretizations per state (default 8; 0 disables concretization).
+              --max-stack-size <n>                    Eval-stack ceiling (default 2048).
+              --max-invocation-stack-depth <n>        Call-frame ceiling (default 1024).
+              --max-try-depth <n>                     TRY-frame ceiling (default 16).
+              --max-item-size <n>                     Per-item byte ceiling (default 65536).
+              --max-collection-size <n>               Compound-collection element ceiling (default 512).
+              --max-heap-objects <n>                  Live-heap object ceiling (default 1024).
+              --max-shift-count <n>                   SHL/SHR amount ceiling (default 256).
+              --max-pow-exponent <n>                  POW exponent ceiling (default 256).
 
               # Gate flags:
               --fail-on-max-severity <sev>            sev in info|low|medium|high|critical
@@ -347,6 +369,17 @@ internal sealed class AnalyzeOptions
     public int? MaxPaths { get; init; }
     public int? MaxSteps { get; init; }
     public int? PerRunDeadlineMs { get; init; }
+    public int? MaxQueuedStates { get; init; }
+    public int? MaxVisitsPerOffset { get; init; }
+    public int? MaxConcretizations { get; init; }
+    public int? MaxStackSize { get; init; }
+    public int? MaxInvocationStackDepth { get; init; }
+    public int? MaxTryDepth { get; init; }
+    public int? MaxItemSize { get; init; }
+    public int? MaxCollectionSize { get; init; }
+    public int? MaxHeapObjects { get; init; }
+    public int? MaxShiftCount { get; init; }
+    public int? MaxPowExponent { get; init; }
 
     public static AnalyzeOptions Parse(string[] args)
     {
@@ -371,6 +404,17 @@ internal sealed class AnalyzeOptions
         int? maxPaths = null;
         int? maxSteps = null;
         int? perRunDeadlineMs = null;
+        int? maxQueuedStates = null;
+        int? maxVisitsPerOffset = null;
+        int? maxConcretizations = null;
+        int? maxStackSize = null;
+        int? maxInvocationStackDepth = null;
+        int? maxTryDepth = null;
+        int? maxItemSize = null;
+        int? maxCollectionSize = null;
+        int? maxHeapObjects = null;
+        int? maxShiftCount = null;
+        int? maxPowExponent = null;
         bool failOnBudget = false;
 
         // Audit C# #22 fix: int.Parse on overflow throws System.OverflowException with a
@@ -413,6 +457,22 @@ internal sealed class AnalyzeOptions
                 case "--max-paths": maxPaths = ParsePositiveInt(a, Next()); break;
                 case "--max-steps": maxSteps = ParsePositiveInt(a, Next()); break;
                 case "--per-run-deadline-ms": perRunDeadlineMs = ParsePositiveInt(a, Next()); break;
+                // Concurrency / path-explosion escape valves: when --max-paths fires after
+                // millions of states queue up, --max-queued-states is the only thing that
+                // bounds peak memory. --max-visits-per-offset cuts tight loops earlier.
+                case "--max-queued-states": maxQueuedStates = ParseNonNegativeInt(a, Next()); break;
+                case "--max-visits-per-offset": maxVisitsPerOffset = ParsePositiveInt(a, Next()); break;
+                case "--max-concretizations": maxConcretizations = ParseNonNegativeInt(a, Next()); break;
+                // Capacity ceilings — usually leave at defaults; raise only when a real contract
+                // legitimately needs more than the conservative analyzer-side bound.
+                case "--max-stack-size": maxStackSize = ParsePositiveInt(a, Next()); break;
+                case "--max-invocation-stack-depth": maxInvocationStackDepth = ParsePositiveInt(a, Next()); break;
+                case "--max-try-depth": maxTryDepth = ParsePositiveInt(a, Next()); break;
+                case "--max-item-size": maxItemSize = ParsePositiveInt(a, Next()); break;
+                case "--max-collection-size": maxCollectionSize = ParsePositiveInt(a, Next()); break;
+                case "--max-heap-objects": maxHeapObjects = ParsePositiveInt(a, Next()); break;
+                case "--max-shift-count": maxShiftCount = ParsePositiveInt(a, Next()); break;
+                case "--max-pow-exponent": maxPowExponent = ParsePositiveInt(a, Next()); break;
                 case "--fail-on-max-severity": maxSev = ParseSeverity(Next()); break;
                 case "--fail-on-total-findings": totalCap = ParseNonNegativeInt(a, Next()); break;
                 case "--fail-on-weighted-score": wsCap = ParseNonNegativeInt(a, Next()); break;
@@ -464,6 +524,17 @@ internal sealed class AnalyzeOptions
             MaxPaths = maxPaths,
             MaxSteps = maxSteps,
             PerRunDeadlineMs = perRunDeadlineMs,
+            MaxQueuedStates = maxQueuedStates,
+            MaxVisitsPerOffset = maxVisitsPerOffset,
+            MaxConcretizations = maxConcretizations,
+            MaxStackSize = maxStackSize,
+            MaxInvocationStackDepth = maxInvocationStackDepth,
+            MaxTryDepth = maxTryDepth,
+            MaxItemSize = maxItemSize,
+            MaxCollectionSize = maxCollectionSize,
+            MaxHeapObjects = maxHeapObjects,
+            MaxShiftCount = maxShiftCount,
+            MaxPowExponent = maxPowExponent,
             GatePolicy = new GatePolicy
             {
                 FailOnMaxSeverity = maxSev,

@@ -221,7 +221,11 @@ public sealed partial class SymbolicEngine
         if (visits >= _options.MaxVisitsPerOffset)
         {
             state.Telemetry.Truncated = true;
-            state.Telemetry.LoopsDetected.Add(state.Pc);
+            // Record under VisitCapsHit, not LoopsDetected. LoopsDetected is the back-edge
+            // target set populated by JMP*/branch sites; the cap-hit PC is not necessarily a
+            // back-edge target. Polluting LoopsDetected with cap-hit offsets caused detectors
+            // to surface non-loop offsets as "loop sites".
+            state.Telemetry.VisitCapsHit.Add(state.Pc);
             state.Terminate(TerminalStatus.Stopped, "budget: visit cap at offset");
             return new[] { state };
         }
