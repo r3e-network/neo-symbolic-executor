@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Neo.SymbolicExecutor.Detectors;
 
@@ -11,46 +14,27 @@ namespace Neo.SymbolicExecutor.Detectors;
 /// Optional source-text hints for protocol detectors. NEF bytecode does not preserve local
 /// variable names or collection/member names, so callers can pass source files to let detectors
 /// recover method-local intent such as "reserve", "amountOutMin", or "owners[tokenId]".
+///
+/// As of v0.7.0 the extractor uses the Roslyn syntax tree (CSharpSyntaxTree.ParseText) rather
+/// than the previous regex-based scanner. The public API and matching semantics are unchanged.
+/// Benefits of the syntactic upgrade:
+///   - Correct brace / string / comment boundary detection for every C# syntax including
+///     raw strings, interpolated verbatim strings, and nested generic angle brackets.
+///   - [DisplayName] attribute aliasing reads from the attribute lists of the method symbol
+///     itself, so a type-level [DisplayName] never accidentally binds to the first method
+///     below it (the prior regex implementation depended on a textual "blocking declaration"
+///     check between attribute and method).
+///   - No regex / ReDoS surface; the parser is a deterministic recursive-descent.
+/// SemanticModel is intentionally NOT used — the lexical matching semantics is what detector
+/// callers want today, and skipping the semantic layer keeps the cost to syntax parsing only
+/// (no References resolution, no Workspaces dependency).
 /// </summary>
 public sealed class SourceHints
 {
-    private static readonly HashSet<string> ControlKeywords = new(StringComparer.Ordinal)
-    {
-        "if", "for", "foreach", "while", "switch", "catch", "using", "lock", "return", "new"
-    };
-
     private static readonly HashSet<string> IgnoredSourceDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
     };
-
-    // ReDoS guard. The patterns are linear in input size by construction (no nested
-    // quantifiers over overlapping alternatives), but defending against a future regex tweak
-    // costs nothing: a regex that takes longer than this on any plausible source input is
-    // already a bug. The fuzzer's per-iteration budget is 500ms, so this is well below that.
-    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
-
-    private static readonly Regex DisplayNameAttribute = new(
-        @"\[\s*(?:System\.ComponentModel\.)?DisplayName\s*\(\s*""(?<alias>[^""\r\n]+)""\s*\)\s*\]",
-        RegexOptions.Compiled,
-        RegexTimeout);
-
-    // Type-declaration keywords that disqualify an upstream [DisplayName] from binding to the
-    // next method — e.g. a class-level DisplayName must not alias the first method below it.
-    private static readonly Regex BlockingDeclaration = new(
-        @"\b(?:class|struct|interface|enum|namespace|record)\b",
-        RegexOptions.Compiled,
-        RegexTimeout);
-
-    // The parameter group forbids '(' and ')' so attribute applications like
-    // [DisplayName("transfer")] do not swallow the following method signature into one
-    // greedy match (which would record name="DisplayName" with the real signature as params).
-    // This is strict enough for Neo contract ABI shapes; default values with parenthesised
-    // expressions (e.g. casts) won't be matched, but those don't appear in DevPack contracts.
-    private static readonly Regex MethodDeclaration = new(
-        @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<parameters>[^;(){}]*)\)\s*\{",
-        RegexOptions.Compiled,
-        RegexTimeout);
 
     private sealed record MethodBody(int ParameterCount, string Body);
 
@@ -171,7 +155,7 @@ public sealed class SourceHints
 
             string searchableBody = includeStringLiterals
                 ? methodBody.Body
-                : MaskNonCodeText(methodBody.Body, maskStringAndCharLiterals: true);
+                : StripStringAndCharLiterals(methodBody.Body);
             string folded = Fold(searchableBody);
             if (foldedHints.Any(h => folded.Contains(h, StringComparison.Ordinal)))
                 return true;
@@ -182,66 +166,190 @@ public sealed class SourceHints
 
     private static Dictionary<string, IReadOnlyList<MethodBody>> ExtractMethodBodies(string text)
     {
-        string textWithoutComments = MaskNonCodeText(text, maskStringAndCharLiterals: false);
-        string structuralText = MaskNonCodeText(text, maskStringAndCharLiterals: true);
-
-        // [DisplayName("foo")] aliases a method's ABI name — Neo DevPack contracts use this
-        // when the C# identifier differs from the manifest entrypoint name. Without aliasing,
-        // SourceHints lookups by ABI name would miss the implementation body. We scan
-        // textWithoutComments so the literal alias survives (structuralText masks string
-        // literals away). Tracked in source order so the assignment loop below can advance an
-        // index pointer instead of re-scanning per method.
-        var displayNameAttrs = new List<(int End, string Alias)>();
-        foreach (Match dn in DisplayNameAttribute.Matches(textWithoutComments))
-            displayNameAttrs.Add((dn.Index + dn.Length, dn.Groups["alias"].Value));
-
         var methods = new Dictionary<string, List<MethodBody>>(StringComparer.OrdinalIgnoreCase);
-        int attrCursor = 0;
-        foreach (Match match in MethodDeclaration.Matches(structuralText))
+        if (string.IsNullOrEmpty(text))
+            return Empty(methods);
+
+        // Test inputs (and unusual user files) sometimes contain bare method declarations at
+        // file scope. C# does not allow top-level MethodDeclarationSyntax outside a type, so
+        // Roslyn parses such input either with diagnostics or as LocalFunctionStatementSyntax
+        // depending on shape. Wrapping in a synthetic class produces a single canonical AST
+        // shape (Type → Method) that the rest of the walker can rely on, and preserves
+        // source-offset semantics for the body-text substring lookup because the wrapper
+        // prefix has a fixed length.
+        var (wrappedText, offset) = WrapIfTopLevel(text);
+
+        // Parse with a permissive LangVersion so files using C# 12+ syntax (raw strings,
+        // primary constructors, collection expressions) are accepted. Diagnostic-free parse
+        // is not required — we only walk the tree's surface syntax.
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Latest);
+        var tree = CSharpSyntaxTree.ParseText(wrappedText, parseOptions);
+        var root = tree.GetRoot();
+
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
-            string name = match.Groups["name"].Value;
-            if (ControlKeywords.Contains(name)) continue;
+            string body = MethodBodyText(method, wrappedText);
+            int paramCount = method.ParameterList.Parameters.Count;
+            var record = new MethodBody(paramCount, body);
 
-            int openBrace = structuralText.IndexOf('{', match.Index + match.Length - 1);
-            if (openBrace < 0) continue;
-            int closeBrace = FindMatchingBrace(structuralText, openBrace);
-            if (closeBrace < 0) continue;
+            AddMethodBody(methods, method.Identifier.Text, record);
 
-            var body = new MethodBody(
-                CountParameters(match.Groups["parameters"].Value),
-                textWithoutComments.Substring(openBrace, closeBrace - openBrace + 1));
-            AddMethodBody(methods, name, body);
-
-            // Consume any DisplayName attributes that precede this method declaration. The
-            // cursor only moves forward, so each attribute binds to at most one method.
-            string? alias = null;
-            int aliasEnd = -1;
-            while (attrCursor < displayNameAttrs.Count
-                   && displayNameAttrs[attrCursor].End <= match.Index)
+            foreach (string alias in DisplayNameAliases(method))
             {
-                alias = displayNameAttrs[attrCursor].Alias;
-                aliasEnd = displayNameAttrs[attrCursor].End;
-                attrCursor++;
+                if (string.Equals(alias, method.Identifier.Text, StringComparison.Ordinal))
+                    continue;
+                AddMethodBody(methods, alias, record);
             }
-
-            // Reject the alias if a type declaration (class/struct/interface/etc.) sits
-            // between the attribute and the method — in that case the attribute targets the
-            // type, not this method. structuralText has comments and string literals masked
-            // so the keyword check is not fooled by them.
-            if (alias is not null
-                && BlockingDeclaration.Match(structuralText, aliasEnd, match.Index - aliasEnd).Success)
-            {
-                alias = null;
-            }
-
-            if (alias is not null && !string.Equals(alias, name, StringComparison.Ordinal))
-                AddMethodBody(methods, alias, body);
         }
 
-        return methods.ToDictionary(
+        // Also surface local functions (top-level methods in some test inputs parse as these).
+        foreach (var local in root.DescendantNodes().OfType<LocalFunctionStatementSyntax>())
+        {
+            string body = LocalFunctionBodyText(local, wrappedText);
+            int paramCount = local.ParameterList.Parameters.Count;
+            var record = new MethodBody(paramCount, body);
+            AddMethodBody(methods, local.Identifier.Text, record);
+        }
+
+        _ = offset; // placeholder for future relative-offset reporting; offsets are already
+                    // resolved against wrappedText, so no caller-visible offset adjustment.
+        return Empty(methods);
+    }
+
+    /// <summary>
+    /// If <paramref name="text"/> contains no top-level type or namespace, wrap it in a
+    /// synthetic class so Roslyn parses bare method declarations as
+    /// <see cref="MethodDeclarationSyntax"/>. Returns the (possibly-wrapped) text along with
+    /// the byte offset prepended (0 when no wrapping was needed).
+    /// </summary>
+    private static (string Text, int Offset) WrapIfTopLevel(string text)
+    {
+        // Cheap heuristic: if the text already declares a type or a namespace, leave it alone.
+        // Roslyn will parse those forms correctly. Otherwise wrap. The wrapper class name is
+        // deliberately uncommon so it never collides with detector hint terms.
+        if (ContainsTypeOrNamespaceKeyword(text)) return (text, 0);
+        string prefix = "class __SourceHintsWrapper { ";
+        string suffix = " }";
+        return (prefix + text + suffix, prefix.Length);
+    }
+
+    private static bool ContainsTypeOrNamespaceKeyword(string text)
+    {
+        // Reuse a tiny Roslyn pass: tokenize and look for keywords. This is exact (handles
+        // strings, comments, identifiers named "class") and cheap (tokenization is linear).
+        var tree = CSharpSyntaxTree.ParseText(text);
+        foreach (var token in tree.GetRoot().DescendantTokens())
+        {
+            if (token.IsKind(SyntaxKind.ClassKeyword)
+                || token.IsKind(SyntaxKind.StructKeyword)
+                || token.IsKind(SyntaxKind.InterfaceKeyword)
+                || token.IsKind(SyntaxKind.RecordKeyword)
+                || token.IsKind(SyntaxKind.EnumKeyword)
+                || token.IsKind(SyntaxKind.NamespaceKeyword))
+                return true;
+        }
+        return false;
+    }
+
+    private static string LocalFunctionBodyText(LocalFunctionStatementSyntax local, string source)
+    {
+        if (local.Body is { } block)
+            return MaskComments(source.Substring(block.FullSpan.Start, block.FullSpan.Length));
+        if (local.ExpressionBody is { } expr)
+            return MaskComments(source.Substring(expr.Expression.FullSpan.Start, expr.Expression.FullSpan.Length));
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Mask single-line and multi-line comments in <paramref name="text"/> by replacing each
+    /// comment character with a space (newlines preserved). Uses Roslyn's lexer to get exact
+    /// boundaries — single-line comment to EOL, multi-line comment to the matching `*/`.
+    /// </summary>
+    private static string MaskComments(string text)
+    {
+        var tree = CSharpSyntaxTree.ParseText(text);
+        var root = tree.GetRoot();
+        var commentSpans = new List<TextSpan>();
+        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+        {
+            if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+                || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
+                || trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                || trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                commentSpans.Add(trivia.Span);
+        }
+        if (commentSpans.Count == 0) return text;
+        return MaskSpans(text, commentSpans);
+    }
+
+    private static string MaskSpans(string text, List<TextSpan> spans)
+    {
+        var chars = text.ToCharArray();
+        foreach (var span in spans)
+        {
+            int start = Math.Max(0, span.Start);
+            int end = Math.Min(chars.Length, span.End);
+            for (int i = start; i < end; i++)
+                if (chars[i] is not '\r' and not '\n')
+                    chars[i] = ' ';
+        }
+        return new string(chars);
+    }
+
+    private static Dictionary<string, IReadOnlyList<MethodBody>> Empty(Dictionary<string, List<MethodBody>> methods) =>
+        methods.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<MethodBody>)kvp.Value,
             StringComparer.OrdinalIgnoreCase);
+
+    private static string MethodBodyText(MethodDeclarationSyntax method, string source)
+    {
+        // Prefer the block body when present; expression-bodied methods retain just the
+        // expression text (no surrounding braces). Comments are always masked at extraction
+        // time so MethodContainsAny does not match a hint word that only appears in a
+        // `// TODO` line — preserving the prior implementation's contract.
+        if (method.Body is { } block)
+            return MaskComments(source.Substring(block.FullSpan.Start, block.FullSpan.Length));
+        if (method.ExpressionBody is { } expr)
+            return MaskComments(source.Substring(expr.Expression.FullSpan.Start, expr.Expression.FullSpan.Length));
+        return string.Empty;
+    }
+
+    private static IEnumerable<string> DisplayNameAliases(MethodDeclarationSyntax method)
+    {
+        foreach (var list in method.AttributeLists)
+        {
+            // Attribute lists on a type/property/etc. parent don't reach this loop — Roslyn
+            // attaches each attribute list to its actual target, so a class-level
+            // [DisplayName] is on the class and never on its methods. This naturally fixes
+            // the prior regex implementation's "blocking declaration" bug class.
+            foreach (var attribute in list.Attributes)
+            {
+                if (!IsDisplayNameAttribute(attribute)) continue;
+                if (attribute.ArgumentList is null) continue;
+                var firstArg = attribute.ArgumentList.Arguments.FirstOrDefault();
+                if (firstArg?.Expression is LiteralExpressionSyntax { Token.Value: string alias }
+                    && !string.IsNullOrEmpty(alias))
+                {
+                    yield return alias;
+                }
+            }
+        }
+    }
+
+    private static bool IsDisplayNameAttribute(AttributeSyntax attribute)
+    {
+        // Honor both `[DisplayName(...)]` and the fully-qualified
+        // `[System.ComponentModel.DisplayName(...)]` form.
+        string name = attribute.Name switch
+        {
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
+            IdentifierNameSyntax ident => ident.Identifier.Text,
+            _ => attribute.Name.ToString(),
+        };
+        return string.Equals(name, "DisplayName", StringComparison.Ordinal)
+            || string.Equals(name, "DisplayNameAttribute", StringComparison.Ordinal);
     }
 
     private static void AddMethodBody(
@@ -257,233 +365,40 @@ public sealed class SourceHints
         bodies.Add(body);
     }
 
-    private static int CountParameters(string parameters)
+    /// <summary>
+    /// Strip string and char literal contents from <paramref name="body"/> for the
+    /// <c>includeStringLiterals=false</c> matching mode. Uses the syntax tree so all C# 12+
+    /// literal shapes (regular, verbatim, interpolated, raw single-line, raw multi-line) are
+    /// handled identically — including the run-counted closing-quote logic for raw strings
+    /// that previously had its own bespoke regex.
+    /// </summary>
+    private static string StripStringAndCharLiterals(string body)
     {
-        string trimmed = parameters.Trim();
-        if (trimmed.Length == 0) return 0;
-
-        // The MethodDeclaration regex forbids '(' and ')' in the captured parameter group, so
-        // only generic and array depth need to be tracked here to avoid splitting on commas
-        // inside Func<int, int> or int[,] declarations.
-        int count = 1;
-        int angleDepth = 0;
-        int bracketDepth = 0;
-        foreach (char c in trimmed)
+        var tree = CSharpSyntaxTree.ParseText(body);
+        var root = tree.GetRoot();
+        var spansToMask = new List<TextSpan>();
+        foreach (var node in root.DescendantNodes())
         {
-            switch (c)
+            switch (node)
             {
-                case '<':
-                    angleDepth++;
+                case LiteralExpressionSyntax lit when
+                    lit.Token.IsKind(SyntaxKind.StringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.MultiLineRawStringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.Utf8StringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.Utf8SingleLineRawStringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.Utf8MultiLineRawStringLiteralToken)
+                    || lit.Token.IsKind(SyntaxKind.CharacterLiteralToken):
+                    spansToMask.Add(lit.Span);
                     break;
-                case '>':
-                    if (angleDepth > 0) angleDepth--;
-                    break;
-                case '[':
-                    bracketDepth++;
-                    break;
-                case ']':
-                    if (bracketDepth > 0) bracketDepth--;
-                    break;
-                case ',' when angleDepth == 0 && bracketDepth == 0:
-                    count++;
+                case InterpolatedStringExpressionSyntax interp:
+                    foreach (var content in interp.Contents)
+                        if (content is InterpolatedStringTextSyntax txt)
+                            spansToMask.Add(txt.Span);
                     break;
             }
         }
-
-        return count;
-    }
-
-    private static string MaskNonCodeText(string text, bool maskStringAndCharLiterals)
-    {
-        char[] chars = text.ToCharArray();
-        int i = 0;
-        while (i < text.Length)
-        {
-            if (i + 1 < text.Length && text[i] == '/' && text[i + 1] == '/')
-            {
-                int end = i + 2;
-                while (end < text.Length && text[end] != '\r' && text[end] != '\n')
-                    end++;
-                MaskRange(chars, i, end);
-                i = end;
-                continue;
-            }
-
-            if (i + 1 < text.Length && text[i] == '/' && text[i + 1] == '*')
-            {
-                int end = i + 2;
-                while (end + 1 < text.Length && !(text[end] == '*' && text[end + 1] == '/'))
-                    end++;
-                end = Math.Min(end + 2, text.Length);
-                MaskRange(chars, i, end);
-                i = end;
-                continue;
-            }
-
-            if (TryGetStringStart(text, i, out int quoteIndex))
-            {
-                int end = FindStringEnd(text, quoteIndex);
-                if (maskStringAndCharLiterals)
-                    MaskRange(chars, i, end);
-                i = end;
-                continue;
-            }
-
-            if (text[i] == '\'')
-            {
-                int end = FindCharLiteralEnd(text, i);
-                if (maskStringAndCharLiterals)
-                    MaskRange(chars, i, end);
-                i = end;
-                continue;
-            }
-
-            i++;
-        }
-
-        return new string(chars);
-    }
-
-    private static bool TryGetStringStart(string text, int index, out int quoteIndex)
-    {
-        quoteIndex = index;
-        if (text[index] == '"')
-            return true;
-
-        if ((text[index] == '@' || text[index] == '$') && index + 1 < text.Length && text[index + 1] == '"')
-        {
-            quoteIndex = index + 1;
-            return true;
-        }
-
-        if ((text[index] == '@' || text[index] == '$')
-            && index + 2 < text.Length
-            && (text[index + 1] == '@' || text[index + 1] == '$')
-            && text[index + 1] != text[index]
-            && text[index + 2] == '"')
-        {
-            quoteIndex = index + 2;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static int FindStringEnd(string text, int quoteIndex)
-    {
-        int quoteRunLength = CountQuoteRun(text, quoteIndex);
-        if (quoteRunLength >= 3)
-            return FindRawStringEnd(text, quoteIndex, quoteRunLength);
-
-        bool verbatim = quoteIndex > 0 && text[quoteIndex - 1] == '@'
-            || quoteIndex > 1 && text[quoteIndex - 2] == '@';
-        if (verbatim)
-            return FindVerbatimStringEnd(text, quoteIndex);
-
-        return FindRegularStringEnd(text, quoteIndex);
-    }
-
-    private static int FindRegularStringEnd(string text, int quoteIndex)
-    {
-        bool escaped = false;
-        for (int i = quoteIndex + 1; i < text.Length; i++)
-        {
-            if (escaped)
-            {
-                escaped = false;
-                continue;
-            }
-
-            if (text[i] == '\\')
-            {
-                escaped = true;
-                continue;
-            }
-
-            if (text[i] == '"')
-                return i + 1;
-        }
-
-        return text.Length;
-    }
-
-    private static int FindVerbatimStringEnd(string text, int quoteIndex)
-    {
-        for (int i = quoteIndex + 1; i < text.Length; i++)
-        {
-            if (text[i] != '"') continue;
-            if (i + 1 < text.Length && text[i + 1] == '"')
-            {
-                i++;
-                continue;
-            }
-
-            return i + 1;
-        }
-
-        return text.Length;
-    }
-
-    private static int FindRawStringEnd(string text, int quoteIndex, int quoteRunLength)
-    {
-        string terminator = new('"', quoteRunLength);
-        int end = text.IndexOf(terminator, quoteIndex + quoteRunLength, StringComparison.Ordinal);
-        return end < 0 ? text.Length : end + quoteRunLength;
-    }
-
-    private static int CountQuoteRun(string text, int quoteIndex)
-    {
-        int count = 0;
-        while (quoteIndex + count < text.Length && text[quoteIndex + count] == '"')
-            count++;
-        return count;
-    }
-
-    private static int FindCharLiteralEnd(string text, int quoteIndex)
-    {
-        bool escaped = false;
-        for (int i = quoteIndex + 1; i < text.Length; i++)
-        {
-            if (escaped)
-            {
-                escaped = false;
-                continue;
-            }
-
-            if (text[i] == '\\')
-            {
-                escaped = true;
-                continue;
-            }
-
-            if (text[i] == '\'')
-                return i + 1;
-        }
-
-        return text.Length;
-    }
-
-    private static void MaskRange(char[] chars, int start, int end)
-    {
-        for (int i = start; i < end; i++)
-            if (chars[i] is not '\r' and not '\n')
-                chars[i] = ' ';
-    }
-
-    private static int FindMatchingBrace(string text, int openBrace)
-    {
-        int depth = 0;
-        for (int i = openBrace; i < text.Length; i++)
-        {
-            if (text[i] == '{') depth++;
-            else if (text[i] == '}')
-            {
-                depth--;
-                if (depth == 0) return i;
-            }
-        }
-
-        return -1;
+        return MaskSpans(body, spansToMask);
     }
 
     private static string Fold(string value)

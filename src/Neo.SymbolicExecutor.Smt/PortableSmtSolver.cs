@@ -110,22 +110,44 @@ internal sealed class PortableSmtSolver
                 : ConstraintStatus.Supported;
         }
 
+        /// <summary>
+        /// Apply a relational predicate to the solver state in three phases:
+        ///   1. Negate the op if the caller passed `negated`. Unknown ops escape as Unsupported.
+        ///   2. Affine path: if both sides parse as affine terms, take the difference and
+        ///      apply the relation via <see cref="ApplyAffineRelation"/>. This handles
+        ///      multi-symbol linear forms that the legacy linear path can't.
+        ///   3. Linear fallback: parse each side as a single-symbol <see cref="LinearTerm"/>.
+        ///      If the difference reduces (same symbol, possibly scaled), apply via
+        ///      <see cref="ApplyRelation"/>; otherwise try the symbol-equality path that
+        ///      handles `x == y + k` shapes.
+        /// Soundness invariant: each phase that returns a definite Supported/Contradiction
+        /// answer terminates dispatch; only Unsupported falls through to the next phase. The
+        /// final return is Unsupported (over-approximation) — never silent UNSAT.
+        /// </summary>
         private ConstraintStatus ApplyPredicate(BinaryExpr binary, bool negated)
         {
             var op = negated ? Negate(binary.Op) : binary.Op;
             if (op is null) return ConstraintStatus.Unsupported;
 
-            if (TryAffineTerm(binary.Left, out var affineLeft) &&
-                TryAffineTerm(binary.Right, out var affineRight) &&
-                affineLeft.TrySubtract(affineRight, out var affineRelation) &&
-                TryRelationOp(op, out var affineOp))
-            {
-                var affineStatus = ApplyAffineRelation(affineRelation, affineOp);
-                if (affineStatus != ConstraintStatus.Unsupported)
-                    return affineStatus;
-            }
+            var affineStatus = TryApplyAffinePath(binary, op);
+            if (affineStatus != ConstraintStatus.Unsupported)
+                return affineStatus;
 
-            if (!TryLinearTerm(binary.Left, out var left) || !TryLinearTerm(binary.Right, out var right))
+            return ApplyLinearPath(binary, op);
+        }
+
+        private ConstraintStatus TryApplyAffinePath(BinaryExpr binary, string op)
+        {
+            if (!TryAffineTerm(binary.Left, out var affineLeft)) return ConstraintStatus.Unsupported;
+            if (!TryAffineTerm(binary.Right, out var affineRight)) return ConstraintStatus.Unsupported;
+            if (!affineLeft.TrySubtract(affineRight, out var affineRelation)) return ConstraintStatus.Unsupported;
+            if (!TryRelationOp(op, out var affineOp)) return ConstraintStatus.Unsupported;
+            return ApplyAffineRelation(affineRelation, affineOp);
+        }
+
+        private ConstraintStatus ApplyLinearPath(BinaryExpr binary, string op)
+        {
+            if (!TryAsLinearTerm(binary.Left, out var left) || !TryAsLinearTerm(binary.Right, out var right))
                 return ConstraintStatus.Unsupported;
             if (!left.TrySubtract(right, out var relation))
             {
@@ -158,7 +180,7 @@ internal sealed class PortableSmtSolver
         public bool TryConcretize(Expression target, BigInteger? lo, BigInteger? hi, out BigInteger? value)
         {
             value = null;
-            if (!TryLinearTerm(target, out var term))
+            if (!TryAsLinearTerm(target, out var term))
                 return false;
 
             if (term.Symbol is null || term.Coefficient.IsZero)
@@ -551,54 +573,41 @@ internal sealed class PortableSmtSolver
             return truth ? ConstraintStatus.Supported : ConstraintStatus.Contradiction;
         }
 
-        private static bool TryLinearTerm(Expression expression, out LinearTerm term)
+        /// <summary>
+        /// Thin wrapper that parses <paramref name="expression"/> via the multi-symbol-aware
+        /// <see cref="TryAffineTerm"/> and collapses the result to a single-symbol
+        /// <see cref="LinearTerm"/> when possible. Returns false for any expression that the
+        /// affine parser rejects (sort mismatch, unsupported op, too many symbols) OR that
+        /// parses successfully but ends up with more than one symbol (out of LinearTerm's
+        /// representation).
+        ///
+        /// Replaces a near-duplicate of <see cref="TryAffineTerm"/>. Equivalent behavior
+        /// because the legacy TryLinearTerm's add/sub paths failed on any two-symbol sum
+        /// (different symbols → TryAdd false), exactly matching this wrapper's collapse-or-fail.
+        /// </summary>
+        private static bool TryAsLinearTerm(Expression expression, out LinearTerm term)
         {
-            if (Expr.ConcreteInt(expression) is { } concrete)
+            if (!TryAffineTerm(expression, out var affine))
             {
-                term = LinearTerm.ConstantTerm(concrete);
+                term = default;
+                return false;
+            }
+            return TryCollapseToLinear(affine, out term);
+        }
+
+        private static bool TryCollapseToLinear(AffineTerm affine, out LinearTerm term)
+        {
+            if (affine.Coefficients.Count == 0)
+            {
+                term = LinearTerm.ConstantTerm(affine.Constant);
                 return true;
             }
-
-            if (expression is Symbol { Sort: Sort.Int } symbol)
+            if (affine.Coefficients.Count == 1)
             {
-                term = LinearTerm.SymbolTerm(symbol.Name);
+                var (symbol, coefficient) = affine.Coefficients.First();
+                term = new LinearTerm(symbol, coefficient, affine.Constant);
                 return true;
             }
-
-            if (expression is UnaryExpr { Sort: Sort.Int, Op: "neg" } unary &&
-                TryLinearTerm(unary.Operand, out var operand))
-            {
-                term = operand.Negate();
-                return true;
-            }
-
-            if (expression is BinaryExpr { Sort: Sort.Int } binary)
-            {
-                if (binary.Op == "+" &&
-                    TryLinearTerm(binary.Left, out var left) &&
-                    TryLinearTerm(binary.Right, out var right) &&
-                    left.TryAdd(right, out term))
-                {
-                    return true;
-                }
-
-                if (binary.Op == "-" &&
-                    TryLinearTerm(binary.Left, out left) &&
-                    TryLinearTerm(binary.Right, out right) &&
-                    left.TryAdd(right.Negate(), out term))
-                {
-                    return true;
-                }
-
-                if (binary.Op == "*" &&
-                    TryLinearTerm(binary.Left, out left) &&
-                    TryLinearTerm(binary.Right, out right) &&
-                    left.TryMultiply(right, out term))
-                {
-                    return true;
-                }
-            }
-
             term = default;
             return false;
         }
@@ -886,35 +895,18 @@ internal sealed class PortableSmtSolver
         }
     }
 
+    // LinearTerm represents a single-symbol affine form `Coefficient * Symbol + Constant`
+    // (or a pure constant when Symbol is null). It is the simpler shape consumed by
+    // TryConcretize and ApplyLinearPath; the more general AffineTerm (multi-symbol) is the
+    // parser-side primitive. TryAsLinearTerm wraps TryAffineTerm + collapses.
     private readonly record struct LinearTerm(string? Symbol, BigInteger Coefficient, BigInteger Constant)
     {
         public static LinearTerm ConstantTerm(BigInteger value) => new(null, BigInteger.Zero, value);
-        public static LinearTerm SymbolTerm(string symbol) => new(symbol, BigInteger.One, BigInteger.Zero);
 
         public LinearTerm Negate() => new(Symbol, -Coefficient, -Constant);
 
         public bool TrySubtract(LinearTerm other, out LinearTerm result) =>
             TryAdd(other.Negate(), out result);
-
-        public LinearTerm Scale(BigInteger factor) => new(Symbol, Coefficient * factor, Constant * factor);
-
-        public bool TryMultiply(LinearTerm other, out LinearTerm result)
-        {
-            if (Symbol is null)
-            {
-                result = other.Scale(Constant);
-                return true;
-            }
-
-            if (other.Symbol is null)
-            {
-                result = Scale(other.Constant);
-                return true;
-            }
-
-            result = default;
-            return false;
-        }
 
         public bool TryAdd(LinearTerm other, out LinearTerm result)
         {

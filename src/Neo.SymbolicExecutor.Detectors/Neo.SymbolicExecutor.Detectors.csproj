@@ -13,4 +13,14 @@
     <ProjectReference Include="..\Neo.SymbolicExecutor\Neo.SymbolicExecutor.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Roslyn syntax-tree parser for SourceHints. We only use the syntax layer
+      (CSharpSyntaxTree.ParseText) — no SemanticModel, no Workspaces, no References.
+      Adds ~3 MiB to the package but eliminates regex-based brace/string/comment handling
+      and naturally handles C# 12 syntax (raw strings, interpolated verbatim, etc.).
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+  </ItemGroup>
+
 </Project>
