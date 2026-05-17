@@ -221,15 +221,14 @@ public class FuzzTests
                 arrays.Add(heap.NewArray(Enumerable.Range(0, rng.Next(0, 8)).Select(k => SymbolicValue.Int(k))));
             }
             var clone = heap.Clone();
-            // Mutate clone arrays.
+            // Mutate clone arrays via the CoW pathway (GetForWrite materializes a private copy
+            // for the writer; Get is read-only post-clone).
             foreach (var a in arrays)
             {
-                if (clone.Get(a.Id) is ArrayObject ca)
-                {
-                    int origLen = a.Items.Count;
-                    ca.Items.Add(SymbolicValue.Int(0xBEEF));
-                    a.Items.Count.Should().Be(origLen, $"iter {i} array {a.Id} should not have grown");
-                }
+                int origLen = a.Items.Count;
+                var ca = clone.GetForWrite<ArrayObject>(a.Id);
+                ca.Items.Add(SymbolicValue.Int(0xBEEF));
+                a.Items.Count.Should().Be(origLen, $"iter {i} array {a.Id} should not have grown");
             }
         }
     }

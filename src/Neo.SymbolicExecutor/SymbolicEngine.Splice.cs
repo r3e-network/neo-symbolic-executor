@@ -28,7 +28,9 @@ public sealed partial class SymbolicEngine
         var dstIdx = state.Pop();
         var dst = state.Pop();
 
-        if (dst.Expression is not HeapRef dstRef || state.Heap.Get(dstRef.ObjectId) is not BufferObject dstBuf)
+        if (dst.Expression is not HeapRef dstRef)
+            throw new VmFaultException("MEMCPY destination is not a Buffer");
+        if (state.Heap.GetForWrite(dstRef.ObjectId) is not BufferObject dstBuf)
             throw new VmFaultException("MEMCPY destination is not a Buffer");
 
         var srcBytes = ResolveSpliceSourceBytes(state, src);

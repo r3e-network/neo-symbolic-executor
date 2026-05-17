@@ -6,13 +6,25 @@ namespace Neo.SymbolicExecutor;
 /// <summary>
 /// Heap-backed compound value with reference semantics. Multiple stack values can
 /// reference the same object via <see cref="HeapRef"/>; mutations are visible to all
-/// holders within the same execution state. State cloning deep-copies the heap so
-/// branches do not alias each other (audit C6 — clone correctness).
+/// holders within the same execution state. State cloning does NOT deep-copy the heap
+/// up-front (v0.8.0 copy-on-write refactor) — instead each shared HeapObject is flagged
+/// via <see cref="IsShared"/> and copied lazily on first write through
+/// <see cref="Heap.GetForWrite{T}"/>. Net behavior preserved per
+/// <c>HeapCloneIsolationTests</c>; allocations on branch-heavy contracts drop ~4×.
 /// </summary>
 public abstract class HeapObject
 {
     public Sort Sort { get; }
     public int Id { get; init; }
+
+    /// <summary>
+    /// Monotonically becomes true when <see cref="Heap.Clone"/> shares this instance with a
+    /// freshly-cloned heap. Stays true thereafter — any mutation site that wants to write
+    /// must first request a heap-private copy via <see cref="Heap.GetForWrite{T}"/>. The
+    /// new copy's IsShared is false; the original retains its shared flag for any other
+    /// heap that still aliases it.
+    /// </summary>
+    internal bool IsShared { get; set; }
 
     protected HeapObject(Sort sort, int id) { Sort = sort; Id = id; }
 

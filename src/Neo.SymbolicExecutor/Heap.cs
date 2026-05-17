@@ -97,13 +97,47 @@ public sealed class Heap
             : throw new VmFaultException($"Heap object {id} is {obj.Sort}, not {typeof(T).Name}");
     }
 
+    /// <summary>
+    /// Fetch a heap object for mutation. If the object is currently shared with another heap
+    /// (via copy-on-write semantics — see <see cref="HeapObject.IsShared"/>), materialise a
+    /// private copy in this heap, mark it non-shared, replace this heap's dictionary entry,
+    /// and return the copy. Callers MUST use this method before any mutation of an existing
+    /// heap object; <see cref="Get(int)"/> / <see cref="Get{T}(int)"/> are read-only.
+    /// </summary>
+    public HeapObject GetForWrite(int id)
+    {
+        var obj = Get(id);
+        if (!obj.IsShared) return obj;
+        var copy = obj.Clone(id);
+        copy.IsShared = false;
+        _objects[id] = copy;
+        return copy;
+    }
+
+    /// <summary>
+    /// Typed convenience for <see cref="GetForWrite(int)"/>. Throws a VmFault if the object's
+    /// runtime sort differs from <typeparamref name="T"/>.
+    /// </summary>
+    public T GetForWrite<T>(int id) where T : HeapObject
+    {
+        var obj = GetForWrite(id);
+        return obj is T typed
+            ? typed
+            : throw new VmFaultException($"Heap object {id} is {obj.Sort}, not {typeof(T).Name}");
+    }
+
+    /// <summary>
+    /// Copy-on-write clone. Both heaps share every HeapObject reference, marked shared, until
+    /// the first <see cref="GetForWrite{T}"/> in either heap materialises a private copy of
+    /// that object. The dictionary itself is shallow-copied (each heap gets its own map, but
+    /// the values are shared references) so a new allocation on one heap does not leak into
+    /// the other. _nextId is forked at the clone point and advances independently per heap.
+    /// </summary>
     public Heap Clone()
     {
-        var copy = new Dictionary<int, HeapObject>(_objects.Count);
-        foreach (var (id, obj) in _objects)
-        {
-            copy[id] = obj.Clone(id);
-        }
+        foreach (var obj in _objects.Values)
+            obj.IsShared = true;
+        var copy = new Dictionary<int, HeapObject>(_objects);
         return new Heap(copy, _nextId, MaxObjects, MaxItemSize, MaxCollectionSize);
     }
 

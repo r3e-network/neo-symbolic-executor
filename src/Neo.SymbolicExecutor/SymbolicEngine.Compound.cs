@@ -409,7 +409,7 @@ public sealed partial class SymbolicEngine
                     var key = state.Pop();
                     var coll = state.Pop();
                     if (coll.Expression is not HeapRef href) throw new VmFaultException("SETITEM on non-collection");
-                    var obj = state.Heap.Get(href.ObjectId);
+                    var obj = state.Heap.GetForWrite(href.ObjectId);
                     SetItem(state, obj, key, value);
                     state.Pc = inst.EndOffset;
                     return Single(state);
@@ -419,7 +419,7 @@ public sealed partial class SymbolicEngine
                     var value = state.Pop();
                     var coll = state.Pop();
                     if (coll.Expression is not HeapRef href) throw new VmFaultException("APPEND on non-collection");
-                    var obj = state.Heap.Get(href.ObjectId);
+                    var obj = state.Heap.GetForWrite(href.ObjectId);
                     if (obj is ArrayObject a)
                     {
                         state.Heap.EnforceCollectionGrowth(a.Items.Count + 1);
@@ -439,7 +439,7 @@ public sealed partial class SymbolicEngine
                     var key = state.Pop();
                     var coll = state.Pop();
                     if (coll.Expression is not HeapRef href) throw new VmFaultException("REMOVE on non-collection");
-                    var obj = state.Heap.Get(href.ObjectId);
+                    var obj = state.Heap.GetForWrite(href.ObjectId);
                     RemoveItem(obj, key);
                     state.Pc = inst.EndOffset;
                     return Single(state);
@@ -536,7 +536,7 @@ public sealed partial class SymbolicEngine
     {
         var coll = state.Pop();
         if (coll.Expression is not HeapRef href) throw new VmFaultException("collection op on non-collection");
-        mutator(state.Heap.Get(href.ObjectId));
+        mutator(state.Heap.GetForWrite(href.ObjectId));
         state.Pc = inst.EndOffset;
         return Single(state);
     }
@@ -569,7 +569,7 @@ public sealed partial class SymbolicEngine
     {
         var coll = state.Pop();
         if (coll.Expression is not HeapRef href) throw new VmFaultException("POPITEM on non-collection");
-        var obj = state.Heap.Get(href.ObjectId);
+        var obj = state.Heap.GetForWrite(href.ObjectId);
         // Audit fix (iter-2 wakeup-4 differential): NeoVM accepts POPITEM on any CompoundType
         // (Array, Struct, Map). Our prior implementation rejected Struct; the differential
         // target found this within seconds.
