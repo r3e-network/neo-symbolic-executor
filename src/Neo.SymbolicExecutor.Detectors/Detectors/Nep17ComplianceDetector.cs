@@ -24,7 +24,7 @@ public sealed class Nep17ComplianceDetector : BaseDetector
     {
         var m = context.Manifest;
         if (m is null) yield break;
-        if (!m.SupportedStandards.Any(s => string.Equals(s, "NEP-17", System.StringComparison.OrdinalIgnoreCase))) yield break;
+        if (!m.DeclaresStandard("NEP-17")) yield break;
 
         foreach (var name in RequiredMethods)
         {

@@ -20,16 +20,10 @@ public sealed class UpgradeabilityDetector : BaseDetector
     private static readonly HashSet<string> SensitiveMethods =
         new(StringComparer.OrdinalIgnoreCase) { "update", "destroy" };
 
-    private static bool IsContractManagement(NativeContractRegistry natives, byte[] hash)
-    {
-        // Audit fix: only 20-byte values are valid Neo N3 contract hashes. A short or long byte
-        // string from a malformed PUSHDATA used to flow straight into the registry lookup, which
-        // returns null silently — masking misuse. Reject non-20 here so the detector neither
-        // misclassifies a 19-byte value as ContractManagement nor lookups a 21-byte one at all.
-        if (hash is null || hash.Length != 20) return false;
-        return natives.ByHash(System.Convert.ToHexString(hash).ToLowerInvariant())?.Name
-            .Equals("ContractManagement", StringComparison.OrdinalIgnoreCase) ?? false;
-    }
+    private static bool IsContractManagement(NativeContractRegistry natives, byte[] hash) =>
+        // Registry's ByHashBytes enforces the 20-byte width that rejects malformed PUSHDATAs
+        // (see audit comment on NativeContractRegistry.ByHashBytes).
+        natives.ByHashBytes(hash)?.Name.Equals("ContractManagement", StringComparison.OrdinalIgnoreCase) ?? false;
 
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {

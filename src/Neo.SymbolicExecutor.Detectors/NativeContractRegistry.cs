@@ -25,8 +25,30 @@ public sealed class NativeContractRegistry
     public NativeContract? ByHash(string hash) =>
         _byHash.TryGetValue(NormalizeHash(hash), out var c) ? c : null;
 
+    /// <summary>
+    /// Look up a native contract by its 20-byte little-endian hash. Returns null when the input
+    /// is null or not exactly 20 bytes — non-N3 hash widths cannot designate a real native
+    /// contract, and a silent prefix match would let the upgradeability detector misclassify a
+    /// short-PUSHDATA value as ContractManagement.
+    /// </summary>
+    public NativeContract? ByHashBytes(byte[]? hash) =>
+        hash is { Length: 20 } ? ByHash(System.Convert.ToHexString(hash)) : null;
+
     public NativeContract? ByName(string name) =>
         _byName.TryGetValue(name, out var c) ? c : null;
+
+    /// <summary>
+    /// True when <paramref name="call"/> targets a known native contract and invokes one of its
+    /// read-only methods. These calls cannot re-enter the caller's storage, so the access_control
+    /// and reentrancy detectors filter them out as benign. Conservative: when the target hash or
+    /// method name is symbolic / unresolved we return false.
+    /// </summary>
+    public bool IsBenignReadOnlyCall(ExternalCall call)
+    {
+        var native = ByHashBytes(call.TargetHash?.AsConcreteBytes());
+        return native is not null
+            && native.ReadOnlyMethods.Contains(call.Method, System.StringComparer.OrdinalIgnoreCase);
+    }
 
     public bool IsReadOnlyMethod(string contractHash, string method)
     {

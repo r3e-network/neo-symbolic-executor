@@ -421,9 +421,7 @@ public sealed partial class SymbolicEngine
                                                    Func<Expression, Expression> f, bool overflow)
     {
         var v = state.Pop();
-        Expression result;
-        try { result = f(v.Expression); }
-        catch (VmFaultException) { throw; }
+        var result = f(v.Expression);
         state.Push(SymbolicValue.Of(result, v.Taints));
         state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
             inst.Offset, opName, v, null,
@@ -440,11 +438,8 @@ public sealed partial class SymbolicEngine
     {
         var b = state.Pop();
         var a = state.Pop();
-        Expression result;
-        bool divisorMaybeZero = false;
-        try { result = f(a.Expression, b.Expression); }
-        catch (VmFaultException) { throw; }
-        if (divisorMatters && !b.IsConcrete) divisorMaybeZero = true;
+        var result = f(a.Expression, b.Expression);
+        bool divisorMaybeZero = divisorMatters && !b.IsConcrete;
         state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
         // Audit overflow.py finding: only flag overflow when neither operand is bounded.
         // For now, mark when either is symbolic; the SMT layer will tighten this later.
@@ -464,9 +459,7 @@ public sealed partial class SymbolicEngine
         var c = state.Pop();
         var b = state.Pop();
         var a = state.Pop();
-        Expression result;
-        try { result = f(a.Expression, b.Expression, c.Expression); }
-        catch (VmFaultException) { throw; }
+        var result = f(a.Expression, b.Expression, c.Expression);
         state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints).Union(c.Taints)));
         state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
             inst.Offset, opName, a, b,

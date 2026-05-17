@@ -149,8 +149,12 @@ internal static class Program
                 StepsExecuted: execResult.StepsExecuted,
                 BudgetExceeded: execResult.BudgetExceeded,
                 BudgetReason: execResult.BudgetReason,
-                SmtAvailable: smtBackend?.IsAvailable ?? false,
-                SmtEngaged: smtBackend?.IsAvailable ?? false)
+                // SmtAvailable reflects whether the high-precision external solver actually ran;
+                // SmtEngaged reflects whether the user asked for SMT. These differ when --smt
+                // is passed on a machine without z3 (engaged=true, available=false). Reporting
+                // both keeps CI consumers honest about which solver verdict they got.
+                SmtAvailable: smtBackend?.IsExternalSolver ?? false,
+                SmtEngaged: opts.UseSmt)
             {
                 SmtStats = smtBackend?.GetStats(),
             };

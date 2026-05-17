@@ -23,6 +23,15 @@ public interface ISmtBackend
     /// <summary>True iff the backend is functional and can answer solver queries.</summary>
     bool IsAvailable { get; }
 
+    /// <summary>
+    /// True iff the backend dispatches to an external high-precision solver (e.g. the
+    /// platform z3 binary). False iff only an in-process portable fallback is in use.
+    /// Surfaced in reports so CI consumers can detect when --smt silently degraded to the
+    /// conservative solver (which proves UNSAT for a strict subset of formulas).
+    /// Default returns <see cref="IsAvailable"/> to keep existing implementations source-compatible.
+    /// </summary>
+    bool IsExternalSolver => IsAvailable;
+
     string Version { get; }
 
     /// <summary>Per-query timeout in milliseconds.</summary>

@@ -91,6 +91,13 @@ public sealed class ContractManifest
     public ContractMethodDescriptor? FindMethodAtOffset(int offset) =>
         Abi.Methods.FirstOrDefault(m => m.Offset == offset);
 
+    /// <summary>
+    /// Case-insensitive membership test for a NEP standard tag (e.g. "NEP-17", "NEP-11"). Manifest
+    /// authors sometimes write "nep-17" / "Nep17"; honoring case keeps detectors deterministic.
+    /// </summary>
+    public bool DeclaresStandard(string standard) =>
+        SupportedStandards.Any(s => string.Equals(s, standard, StringComparison.OrdinalIgnoreCase));
+
     private static WildCard<string> ParseWildCardOfString(JsonNode? node)
     {
         if (node is null) return WildCard<string>.Empty;

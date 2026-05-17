@@ -30,8 +30,7 @@ public sealed class ReplayAttackDetector : BaseDetector
             if (state.Telemetry.SignatureChecks.Count == 0
                 && state.Telemetry.CallerHashChecks.Count == 0) continue;
 
-            bool hasSensitive = state.Telemetry.StorageOps.Any(o =>
-                o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete);
+            bool hasSensitive = state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite);
             if (!hasSensitive) continue;
 
             // Audit C# #9 fix: only count Storage.Get reads as nonce-presence signals. Writes
@@ -48,7 +47,7 @@ public sealed class ReplayAttackDetector : BaseDetector
             if (nonceLooking) continue;
 
             int firstSensitive = state.Telemetry.StorageOps
-                .Where(o => o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete)
+                .Where(ProtocolRiskHelpers.IsStateWrite)
                 .Min(o => o.Offset);
 
             yield return MakeFinding(

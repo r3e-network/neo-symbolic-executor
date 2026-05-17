@@ -37,8 +37,7 @@ public sealed class CallbackReentryDetector : BaseDetector
             foreach (var t in transfers)
             {
                 bool postWriteExists = state.Telemetry.StorageOps.Any(o =>
-                    (o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete)
-                    && o.Offset > t.Offset);
+                    ProtocolRiskHelpers.IsStateWrite(o) && o.Offset > t.Offset);
                 if (!postWriteExists) continue;
 
                 yield return MakeFinding(

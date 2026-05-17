@@ -21,7 +21,7 @@ public sealed class AdminCentralizationDetector : BaseDetector
             // Require at least one sensitive operation in this state.
             bool hasSensitive = false;
             foreach (var op in state.Telemetry.StorageOps)
-                if (op.Kind == StorageOpKind.Put || op.Kind == StorageOpKind.Delete)
+                if (ProtocolRiskHelpers.IsStateWrite(op))
                 { hasSensitive = true; break; }
             if (!hasSensitive)
                 foreach (var c in state.Telemetry.ExternalCalls)

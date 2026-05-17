@@ -30,9 +30,9 @@ public sealed partial class SymbolicEngine
                     state.Pc = inst.EndOffset; return Single(state);
                 }
             case NeoVm.OpCode.NEWARRAY:
-                return NewSized(state, inst, kind: "array");
+                return NewSized(state, inst, CompoundKind.Array);
             case NeoVm.OpCode.NEWSTRUCT:
-                return NewSized(state, inst, kind: "struct");
+                return NewSized(state, inst, CompoundKind.Struct);
             case NeoVm.OpCode.NEWARRAY_T:
                 {
                     // Audit fix (engine H5): NeoVM prefills cells with the type's default
@@ -134,23 +134,27 @@ public sealed partial class SymbolicEngine
         _ => SymbolicValue.Null(),
     };
 
-    private IEnumerable<ExecutionState> NewSized(ExecutionState state, Instruction inst, string kind)
+    private enum CompoundKind { Array, Struct }
+
+    private IEnumerable<ExecutionState> NewSized(ExecutionState state, Instruction inst, CompoundKind kind)
     {
         var n = state.Pop();
         var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, $"NEW{kind.ToUpper()} requires concrete size (no SMT model)"); return Single(state); }
+        string opName = inst.OpCode.ToString();
+        if (sz is null) { state.Terminate(TerminalStatus.Stopped, $"{opName} requires concrete size (no SMT model)"); return Single(state); }
         if (sz < 0 || sz > _options.MaxCollectionSize)
-            throw new VmFaultException($"NEW{kind.ToUpper()} size {sz} out of range");
+            throw new VmFaultException($"{opName} size {sz} out of range");
         var fill = Enumerable.Repeat(SymbolicValue.Null(), (int)sz.Value);
-        if (kind == "array")
+        switch (kind)
         {
-            var a = state.Heap.NewArray(fill);
-            state.Push(SymbolicValue.HeapRef(Sort.Array, a.Id));
-        }
-        else
-        {
-            var s = state.Heap.NewStruct(fill);
-            state.Push(SymbolicValue.HeapRef(Sort.Struct, s.Id));
+            case CompoundKind.Array:
+                var a = state.Heap.NewArray(fill);
+                state.Push(SymbolicValue.HeapRef(Sort.Array, a.Id));
+                break;
+            case CompoundKind.Struct:
+                var s = state.Heap.NewStruct(fill);
+                state.Push(SymbolicValue.HeapRef(Sort.Struct, s.Id));
+                break;
         }
         state.Pc = inst.EndOffset;
         return Single(state);
@@ -264,19 +268,14 @@ public sealed partial class SymbolicEngine
             return PrimitivePickItem(state, inst, coll, key, mode);
         }
         var obj = state.Heap.Get(href.ObjectId);
-        switch (obj)
+        return obj switch
         {
-            case ArrayObject a:
-                return ArrayLookup(state, inst, a, key, mode);
-            case StructObject s:
-                return ArrayLookup(state, inst, new ArrayWrapper(s.Fields), key, mode);
-            case MapObject m:
-                return MapLookup(state, inst, m, key, mode);
-            case BufferObject b:
-                return BufferLookup(state, inst, b, key, mode);
-            default:
-                throw new VmFaultException($"PICKITEM/HASKEY on {obj.Sort}");
-        }
+            ArrayObject a => IndexedLookup(state, inst, a.Items, "array", key, mode),
+            StructObject s => IndexedLookup(state, inst, s.Fields, "struct", key, mode),
+            MapObject m => MapLookup(state, inst, m, key, mode),
+            BufferObject b => BufferLookup(state, inst, b, key, mode),
+            _ => throw new VmFaultException($"PICKITEM/HASKEY on {obj.Sort}"),
+        };
     }
 
     private IEnumerable<ExecutionState> PrimitivePickItem(ExecutionState state, Instruction inst, SymbolicValue coll, SymbolicValue key, LookupMode mode)
@@ -285,7 +284,11 @@ public sealed partial class SymbolicEngine
         var idx = key.AsConcreteInt();
         if (bytes is null || idx is null)
         {
-            state.Push(SymbolicValue.Of(new BinaryExpr(Sort.Int, mode == LookupMode.Get ? "pick" : "haskey", coll.Expression, key.Expression)));
+            // HASKEY pushes a Boolean; PICKITEM on bytes pushes an Integer (the byte at index).
+            // Mismatching the sort here lets a downstream ISTYPE Boolean false-positive on a
+            // symbolic-key HASKEY result.
+            var (sort, op) = mode == LookupMode.Get ? (Sort.Int, "pick") : (Sort.Bool, "haskey");
+            state.Push(SymbolicValue.Of(new BinaryExpr(sort, op, coll.Expression, key.Expression)));
             state.Pc = inst.EndOffset;
             return Single(state);
         }
@@ -306,59 +309,37 @@ public sealed partial class SymbolicEngine
         return Single(state);
     }
 
-    private static IEnumerable<ExecutionState> ArrayLookup(ExecutionState state, Instruction inst, ArrayObject a, SymbolicValue key, LookupMode mode)
+    /// <summary>
+    /// Shared concrete-index lookup over a list-backed compound (Array.Items or Struct.Fields).
+    /// HASKEY pushes Bool(idx in range); PICKITEM pushes the element or throws a Catchable for
+    /// out-of-range — the exception will be routed through the active TRY frame, matching NeoVM.
+    /// Symbolic indices terminate the state cleanly (a sound under-approximation until the SMT
+    /// concretization plumbing extends to compound indexing).
+    /// </summary>
+    private static IEnumerable<ExecutionState> IndexedLookup(
+        ExecutionState state, Instruction inst,
+        IList<SymbolicValue> items, string kindLabel,
+        SymbolicValue key, LookupMode mode)
     {
         var idx = key.AsConcreteInt();
         if (idx is null)
         {
-            // Symbolic index over array — concretization deferred.
-            state.Terminate(TerminalStatus.Stopped, "Array PICKITEM/HASKEY with symbolic index not yet supported");
+            state.Terminate(TerminalStatus.Stopped, $"{kindLabel} PICKITEM/HASKEY with symbolic index not yet supported");
             return Single(state);
         }
         int i = (int)idx.Value;
         if (mode == LookupMode.HasKey)
         {
-            state.Push(SymbolicValue.Bool(i >= 0 && i < a.Items.Count));
+            state.Push(SymbolicValue.Bool(i >= 0 && i < items.Count));
         }
         else
         {
-            if (i < 0 || i >= a.Items.Count)
-                throw new CatchableVmException($"PICKITEM index {i} out of array range (size {a.Items.Count})");
-            state.Push(a.Items[i]);
+            if (i < 0 || i >= items.Count)
+                throw new CatchableVmException($"PICKITEM index {i} out of {kindLabel} range (size {items.Count})");
+            state.Push(items[i]);
         }
         state.Pc = inst.EndOffset;
         return Single(state);
-    }
-
-    /// <summary>Wrapper to share array-style indexing logic between Array and Struct.</summary>
-    private sealed class ArrayWrapper
-    {
-        private readonly List<SymbolicValue> _items;
-        public ArrayWrapper(List<SymbolicValue> items) { _items = items; }
-        public List<SymbolicValue> Items => _items;
-    }
-
-    private static IEnumerable<ExecutionState> ArrayLookup(ExecutionState state, Instruction inst, ArrayWrapper a, SymbolicValue key, LookupMode mode)
-    {
-        var idx = key.AsConcreteInt();
-        if (idx is null)
-        {
-            state.Terminate(TerminalStatus.Stopped, "Struct PICKITEM/HASKEY with symbolic index not yet supported");
-            return new[] { state };
-        }
-        int i = (int)idx.Value;
-        if (mode == LookupMode.HasKey)
-        {
-            state.Push(SymbolicValue.Bool(i >= 0 && i < a.Items.Count));
-        }
-        else
-        {
-            if (i < 0 || i >= a.Items.Count)
-                throw new CatchableVmException($"PICKITEM index {i} out of struct range (size {a.Items.Count})");
-            state.Push(a.Items[i]);
-        }
-        state.Pc = inst.EndOffset;
-        return new[] { state };
     }
 
     private static IEnumerable<ExecutionState> BufferLookup(ExecutionState state, Instruction inst, BufferObject b, SymbolicValue key, LookupMode mode)
@@ -367,7 +348,7 @@ public sealed partial class SymbolicEngine
         if (idx is null)
         {
             state.Terminate(TerminalStatus.Stopped, "Buffer PICKITEM with symbolic index not yet supported");
-            return new[] { state };
+            return Single(state);
         }
         int i = (int)idx.Value;
         if (mode == LookupMode.HasKey)
@@ -381,7 +362,7 @@ public sealed partial class SymbolicEngine
             state.Push(SymbolicValue.Of(b.Cells[i]));
         }
         state.Pc = inst.EndOffset;
-        return new[] { state };
+        return Single(state);
     }
 
     private static IEnumerable<ExecutionState> MapLookup(ExecutionState state, Instruction inst, MapObject m, SymbolicValue key, LookupMode mode)
@@ -401,11 +382,11 @@ public sealed partial class SymbolicEngine
                 state.Push(m.Entries[idx].Value);
             }
             state.Pc = inst.EndOffset;
-            return new[] { state };
+            return Single(state);
         }
         // Symbolic key — defer (full path explosion would otherwise occur). SMT layer pulls weight here.
         state.Terminate(TerminalStatus.Stopped, "Map PICKITEM/HASKEY with symbolic key not yet supported");
-        return new[] { state };
+        return Single(state);
     }
 
     private static int FindMapEntry(MapObject m, SymbolicValue key)

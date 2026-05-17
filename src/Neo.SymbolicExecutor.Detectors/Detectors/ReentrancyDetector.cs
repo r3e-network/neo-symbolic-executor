@@ -35,13 +35,13 @@ public sealed class ReentrancyDetector : BaseDetector
             var calls = state.Telemetry.ExternalCalls;
             if (calls.Count == 0) continue;
             var writes = state.Telemetry.StorageOps
-                .Where(o => o.Kind == StorageOpKind.Put || o.Kind == StorageOpKind.Delete)
+                .Where(ProtocolRiskHelpers.IsStateWrite)
                 .ToList();
             if (writes.Count == 0) continue;
 
             int lastWriteOffset = writes.Max(w => w.Offset);
             var preWriteCalls = calls
-                .Where(c => !IsBenignNativeCall(context, c))
+                .Where(c => !context.Natives.IsBenignReadOnlyCall(c))
                 .Where(c => c.Offset < lastWriteOffset)
                 .ToList();
             if (preWriteCalls.Count == 0) continue;
@@ -53,7 +53,7 @@ public sealed class ReentrancyDetector : BaseDetector
             if (preWriteCalls.Count > 1) amp++;
             if (preWriteCalls.Any(c => c.TargetHashDynamic)) amp++;
             if (preWriteCalls.Any(c => c.MethodDynamic)) amp++;
-            if (preWriteCalls.Any(c => c.CallFlagsDynamic || c.CallFlags == CallFlagsAll)) amp++;
+            if (preWriteCalls.Any(c => c.CallFlagsDynamic || c.CallFlags == CallFlags.All)) amp++;
             if (state.Telemetry.MaxCallStackDepth >= 8) amp++;
 
             // Severity policy.
@@ -85,18 +85,4 @@ public sealed class ReentrancyDetector : BaseDetector
         }
     }
 
-    private static bool IsBenignNativeCall(AnalysisContext context, ExternalCall call)
-    {
-        // If the target hash is concrete and matches a known native, and the method is concrete and
-        // appears in the read-only list, it can't re-enter. Otherwise treat as suspect.
-        var hash = call.TargetHash?.AsConcreteBytes();
-        if (hash is null) return false;
-        string hex = System.Convert.ToHexString(hash).ToLowerInvariant();
-        var native = context.Natives.ByHash(hex);
-        if (native is null) return false;
-        return native.ReadOnlyMethods.Contains(call.Method, System.StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <summary>CallFlags.All bitmask per Neo N3.</summary>
-    private const int CallFlagsAll = 0x0F;
 }

@@ -90,22 +90,12 @@ public sealed class AccessControlDetector : BaseDetector
     {
         var ops = new List<SensitiveOp>();
         foreach (var s in state.Telemetry.StorageOps)
-            if (s.Kind == StorageOpKind.Put || s.Kind == StorageOpKind.Delete)
+            if (ProtocolRiskHelpers.IsStateWrite(s))
                 ops.Add(new SensitiveOp(s.Offset, "storage-write"));
         foreach (var c in state.Telemetry.ExternalCalls)
-            if (!IsBenignNativeCall(context, c))
+            if (!context.Natives.IsBenignReadOnlyCall(c))
                 ops.Add(new SensitiveOp(c.Offset, "external-call"));
         return ops;
-    }
-
-    private static bool IsBenignNativeCall(AnalysisContext context, ExternalCall call)
-    {
-        var hash = call.TargetHash?.AsConcreteBytes();
-        if (hash is null) return false;
-        string hex = System.Convert.ToHexString(hash).ToLowerInvariant();
-        var native = context.Natives.ByHash(hex);
-        if (native is null) return false;
-        return native.ReadOnlyMethods.Contains(call.Method, System.StringComparer.OrdinalIgnoreCase);
     }
 
     private sealed record SensitiveOp(int Offset, string Kind);

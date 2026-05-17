@@ -41,6 +41,11 @@ public static class DefaultDetectorSet
         new PublicPrivilegedMethodDetector(),
         new DefiSlippageOracleDetector(),
         new NftOwnershipAuthorizationDetector(),
+        // Cross-cutting Neo VM / contract-runtime issue classes (audit Iter-3 coverage pass).
+        new EntryScriptAuthDetector(),
+        new UnsafeDeserializationDetector(),
+        new UnprotectedDeployDetector(),
+        new Nep17AmountValidationDetector(),
     };
 
     public static IReadOnlyList<IDetector> All() => _instances;

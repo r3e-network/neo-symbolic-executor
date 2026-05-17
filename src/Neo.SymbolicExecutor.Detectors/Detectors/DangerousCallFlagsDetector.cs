@@ -15,8 +15,6 @@ public sealed class DangerousCallFlagsDetector : BaseDetector
     public override Severity DefaultSeverity => Severity.Medium;
     public override double DefaultConfidence => 0.85;
 
-    public const int CallFlagsAll = 0x0F;
-
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {
         foreach (var state in context.States)
@@ -35,8 +33,7 @@ public sealed class DangerousCallFlagsDetector : BaseDetector
                         tags: new[] { "dynamic-call-flags" });
                     continue;
                 }
-                int bitCount = System.Numerics.BitOperations.PopCount((uint)(call.CallFlags & 0x0F));
-                if (call.CallFlags == CallFlagsAll)
+                if (call.CallFlags == CallFlags.All)
                 {
                     yield return MakeFinding(
                         title: "External call grants CallFlags.All",
@@ -47,8 +44,9 @@ public sealed class DangerousCallFlagsDetector : BaseDetector
                         state: state,
                         tags: new[] { "callflags-all" });
                 }
-                else if (bitCount >= 3)
+                else if (CallFlags.IsBroad(call.CallFlags))
                 {
+                    int bitCount = System.Numerics.BitOperations.PopCount((uint)(call.CallFlags & CallFlags.All));
                     yield return MakeFinding(
                         title: "External call grants over-broad call flags",
                         description: $"Contract.Call at 0x{call.Offset:X4} grants {bitCount} call-flag bits "

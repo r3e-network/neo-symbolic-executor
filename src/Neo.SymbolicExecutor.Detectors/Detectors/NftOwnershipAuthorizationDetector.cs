@@ -17,9 +17,7 @@ public sealed class NftOwnershipAuthorizationDetector : BaseDetector
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {
         if (context.Manifest is null) yield break;
-        bool declaresNep11 = context.Manifest.SupportedStandards
-            .Any(s => string.Equals(s, "NEP-11", System.StringComparison.OrdinalIgnoreCase));
-        if (!declaresNep11) yield break;
+        if (!context.Manifest.DeclaresStandard("NEP-11")) yield break;
 
         foreach (var state in context.States)
         {

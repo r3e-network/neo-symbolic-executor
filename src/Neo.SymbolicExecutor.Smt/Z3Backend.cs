@@ -40,6 +40,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
     private readonly Dictionary<string, SmtOutcome> _queryCache = new(StringComparer.Ordinal);
 
     public bool IsAvailable { get; }
+    public bool IsExternalSolver => _useExternalZ3;
     public string Version { get; }
     public int TimeoutMs => _timeoutMs;
     public int BytesBound => _bytesBound;

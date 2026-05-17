@@ -9,13 +9,13 @@ Neo DevPack submodule so contracts can run `neo-sym analyze` automatically after
 |---|---|
 | Engine + decoder + types | ~4,900 |
 | NEF + manifest parsers | ~400 |
-| 24 detectors + framework | ~3,000 |
+| 28 detectors + framework | ~3,300 |
 | Reports + gates + CLI | ~750 |
 | SMT-LIB layer | ~1,700 |
 | Fuzzer (23 targets, multi-worker) | ~3,600 |
-| **Total** | **~13,600** |
+| **Total** | **~13,900** |
 
-**Tests:** 266 xUnit cases passing (smoke + audit-regression + per-detector + parser
+**Tests:** 280 xUnit cases passing (smoke + audit-regression + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation regressions).
 
@@ -102,8 +102,9 @@ as an artifact key. Top-level shape:
     "steps_executed": 12340,
     "budget_exceeded": false,
     "budget_reason": null,
-    "smt_available": true,
-    "smt_engaged": true,
+    "smt_available": true,               // true iff the external high-precision solver (z3) ran;
+                                         // false when --smt fell back to the portable in-process solver
+    "smt_engaged": true,                 // true iff the user passed --smt
     "smt_stats": {                       // present iff --smt was passed
       "queries": 42, "cache_hits": 12,
       "sat": 18, "unsat": 8, "unknowns": 4, "timeouts": 0,
@@ -175,7 +176,7 @@ by `FuzzerRegressionTests`.
 
 ## Detectors
 
-24 detectors are wired in `DefaultDetectorSet`:
+28 detectors are wired in `DefaultDetectorSet`:
 
 - `reentrancy` — checks-effects-interactions with audit-driven amplification scoring
 - `access_control` — missing / unenforced / late authorization, with `manifest.safe` respect
@@ -200,6 +201,10 @@ by `FuzzerRegressionTests`.
 - `public_privileged_method` — manifest-exposed mint/burn/withdraw/upgrade-like entrypoints without early auth
 - `defi_slippage_oracle` — swap-like or reserve/vault-mutating token flows lacking min-out/slippage or oracle freshness signals
 - `nft_ownership_authorization` — NEP-11 ownership/approval or dynamic-key writes before owner/operator authorization
+- `entry_script_auth` — `Runtime.GetEntryScriptHash` used for authorization (Neo analogue of the Ethereum tx.origin bug)
+- `unsafe_deserialization` — `StdLib.deserialize` / `jsonDeserialize` on values derived from method arguments, storage, iterator yields, or prior external-call returns
+- `unprotected_deploy` — `_deploy(data, update)` does not branch on the `update` flag, so contract upgrades re-run initialization (admin reset, re-mint) — see audit Iter-3
+- `nep17_amount_validation` — NEP-17 `transfer` mutates state without first constraining the `amount` argument (negative-amount mint via balance debit/credit role flip)
 - `unknown_instructions` — coverage gap surface (INFO)
 
 With `--source <file-or-dir>`, protocol detectors use method-local C# source hints to recover
