@@ -168,7 +168,7 @@ public sealed class SourceHints
     {
         var methods = new Dictionary<string, List<MethodBody>>(StringComparer.OrdinalIgnoreCase);
         if (string.IsNullOrEmpty(text))
-            return Empty(methods);
+            return Materialize(methods);
 
         // Test inputs (and unusual user files) sometimes contain bare method declarations at
         // file scope. C# does not allow top-level MethodDeclarationSyntax outside a type, so
@@ -177,7 +177,7 @@ public sealed class SourceHints
         // shape (Type → Method) that the rest of the walker can rely on, and preserves
         // source-offset semantics for the body-text substring lookup because the wrapper
         // prefix has a fixed length.
-        var (wrappedText, offset) = WrapIfTopLevel(text);
+        string wrappedText = WrapIfTopLevel(text);
 
         // Parse with a permissive LangVersion so files using C# 12+ syntax (raw strings,
         // primary constructors, collection expressions) are accepted. Diagnostic-free parse
@@ -212,26 +212,21 @@ public sealed class SourceHints
             AddMethodBody(methods, local.Identifier.Text, record);
         }
 
-        _ = offset; // placeholder for future relative-offset reporting; offsets are already
-                    // resolved against wrappedText, so no caller-visible offset adjustment.
-        return Empty(methods);
+        return Materialize(methods);
     }
 
     /// <summary>
     /// If <paramref name="text"/> contains no top-level type or namespace, wrap it in a
     /// synthetic class so Roslyn parses bare method declarations as
-    /// <see cref="MethodDeclarationSyntax"/>. Returns the (possibly-wrapped) text along with
-    /// the byte offset prepended (0 when no wrapping was needed).
+    /// <see cref="MethodDeclarationSyntax"/>. Returns the (possibly-wrapped) text.
     /// </summary>
-    private static (string Text, int Offset) WrapIfTopLevel(string text)
+    private static string WrapIfTopLevel(string text)
     {
         // Cheap heuristic: if the text already declares a type or a namespace, leave it alone.
         // Roslyn will parse those forms correctly. Otherwise wrap. The wrapper class name is
         // deliberately uncommon so it never collides with detector hint terms.
-        if (ContainsTypeOrNamespaceKeyword(text)) return (text, 0);
-        string prefix = "class __SourceHintsWrapper { ";
-        string suffix = " }";
-        return (prefix + text + suffix, prefix.Length);
+        if (ContainsTypeOrNamespaceKeyword(text)) return text;
+        return "class __SourceHintsWrapper { " + text + " }";
     }
 
     private static bool ContainsTypeOrNamespaceKeyword(string text)
@@ -297,7 +292,7 @@ public sealed class SourceHints
         return new string(chars);
     }
 
-    private static Dictionary<string, IReadOnlyList<MethodBody>> Empty(Dictionary<string, List<MethodBody>> methods) =>
+    private static Dictionary<string, IReadOnlyList<MethodBody>> Materialize(Dictionary<string, List<MethodBody>> methods) =>
         methods.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<MethodBody>)kvp.Value,

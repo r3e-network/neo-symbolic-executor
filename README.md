@@ -34,7 +34,7 @@ neo-symbolic-executor/
 ├── NuGet.Config                — NuGet.org package source
 ├── src/
 │   ├── Neo.SymbolicExecutor/   — engine + decoder + IR + NEF/manifest parsers
-│   ├── Neo.SymbolicExecutor.Detectors/  — 24 detectors + reports + gates
+│   ├── Neo.SymbolicExecutor.Detectors/  — 33 detectors + reports + gates
 │   ├── Neo.SymbolicExecutor.Smt/        — SMT-LIB translator + Z3/portable backend
 │   └── Neo.SymbolicExecutor.Cli/        — `neo-sym` command-line tool
 ├── tests/Neo.SymbolicExecutor.Tests/    — xUnit + FluentAssertions
@@ -97,7 +97,7 @@ as an artifact key. Top-level shape:
 {
   "meta": {
     "tool": "Neo.SymbolicExecutor",
-    "version": "0.4.0",                  // assembly InformationalVersion (no commit suffix)
+    "version": "0.8.0",                  // assembly InformationalVersion (no commit suffix)
     "states_explored": 168,
     "steps_executed": 12340,
     "budget_exceeded": false,

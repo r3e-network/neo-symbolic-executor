@@ -38,10 +38,10 @@ public sealed class OracleResponseValidationDetector : BaseDetector
 
         foreach (var method in callbacks)
         {
-            string codeSym = ParameterSymbolName(method.Parameters, index: 2, defaultIfMissing: "arg2");
+            string codeSym = ProtocolRiskHelpers.MethodArgSymbolName(method, index: 2, defaultIfMissing: "arg2");
             foreach (var state in context.States)
             {
-                if (state.Path.Count == 0 || state.Path[0] != method.Offset) continue;
+                if (!ProtocolRiskHelpers.IsEntryStateFor(state, method)) continue;
                 if (!state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite)) continue;
 
                 bool codeGated = state.PathConditions
@@ -77,13 +77,4 @@ public sealed class OracleResponseValidationDetector : BaseDetector
         return n.Contains("oracle") && (n.Contains("response") || n.Contains("callback"));
     }
 
-    private static string ParameterSymbolName(
-        IReadOnlyList<Nef.ContractParameterDefinition> parameters,
-        int index,
-        string defaultIfMissing)
-    {
-        if (index < 0 || index >= parameters.Count) return defaultIfMissing;
-        var p = parameters[index];
-        return string.IsNullOrEmpty(p.Name) ? $"arg{index}" : $"arg_{p.Name}";
-    }
 }

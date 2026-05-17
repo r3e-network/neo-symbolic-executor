@@ -14,12 +14,10 @@ public sealed class NativeContractRegistry
     public static NativeContractRegistry Default { get; } = BuildDefault();
 
     private readonly Dictionary<string, NativeContract> _byHash;
-    private readonly Dictionary<string, NativeContract> _byName;
 
     public NativeContractRegistry(IEnumerable<NativeContract> contracts)
     {
         _byHash = contracts.ToDictionary(c => c.Hash, System.StringComparer.OrdinalIgnoreCase);
-        _byName = _byHash.Values.ToDictionary(c => c.Name, System.StringComparer.OrdinalIgnoreCase);
     }
 
     public NativeContract? ByHash(string hash) =>
@@ -34,9 +32,6 @@ public sealed class NativeContractRegistry
     public NativeContract? ByHashBytes(byte[]? hash) =>
         hash is { Length: 20 } ? ByHash(System.Convert.ToHexString(hash)) : null;
 
-    public NativeContract? ByName(string name) =>
-        _byName.TryGetValue(name, out var c) ? c : null;
-
     /// <summary>
     /// True when <paramref name="call"/> targets a known native contract and invokes one of its
     /// read-only methods. These calls cannot re-enter the caller's storage, so the access_control
@@ -48,20 +43,6 @@ public sealed class NativeContractRegistry
         var native = ByHashBytes(call.TargetHash?.AsConcreteBytes());
         return native is not null
             && native.ReadOnlyMethods.Contains(call.Method, System.StringComparer.OrdinalIgnoreCase);
-    }
-
-    public bool IsReadOnlyMethod(string contractHash, string method)
-    {
-        var c = ByHash(contractHash);
-        if (c is null) return false;
-        return c.ReadOnlyMethods.Contains(method, System.StringComparer.OrdinalIgnoreCase);
-    }
-
-    public bool IsSensitiveMethod(string contractHash, string method)
-    {
-        var c = ByHash(contractHash);
-        if (c is null) return false;
-        return c.SensitiveMethods.Contains(method, System.StringComparer.OrdinalIgnoreCase);
     }
 
     private static string NormalizeHash(string hash)

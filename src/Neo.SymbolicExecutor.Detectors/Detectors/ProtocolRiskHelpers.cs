@@ -86,6 +86,34 @@ internal static class ProtocolRiskHelpers
         || state.Telemetry.SignatureChecks.Any(o => o < offset);
 
     /// <summary>
+    /// Resolve the symbol name the engine seeded for argument <paramref name="index"/> of
+    /// <paramref name="method"/>. Mirrors <see cref="SymbolicEngine.MethodEntryArgSymbolName"/>
+    /// so a manifest-named parameter becomes <c>arg_&lt;name&gt;</c>; positional becomes
+    /// <c>arg&lt;i&gt;</c>; missing parameter at that index falls back to
+    /// <paramref name="defaultIfMissing"/>. Used by detectors that scan a state's
+    /// PathConditions for branches on a specific argument (amount validation, deploy update
+    /// flag, oracle response code, etc.).
+    /// </summary>
+    public static string MethodArgSymbolName(
+        Nef.ContractMethodDescriptor method,
+        int index,
+        string defaultIfMissing)
+    {
+        if (index < 0 || index >= method.Parameters.Count) return defaultIfMissing;
+        var p = method.Parameters[index];
+        return SymbolicEngine.MethodEntryArgSymbolName(p.Name, index);
+    }
+
+    /// <summary>
+    /// True iff <paramref name="state"/> is a per-method analysis entry state for
+    /// <paramref name="method"/> — i.e. <c>state.Path[0]</c> is the method's offset. Detectors
+    /// that only fire on per-method-seeded explorations use this guard to skip states that
+    /// reached the method via an internal CALL.
+    /// </summary>
+    public static bool IsEntryStateFor(ExecutionState state, Nef.ContractMethodDescriptor method) =>
+        state.Path.Count > 0 && state.Path[0] == method.Offset;
+
+    /// <summary>
     /// True iff the state has any enforced authorization signal on this path: a witness check
     /// whose result gates the path (<see cref="Telemetry.WitnessChecksEnforced"/>), a caller-hash
     /// check (<see cref="Telemetry.CallerHashChecks"/>), or a signature verification

@@ -171,12 +171,20 @@ public sealed partial class SymbolicEngine
             for (int i = pars.Count - 1; i >= 0; i--)
             {
                 var p = pars[i];
-                string symbolName = string.IsNullOrEmpty(p.Name) ? $"arg{i}" : $"arg_{p.Name}";
-                state.Push(SymbolicValue.Symbol(SortForParameterType(p.Type), symbolName));
+                state.Push(SymbolicValue.Symbol(SortForParameterType(p.Type), MethodEntryArgSymbolName(p.Name, i)));
             }
         }
         return state;
     }
+
+    /// <summary>
+    /// Canonical symbol-name shape for a method-entry argument: <c>arg_&lt;name&gt;</c> when the
+    /// manifest declares a parameter name, <c>arg&lt;i&gt;</c> otherwise. Detectors reading
+    /// path-condition free symbols must use this exact shape to match the engine — see
+    /// <c>ProtocolRiskHelpers.MethodArgSymbolName</c>.
+    /// </summary>
+    public static string MethodEntryArgSymbolName(string? declaredName, int positionalIndex) =>
+        string.IsNullOrEmpty(declaredName) ? $"arg{positionalIndex}" : $"arg_{declaredName}";
 
     // Audit fix (iter-2 wakeup-2 memory bomb): construct the Heap with the engine's budgets
     // rather than letting it default to 1 MiB × 4096 objects. Without this plumbing a single

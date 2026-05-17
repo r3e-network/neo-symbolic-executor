@@ -32,11 +32,11 @@ public sealed class UnprotectedDeployDetector : BaseDetector
 
         // Identify the symbol name used for the `update` (second) parameter. NEP-compliant
         // _deploy(data, update) has update at index 1.
-        string updateSym = ParameterSymbolName(deploy.Parameters, index: 1, defaultIfMissing: "arg1");
+        string updateSym = ProtocolRiskHelpers.MethodArgSymbolName(deploy, index: 1, defaultIfMissing: "arg1");
 
         foreach (var state in context.States)
         {
-            if (state.Path.Count == 0 || state.Path[0] != deploy.Offset) continue;
+            if (!ProtocolRiskHelpers.IsEntryStateFor(state, deploy)) continue;
             // Empty path-conditions means no branching ever occurred — the state walked _deploy
             // straight through, never gating on `update`.
             bool sawUpdateInBranch = state.PathConditions
@@ -64,13 +64,4 @@ public sealed class UnprotectedDeployDetector : BaseDetector
         }
     }
 
-    private static string ParameterSymbolName(
-        IReadOnlyList<Nef.ContractParameterDefinition> parameters,
-        int index,
-        string defaultIfMissing)
-    {
-        if (index < 0 || index >= parameters.Count) return defaultIfMissing;
-        var p = parameters[index];
-        return string.IsNullOrEmpty(p.Name) ? $"arg{index}" : $"arg_{p.Name}";
-    }
 }

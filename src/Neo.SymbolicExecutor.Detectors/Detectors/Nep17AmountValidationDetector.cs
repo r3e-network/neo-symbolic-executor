@@ -30,11 +30,11 @@ public sealed class Nep17AmountValidationDetector : BaseDetector
         if (transfer is null) yield break;
         // Spec layout: (from: Hash160, to: Hash160, amount: Integer, data: Any). Index 2 is the
         // amount; honour the manifest-declared parameter name if present.
-        string amountSym = ParameterSymbolName(transfer.Parameters, index: 2, defaultIfMissing: "arg2");
+        string amountSym = ProtocolRiskHelpers.MethodArgSymbolName(transfer, index: 2, defaultIfMissing: "arg2");
 
         foreach (var state in context.States)
         {
-            if (state.Path.Count == 0 || state.Path[0] != transfer.Offset) continue;
+            if (!ProtocolRiskHelpers.IsEntryStateFor(state, transfer)) continue;
             // No state-mutating storage write on this path => nothing to drain. Pure-revert
             // paths (e.g. the amount==0 early-return) need not be flagged.
             if (!state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite)) continue;
@@ -61,13 +61,4 @@ public sealed class Nep17AmountValidationDetector : BaseDetector
         }
     }
 
-    private static string ParameterSymbolName(
-        IReadOnlyList<Nef.ContractParameterDefinition> parameters,
-        int index,
-        string defaultIfMissing)
-    {
-        if (index < 0 || index >= parameters.Count) return defaultIfMissing;
-        var p = parameters[index];
-        return string.IsNullOrEmpty(p.Name) ? $"arg{index}" : $"arg_{p.Name}";
-    }
 }

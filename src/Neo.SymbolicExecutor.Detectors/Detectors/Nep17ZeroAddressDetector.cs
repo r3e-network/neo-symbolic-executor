@@ -33,12 +33,12 @@ public sealed class Nep17ZeroAddressDetector : BaseDetector
         var transfer = context.Manifest.FindMethod("transfer");
         if (transfer is null) yield break;
 
-        string fromSym = ParameterSymbolName(transfer.Parameters, index: 0, defaultIfMissing: "arg0");
-        string toSym = ParameterSymbolName(transfer.Parameters, index: 1, defaultIfMissing: "arg1");
+        string fromSym = ProtocolRiskHelpers.MethodArgSymbolName(transfer, index: 0, defaultIfMissing: "arg0");
+        string toSym = ProtocolRiskHelpers.MethodArgSymbolName(transfer, index: 1, defaultIfMissing: "arg1");
 
         foreach (var state in context.States)
         {
-            if (state.Path.Count == 0 || state.Path[0] != transfer.Offset) continue;
+            if (!ProtocolRiskHelpers.IsEntryStateFor(state, transfer)) continue;
             if (!state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite)) continue;
 
             var pathSymbols = new HashSet<string>(
@@ -68,13 +68,4 @@ public sealed class Nep17ZeroAddressDetector : BaseDetector
         }
     }
 
-    private static string ParameterSymbolName(
-        IReadOnlyList<Nef.ContractParameterDefinition> parameters,
-        int index,
-        string defaultIfMissing)
-    {
-        if (index < 0 || index >= parameters.Count) return defaultIfMissing;
-        var p = parameters[index];
-        return string.IsNullOrEmpty(p.Name) ? $"arg{index}" : $"arg_{p.Name}";
-    }
 }

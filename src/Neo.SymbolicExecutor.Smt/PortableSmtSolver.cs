@@ -73,8 +73,6 @@ internal sealed class PortableSmtSolver
         private readonly List<SymbolEquality> _equalities = new();
         private readonly List<AffineTerm> _affineEqualities = new();
 
-        public IReadOnlyDictionary<string, IntDomain> IntDomains => _ints;
-
         public IntDomain GetIntDomain(string name)
         {
             if (!_ints.TryGetValue(name, out var domain))
