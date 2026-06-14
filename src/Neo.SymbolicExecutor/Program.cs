@@ -17,8 +17,8 @@ public sealed class NeoProgram
 
     /// <summary>
     /// Method tokens declared in the source NEF for CALLT dispatch. May be null when the
-    /// program was decoded from raw bytes only — in that case the engine treats CALLT
-    /// metadata as fully dynamic (audit M1).
+    /// program was decoded from raw bytes only; in that case CALLT paths stop as incomplete
+    /// because their stack effect cannot be proven without MethodToken metadata.
     /// </summary>
     public ImmutableArray<Nef.MethodToken> Tokens { get; }
 
@@ -39,6 +39,8 @@ public sealed class NeoProgram
 
     public Instruction? AtOffset(int offset) =>
         OffsetToIndex.TryGetValue(offset, out int idx) ? Instructions[idx] : null;
+
+    public bool IsDecodedInstructionBoundary(int offset) => AtOffset(offset) is not null;
 
     /// <summary>
     /// Look up an instruction at <paramref name="offset"/>; if the linear-scan index has no
@@ -61,6 +63,8 @@ public sealed class NeoProgram
 
 public static class ScriptDecoder
 {
+    public const int MaxRawScriptSize = Nef.NefFile.MaxScriptSize;
+
     /// <summary>
     /// Decode a raw NeoVM script into instructions. Resolves branch targets from signed offsets
     /// per the canonical operand-size table. Variable-length operands (PUSHDATA*) read their
@@ -68,6 +72,9 @@ public static class ScriptDecoder
     /// </summary>
     public static NeoProgram Decode(byte[] script)
     {
+        if (script.Length > MaxRawScriptSize)
+            throw new VmFaultException($"Raw script size {script.Length} exceeds max {MaxRawScriptSize}");
+
         var instructions = ImmutableArray.CreateBuilder<Instruction>();
         var offsetIndex = ImmutableDictionary.CreateBuilder<int, int>();
 
@@ -84,7 +91,7 @@ public static class ScriptDecoder
             int prefixSize = OpCodeInfo.OperandPrefixSize(op);
             if (prefixSize > 0)
             {
-                if (pos + prefixSize > script.Length)
+                if (prefixSize > script.Length - pos)
                     throw new VmFaultException($"Truncated size prefix for {op} at offset {offset}");
                 long size = ReadUnsigned(script.AsSpan(pos, prefixSize));
                 pos += prefixSize;
@@ -97,7 +104,7 @@ public static class ScriptDecoder
                 operandSize = OpCodeInfo.FixedOperandSize(op);
             }
 
-            if (operandSize < 0 || pos + operandSize > script.Length)
+            if (operandSize < 0 || operandSize > script.Length - pos)
                 throw new VmFaultException($"Truncated operand for {op} at offset {offset}");
 
             var operandBytes = new ReadOnlyMemory<byte>(script, pos, operandSize);
@@ -150,6 +157,7 @@ public static class ScriptDecoder
     {
         var span = script.Span;
         if (offset < 0 || offset >= span.Length) return null;
+        if (span.Length > MaxRawScriptSize) return null;
         int pos = offset;
         byte b = span[pos++];
         if (!OpCodeInfo.IsDefined(b)) return null;
@@ -159,7 +167,7 @@ public static class ScriptDecoder
         int prefixSize = OpCodeInfo.OperandPrefixSize(op);
         if (prefixSize > 0)
         {
-            if (pos + prefixSize > span.Length) return null;
+            if (prefixSize > span.Length - pos) return null;
             long size = ReadUnsigned(span.Slice(pos, prefixSize));
             pos += prefixSize;
             if (size < 0 || size > int.MaxValue) return null;
@@ -169,7 +177,7 @@ public static class ScriptDecoder
         {
             operandSize = OpCodeInfo.FixedOperandSize(op);
         }
-        if (operandSize < 0 || pos + operandSize > span.Length) return null;
+        if (operandSize < 0 || operandSize > span.Length - pos) return null;
 
         var operandMem = script.Slice(pos, operandSize);
         pos += operandSize;

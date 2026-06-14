@@ -28,6 +28,8 @@ public sealed class CallbackReentryDetector : BaseDetector
             // Dynamic-target transfers are flagged separately by DynamicCallTargetDetector.
             var transfers = state.Telemetry.ExternalCalls
                 .Where(c =>
+                    !c.ModeledSelfCall
+                    &&
                     string.Equals(c.Method, "transfer", System.StringComparison.OrdinalIgnoreCase)
                     && c.TargetHash?.AsConcreteBytes() is byte[] hb
                     && hb.Length == 20)

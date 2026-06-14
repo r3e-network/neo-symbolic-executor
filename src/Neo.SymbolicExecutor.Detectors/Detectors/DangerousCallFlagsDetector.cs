@@ -21,6 +21,7 @@ public sealed class DangerousCallFlagsDetector : BaseDetector
         {
             foreach (var call in state.Telemetry.ExternalCalls)
             {
+                if (call.ModeledSelfCall) continue;
                 if (call.CallFlagsDynamic)
                 {
                     yield return MakeFinding(

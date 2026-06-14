@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Neo.SymbolicExecutor.Nef;
 using Neo.SymbolicExecutor.Fuzzer.Targets;
 
 namespace Neo.SymbolicExecutor.Fuzzer;
@@ -19,6 +20,9 @@ namespace Neo.SymbolicExecutor.Fuzzer;
 /// </summary>
 internal static class Program
 {
+    private const int MaxWorkers = 256;
+    private const int MaxReproduceInputBytes = NefFile.MaxScriptSize;
+
     public static async Task<int> Main(string[] args)
     {
         if (args.Length > 0 && args[0] is "-h" or "--help")
@@ -109,16 +113,22 @@ internal static class Program
             return 2;
         }
         var target = opts.Targets[0];
-        byte[] input = File.ReadAllBytes(opts.Reproduce!);
-        Console.WriteLine($"Reproducing on target '{target.Name}' with {input.Length} bytes...");
-        await Task.Yield();
-
         if (!target.SupportsDirectReplay)
         {
             Console.Error.WriteLine($"Target '{target.Name}' does not support direct-input replay.");
             Console.Error.WriteLine($"Try: --target {DirectReplayTargetsText()} — or use --seed instead.");
             return 2;
         }
+        var inputInfo = new FileInfo(opts.Reproduce!);
+        if (inputInfo.Length > MaxReproduceInputBytes)
+        {
+            Console.Error.WriteLine(
+                $"--reproduce input is {inputInfo.Length} bytes, exceeds max {MaxReproduceInputBytes} bytes.");
+            return 2;
+        }
+        byte[] input = File.ReadAllBytes(opts.Reproduce!);
+        Console.WriteLine($"Reproducing on target '{target.Name}' with {input.Length} bytes...");
+        await Task.Yield();
 
         try
         {
@@ -204,7 +214,7 @@ internal static class Program
                     forever = true;
                     break;
                 case "--workers":
-                    workers = ParsePositiveInt(a, Next());
+                    workers = ParseBoundedPositiveInt(a, Next(), MaxWorkers);
                     break;
                 case "--seed":
                     startSeed = ParseInt(a, Next());
@@ -257,6 +267,17 @@ internal static class Program
             MaxMemoryMb = maxMemoryMb,
             Reproduce = reproduce,
         };
+    }
+
+    private static int ParseBoundedPositiveInt(string label, string value, int max)
+    {
+        if (!int.TryParse(value, out int parsed))
+            throw new ArgumentException($"{label}: expected int32, got '{value}'");
+        if (parsed <= 0)
+            throw new ArgumentException($"{label}: expected positive int32, got '{value}'");
+        if (parsed > max)
+            throw new ArgumentException($"{label}: {parsed} exceeds max {max}");
+        return parsed;
     }
 
     private static void PrintHelp()

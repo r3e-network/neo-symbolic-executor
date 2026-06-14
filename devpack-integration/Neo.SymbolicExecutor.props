@@ -2,13 +2,28 @@
   <!--
     Neo.SymbolicExecutor MSBuild integration for Neo DevPack contracts.
 
-    To opt in, add this file as <Import> in your contract's csproj OR
-    drop it into the same directory as a Directory.Build.props sibling.
+    To opt in, add this file as an explicit <Import> in your contract's csproj,
+    or import it from a Directory.Build.props file that MSBuild already loads.
 
     Behavior:
-      - After the contract project builds, runs `neo-sym analyze <output.nef> ...`
+      - After the contract project builds, runs analysis and the default
+        neo-n3-security proof gate.
       - Honors gate flags (NeoSymFailOn*) to break the build on policy violations.
       - Disable with <NeoSymEnabled>false</NeoSymEnabled>.
+      - Disable only the proof gate with <NeoSymVerifyEnabled>false</NeoSymVerifyEnabled>.
+
+    SMT and proof grading (review fix #22/#42):
+      - By default NeoSymUseSmt is false, so the gate uses no SMT solver. Enabling SMT
+        (NeoSymUseSmt=true) without the z3 binary on PATH (or NEO_SYMBOLIC_EXECUTOR_Z3) silently
+        falls back to the in-process portable solver. The portable solver is SOUND (it only proves
+        UNSAT on a genuinely-implied contradiction and otherwise returns Unknown, which downgrades
+        the verdict), so a portable "proved" verdict is not unsound — but it is strictly less
+        complete than z3 and the exit code does not distinguish the two.
+      - For PROOF-GRADE CI gates, install z3 and set
+        <NeoSymVerifyRequireExternalSmt>true</NeoSymVerifyRequireExternalSmt> so the gate fails
+        closed (rather than degrading silently) when the external solver is unavailable. The
+        emitted JSON report always records smt_available / smt_solver_version so consumers can tell
+        which solver backed each proof.
   -->
 
   <PropertyGroup>
@@ -16,7 +31,24 @@
     <NeoSymToolPath Condition="'$(NeoSymToolPath)' == ''">neo-sym</NeoSymToolPath>
     <NeoSymFormat Condition="'$(NeoSymFormat)' == ''">markdown</NeoSymFormat>
     <NeoSymFailOnMaxSeverity Condition="'$(NeoSymFailOnMaxSeverity)' == ''">high</NeoSymFailOnMaxSeverity>
+    <NeoSymFailOnIncompleteCoverage Condition="'$(NeoSymFailOnIncompleteCoverage)' == ''">true</NeoSymFailOnIncompleteCoverage>
+    <NeoSymFailOnBudgetExceeded Condition="'$(NeoSymFailOnBudgetExceeded)' == ''">true</NeoSymFailOnBudgetExceeded>
+    <NeoSymRequireArtifacts Condition="'$(NeoSymRequireArtifacts)' == ''">true</NeoSymRequireArtifacts>
     <NeoSymUseSmt Condition="'$(NeoSymUseSmt)' == ''">false</NeoSymUseSmt>
+    <NeoSymSmtDropUnsat Condition="'$(NeoSymSmtDropUnsat)' == ''">false</NeoSymSmtDropUnsat>
     <NeoSymSourceDir Condition="'$(NeoSymSourceDir)' == ''">$(MSBuildProjectDirectory)</NeoSymSourceDir>
+    <NeoSymMaxEntrypoints Condition="'$(NeoSymMaxEntrypoints)' == ''"></NeoSymMaxEntrypoints>
+    <NeoSymDeploySenderHash Condition="'$(NeoSymDeploySenderHash)' == ''"></NeoSymDeploySenderHash>
+    <NeoSymVerifyEnabled Condition="'$(NeoSymVerifyEnabled)' == ''">true</NeoSymVerifyEnabled>
+    <NeoSymVerifyProfile Condition="'$(NeoSymVerifyProfile)' == ''">neo-n3-security</NeoSymVerifyProfile>
+    <NeoSymVerifyDependencyProofSummaries Condition="'$(NeoSymVerifyDependencyProofSummaries)' == ''"></NeoSymVerifyDependencyProofSummaries>
+    <NeoSymVerifyDependencyProofArtifacts Condition="'$(NeoSymVerifyDependencyProofArtifacts)' == ''"></NeoSymVerifyDependencyProofArtifacts>
+    <NeoSymVerifyTrustDependencyProofSummaries Condition="'$(NeoSymVerifyTrustDependencyProofSummaries)' == ''">false</NeoSymVerifyTrustDependencyProofSummaries>
+    <NeoSymVerifyAllowUnboundDependencyProofSummaries Condition="'$(NeoSymVerifyAllowUnboundDependencyProofSummaries)' == ''">false</NeoSymVerifyAllowUnboundDependencyProofSummaries>
+    <NeoSymVerifyEmitDependencyProofSummary Condition="'$(NeoSymVerifyEmitDependencyProofSummary)' == ''"></NeoSymVerifyEmitDependencyProofSummary>
+    <NeoSymVerifyAllowUnproved Condition="'$(NeoSymVerifyAllowUnproved)' == ''">false</NeoSymVerifyAllowUnproved>
+    <NeoSymVerifyRequireExternalSmt Condition="'$(NeoSymVerifyRequireExternalSmt)' == ''">false</NeoSymVerifyRequireExternalSmt>
+    <NeoSymVerifyRequireUnqualifiedProofs Condition="'$(NeoSymVerifyRequireUnqualifiedProofs)' == ''">true</NeoSymVerifyRequireUnqualifiedProofs>
+    <NeoSymVerifyAllowAssumptionBackedProofs Condition="'$(NeoSymVerifyAllowAssumptionBackedProofs)' == ''">false</NeoSymVerifyAllowAssumptionBackedProofs>
   </PropertyGroup>
 </Project>

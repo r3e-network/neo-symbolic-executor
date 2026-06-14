@@ -10,19 +10,30 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: |
             10.0.x
 
+      # Review fix (#26): install the external z3 solver so the SMT-LIB translation and
+      # external-solver UNSAT-prune soundness tests exercise the real z3 path in CI instead of
+      # silently degrading to the in-process portable fallback. The Z3 backend auto-detects `z3`
+      # on PATH (Z3Backend.DetectZ3), so no extra wiring is needed.
+      - name: Install z3
+        run: sudo apt-get update && sudo apt-get install -y z3 && z3 --version
+
       - name: Restore
-        run: dotnet restore Neo.SymbolicExecutor.sln
+        run: dotnet restore Neo.SymbolicExecutor.sln --locked-mode
 
       - name: Build (Release)
         run: dotnet build Neo.SymbolicExecutor.sln -c Release --no-restore
+
+      - name: Format check
+        run: dotnet format Neo.SymbolicExecutor.sln --verify-no-changes --verbosity minimal
 
       - name: Test
         run: dotnet test tests/Neo.SymbolicExecutor.Tests/Neo.SymbolicExecutor.Tests.csproj -c Release --no-build --logger "console;verbosity=normal"
@@ -35,7 +46,7 @@ jobs:
 
       - name: Upload fuzz corpus on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: fuzz-corpus
           path: fuzz-corpus/

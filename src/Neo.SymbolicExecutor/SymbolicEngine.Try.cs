@@ -8,6 +8,8 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleTry(ExecutionState state, Instruction inst)
     {
         var (catchOffset, finallyOffset) = ScriptDecoder.ResolveTryTargets(inst);
+        if (catchOffset < 0 && finallyOffset < 0)
+            throw new VmFaultException("TRY requires catch or finally target");
         var frame = state.CurrentFrame;
         if (frame.TryStack.Count >= _options.MaxTryDepth)
             throw new VmFaultException("TRY depth exceeded");

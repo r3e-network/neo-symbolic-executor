@@ -34,25 +34,57 @@ public abstract class HeapObject
 public sealed class ArrayObject : HeapObject
 {
     public List<SymbolicValue> Items { get; }
+    public bool IsSymbolicOpen { get; }
+    public int MinCount { get; }
+    public int OpenSizeOffset { get; set; }
+    public List<(SymbolicValue Key, SymbolicValue Value)> OpenWrites { get; }
 
-    public ArrayObject(int id, IEnumerable<SymbolicValue>? items = null) : base(Sort.Array, id)
+    public ArrayObject(
+        int id,
+        IEnumerable<SymbolicValue>? items = null,
+        bool isSymbolicOpen = false,
+        int? minCount = null,
+        int openSizeOffset = 0,
+        IEnumerable<(SymbolicValue Key, SymbolicValue Value)>? openWrites = null) : base(Sort.Array, id)
     {
         Items = items?.ToList() ?? new List<SymbolicValue>();
+        IsSymbolicOpen = isSymbolicOpen;
+        MinCount = isSymbolicOpen
+            ? System.Math.Max(0, minCount ?? 0)
+            : Items.Count;
+        OpenSizeOffset = openSizeOffset;
+        OpenWrites = openWrites?.ToList() ?? new List<(SymbolicValue Key, SymbolicValue Value)>();
     }
 
-    public override HeapObject Clone(int newId) => new ArrayObject(newId, Items);
+    public override HeapObject Clone(int newId) => new ArrayObject(newId, Items, IsSymbolicOpen, MinCount, OpenSizeOffset, OpenWrites);
 }
 
 public sealed class StructObject : HeapObject
 {
     public List<SymbolicValue> Fields { get; }
+    public bool IsSymbolicOpen { get; }
+    public int MinCount { get; }
+    public int OpenSizeOffset { get; set; }
+    public List<(SymbolicValue Key, SymbolicValue Value)> OpenWrites { get; }
 
-    public StructObject(int id, IEnumerable<SymbolicValue>? fields = null) : base(Sort.Struct, id)
+    public StructObject(
+        int id,
+        IEnumerable<SymbolicValue>? fields = null,
+        bool isSymbolicOpen = false,
+        int? minCount = null,
+        int openSizeOffset = 0,
+        IEnumerable<(SymbolicValue Key, SymbolicValue Value)>? openWrites = null) : base(Sort.Struct, id)
     {
         Fields = fields?.ToList() ?? new List<SymbolicValue>();
+        IsSymbolicOpen = isSymbolicOpen;
+        MinCount = isSymbolicOpen
+            ? System.Math.Max(0, minCount ?? 0)
+            : Fields.Count;
+        OpenSizeOffset = openSizeOffset;
+        OpenWrites = openWrites?.ToList() ?? new List<(SymbolicValue Key, SymbolicValue Value)>();
     }
 
-    public override HeapObject Clone(int newId) => new StructObject(newId, Fields);
+    public override HeapObject Clone(int newId) => new StructObject(newId, Fields, IsSymbolicOpen, MinCount, OpenSizeOffset, OpenWrites);
 }
 
 public sealed class MapObject : HeapObject
@@ -64,13 +96,29 @@ public sealed class MapObject : HeapObject
     /// </summary>
     public List<(SymbolicValue Key, SymbolicValue Value)> Entries { get; }
 
-    public MapObject(int id, IEnumerable<(SymbolicValue, SymbolicValue)>? entries = null) : base(Sort.Map, id)
+    /// <summary>
+    /// True for ABI method-entry maps that represent an unknown runtime argument. Contract-created
+    /// NEWMAP values stay closed/concrete, but an external Map parameter can contain keys the
+    /// seed corpus did not enumerate, so lookups may conservatively materialize symbolic values.
+    /// </summary>
+    public bool IsSymbolicOpen { get; }
+    public List<MapOpenUpdate> OpenUpdates { get; }
+
+    public MapObject(
+        int id,
+        IEnumerable<(SymbolicValue, SymbolicValue)>? entries = null,
+        bool isSymbolicOpen = false,
+        IEnumerable<MapOpenUpdate>? openUpdates = null) : base(Sort.Map, id)
     {
         Entries = entries?.ToList() ?? new List<(SymbolicValue, SymbolicValue)>();
+        IsSymbolicOpen = isSymbolicOpen;
+        OpenUpdates = openUpdates?.ToList() ?? new List<MapOpenUpdate>();
     }
 
-    public override HeapObject Clone(int newId) => new MapObject(newId, Entries);
+    public override HeapObject Clone(int newId) => new MapObject(newId, Entries, IsSymbolicOpen, OpenUpdates);
 }
+
+public sealed record MapOpenUpdate(SymbolicValue Key, SymbolicValue Value, bool IsRemove);
 
 public sealed class BufferObject : HeapObject
 {
@@ -79,25 +127,70 @@ public sealed class BufferObject : HeapObject
     /// bytes the cell holds an <see cref="Expression"/> of sort Int (treated as a byte 0..255).
     /// </summary>
     public List<Expression> Cells { get; }
+    public bool IsSymbolicOpen { get; }
+    public int MinLength { get; }
+    public Expression? SymbolicLength { get; }
+    public Expression? SourceBytes { get; }
+    public List<(SymbolicValue Key, SymbolicValue Value)> OpenWrites { get; }
 
     public BufferObject(int id, int length) : base(Sort.Buffer, id)
     {
         Cells = new List<Expression>(length);
         for (int i = 0; i < length; i++) Cells.Add(Expr.Int(0));
+        IsSymbolicOpen = false;
+        MinLength = Cells.Count;
+        OpenWrites = new List<(SymbolicValue Key, SymbolicValue Value)>();
     }
 
-    public BufferObject(int id, IEnumerable<Expression> cells) : base(Sort.Buffer, id)
+    public BufferObject(
+        int id,
+        IEnumerable<Expression> cells,
+        bool isSymbolicOpen = false,
+        int? minLength = null,
+        Expression? symbolicLength = null,
+        Expression? sourceBytes = null,
+        IEnumerable<(SymbolicValue Key, SymbolicValue Value)>? openWrites = null) : base(Sort.Buffer, id)
     {
         Cells = cells.ToList();
+        IsSymbolicOpen = isSymbolicOpen;
+        MinLength = isSymbolicOpen
+            ? System.Math.Max(0, minLength ?? 0)
+            : Cells.Count;
+        SymbolicLength = symbolicLength;
+        SourceBytes = sourceBytes;
+        OpenWrites = openWrites?.ToList() ?? new List<(SymbolicValue Key, SymbolicValue Value)>();
     }
 
     public BufferObject(int id, byte[] bytes) : base(Sort.Buffer, id)
     {
         Cells = new List<Expression>(bytes.Length);
         foreach (var b in bytes) Cells.Add(Expr.Int(b));
+        IsSymbolicOpen = false;
+        MinLength = Cells.Count;
+        OpenWrites = new List<(SymbolicValue Key, SymbolicValue Value)>();
     }
 
     public int Length => Cells.Count;
 
-    public override HeapObject Clone(int newId) => new BufferObject(newId, Cells);
+    public override HeapObject Clone(int newId) => new BufferObject(newId, Cells, IsSymbolicOpen, MinLength, SymbolicLength, SourceBytes, OpenWrites);
+}
+
+public sealed class InteropObject : HeapObject
+{
+    public string Kind { get; }
+    public byte[] Payload { get; }
+    public SymbolicValue? SymbolicPayload { get; }
+
+    public InteropObject(
+        int id,
+        string kind,
+        byte[] payload,
+        SymbolicValue? symbolicPayload = null) : base(Sort.InteropInterface, id)
+    {
+        Kind = kind;
+        Payload = payload.ToArray();
+        SymbolicPayload = symbolicPayload;
+    }
+
+    public override HeapObject Clone(int newId) => new InteropObject(newId, Kind, Payload, SymbolicPayload);
 }

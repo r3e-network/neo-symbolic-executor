@@ -19,20 +19,43 @@ public sealed class TaintFlowUpgradeDetector : BaseDetector
     public override Severity DefaultSeverity => Severity.Critical;
     public override double DefaultConfidence => 0.85;
 
+    private static bool IsContractManagement(NativeContractRegistry natives, byte[] hash) =>
+        natives.ByHashBytes(hash)?.Name.Equals("ContractManagement", System.StringComparison.OrdinalIgnoreCase) ?? false;
+
     public override IEnumerable<Finding> Analyze(AnalysisContext context)
     {
+        var natives = context.Natives;
         foreach (var state in context.States)
         {
             foreach (var call in state.Telemetry.ExternalCalls)
             {
+                if (call.ModeledSelfCall) continue;
                 bool isUpdate = call.Method.Equals("update", System.StringComparison.OrdinalIgnoreCase);
                 if (!isUpdate) continue;
+
+                // Review fix (#7): mirror UpgradeabilityDetector's target guard. The engine records
+                // Method as the verbatim method string for EVERY Contract.Call regardless of target,
+                // so matching only on the name "update" fired a Critical (with a hardcoded
+                // "ContractManagement.Update" message) on any userland call to an unrelated
+                // contract's method named `update` (price feeds, registries, config setters). Only a
+                // null/symbolic target (resolves to ContractManagement only at runtime) or a
+                // concrete ContractManagement hash is a real contract-replacement risk.
+                bool targetIsContractManagement = call.TargetHash is { } th
+                    && th.AsConcreteBytes() is byte[] hb
+                    && IsContractManagement(natives, hb);
+                bool targetIsDynamic = call.TargetHash is null
+                    || call.TargetHash.AsConcreteBytes() is null;
+                if (!targetIsContractManagement && !targetIsDynamic) continue;
+
                 bool tainted = call.Args.Any(a => a.Taints.Any(t => t.StartsWith("arg", System.StringComparison.Ordinal)));
                 if (!tainted) continue;
 
+                string targetDescription = targetIsContractManagement
+                    ? "ContractManagement.update"
+                    : "update (dynamic target that may resolve to ContractManagement)";
                 yield return MakeFinding(
-                    title: "ContractManagement.Update payload flows from caller-supplied input",
-                    description: $"update() invocation at 0x{call.Offset:X4} is reached with a NEF/manifest "
+                    title: "Contract upgrade payload flows from caller-supplied input",
+                    description: $"{targetDescription} invocation at 0x{call.Offset:X4} is reached with a NEF/manifest "
                                + "argument that depends on a method parameter. A malicious caller (or compromised "
                                + "admin key) can replace the contract with arbitrary code.",
                     offset: call.Offset,

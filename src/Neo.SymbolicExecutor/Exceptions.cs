@@ -29,3 +29,13 @@ public sealed class AnalysisBudgetException : Exception
 {
     public AnalysisBudgetException(string message) : base(message) { }
 }
+
+/// <summary>
+/// Raised when a runtime-feasible operation reaches a modeling surface the analyzer cannot yet
+/// over-approximate soundly. Distinct from VM faults: callers must treat this as incomplete
+/// coverage, not as contract behavior.
+/// </summary>
+public sealed class ModelingLimitException : Exception
+{
+    public ModelingLimitException(string message) : base(message) { }
+}

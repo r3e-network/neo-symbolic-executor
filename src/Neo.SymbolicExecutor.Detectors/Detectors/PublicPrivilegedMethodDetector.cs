@@ -21,7 +21,7 @@ public sealed class PublicPrivilegedMethodDetector : BaseDetector
         foreach (var state in context.States)
         {
             var method = ProtocolRiskHelpers.MethodForState(context, state);
-            if (method is null || method.Safe) continue;
+            if (method is null) continue;
             if (!ProtocolRiskHelpers.IsPrivilegedMethodName(method.Name)) continue;
 
             var sensitiveOps = ProtocolRiskHelpers.SensitiveOps(state).OrderBy(op => op.Offset).ToList();
@@ -35,11 +35,16 @@ public sealed class PublicPrivilegedMethodDetector : BaseDetector
                 description: $"Manifest-exposed method `{method.Name}` reaches {firstSensitive.Kind} at "
                            + $"0x{firstSensitive.Offset:X4} before an enforced witness, caller-hash, or signature check. "
                            + "Privileged DApp entrypoints such as mint, burn, withdraw, sweep, oracle, fee, and upgrade "
-                           + "methods should authorize before touching state or calling out.",
+                           + "methods should authorize before touching state or calling out."
+                           + (method.Safe
+                               ? " Manifest marks the entrypoint safe=true, so this is downgraded but kept visible because telemetry reached a sensitive operation."
+                               : ""),
                 offset: firstSensitive.Offset,
-                severity: Severity.High,
+                severity: method.Safe ? Severity.Info : Severity.High,
                 state: state,
-                tags: new[] { "dapp", "privileged-method", "missing-auth" });
+                tags: method.Safe
+                    ? new[] { "dapp", "privileged-method", "missing-auth", "manifest-safe-assertion" }
+                    : new[] { "dapp", "privileged-method", "missing-auth" });
         }
     }
 }

@@ -80,10 +80,23 @@ internal static class ProtocolRiskHelpers
     public static bool IsSwapLikeMethodName(string name) =>
         SwapNames.Any(h => ContainsFolded(name, h));
 
-    public static bool HasAuthBefore(ExecutionState state, int offset) =>
-        state.Telemetry.WitnessChecksEnforced.Any(o => o < offset)
-        || state.Telemetry.CallerHashChecks.Any(o => o < offset)
-        || state.Telemetry.SignatureChecks.Any(o => o < offset);
+    /// <summary>
+    /// True iff an enforced auth check appears at a lower bytecode offset than
+    /// <paramref name="offset"/>. Callers use this to clear a sensitive op as "auth-gated".
+    ///
+    /// Review fix (#56): raw bytecode-offset order is only a sound proxy for execution order on a
+    /// path with no back-edges. When <see cref="Telemetry.LoopsDetected"/> is non-empty, a check at
+    /// a lower offset may execute AFTER the sensitive op (or not at all on some iterations), so we
+    /// refuse to clear via offset order and return false. Behavior is identical for loop-free
+    /// states.
+    /// </summary>
+    public static bool HasAuthBefore(ExecutionState state, int offset)
+    {
+        if (state.Telemetry.LoopsDetected.Count > 0) return false;
+        return state.Telemetry.WitnessChecksEnforced.Any(o => o < offset)
+            || state.Telemetry.CallerHashChecks.Any(o => o < offset)
+            || state.Telemetry.SignatureChecks.Any(o => o < offset);
+    }
 
     /// <summary>
     /// Resolve the symbol name the engine seeded for argument <paramref name="index"/> of
@@ -138,15 +151,49 @@ internal static class ProtocolRiskHelpers
         }
 
         foreach (var call in state.Telemetry.ExternalCalls)
-            yield return (call.Offset, "external-call");
+        {
+            if (!call.ModeledSelfCall)
+                yield return (call.Offset, "external-call");
+        }
     }
 
     public static bool IsStateWrite(StorageOp op) =>
         op.Kind is StorageOpKind.Put or StorageOpKind.Delete;
 
     public static bool IsTokenTransferCall(ExternalCall call) =>
-        string.Equals(call.Method, "transfer", StringComparison.OrdinalIgnoreCase)
+        !call.ModeledSelfCall
+        && string.Equals(call.Method, "transfer", StringComparison.OrdinalIgnoreCase)
         && call.TargetHash?.AsConcreteBytes() is { Length: 20 };
+
+    /// <summary>
+    /// Review fix (#59): a transfer-named external call whose target hash is symbolic / dynamic
+    /// (resolved at runtime, e.g. a router or token address read from storage). The strict
+    /// <see cref="IsTokenTransferCall"/> requires a concrete 20-byte target and therefore misses
+    /// these — yet a dynamic-target transfer is exactly the shape DeFi routers use. We recognize it
+    /// as a token-transfer signal too, but the caller should apply this only in combination with an
+    /// established defi/swap signal and at reduced confidence, since a dynamic target is a weaker
+    /// indicator than a concrete token hash.
+    /// </summary>
+    public static bool IsDynamicTokenTransferCall(ExternalCall call) =>
+        !call.ModeledSelfCall
+        && !IsTokenTransferCall(call)
+        && (call.MethodDynamic
+            || string.Equals(call.Method, "transfer", StringComparison.OrdinalIgnoreCase))
+        && (call.TargetHashDynamic || call.TargetHash?.AsConcreteBytes() is not { Length: 20 });
+
+    public static ContractMethodDescriptor? FindStandardNep17TransferMethod(ContractManifest manifest) =>
+        manifest.Abi.Methods.FirstOrDefault(IsStandardNep17TransferMethod);
+
+    private static bool IsStandardNep17TransferMethod(ContractMethodDescriptor method) =>
+        string.Equals(method.Name, "transfer", StringComparison.Ordinal)
+        && method.Parameters.Count == 4
+        && IsAbiType(method.Parameters[0].Type, "Hash160")
+        && IsAbiType(method.Parameters[1].Type, "Hash160")
+        && IsAbiType(method.Parameters[2].Type, "Integer")
+        && IsAbiType(method.Parameters[3].Type, "Any");
+
+    private static bool IsAbiType(string? actual, string expected) =>
+        string.Equals(actual ?? "", expected, StringComparison.OrdinalIgnoreCase);
 
     public static bool HasSlippageSignal(ExecutionState state)
     {
@@ -161,8 +208,9 @@ internal static class ProtocolRiskHelpers
         if (state.Telemetry.StorageOps.Any(op => KeyContainsAny(op, OracleHints) || KeyContainsAny(op, FreshnessHints)))
             return true;
         return state.Telemetry.ExternalCalls.Any(call =>
-            OracleHints.Any(h => ContainsFolded(call.Method, h))
-            || FreshnessHints.Any(h => ContainsFolded(call.Method, h)));
+            !call.ModeledSelfCall
+            && (OracleHints.Any(h => ContainsFolded(call.Method, h))
+                || FreshnessHints.Any(h => ContainsFolded(call.Method, h))));
     }
 
     public static bool HasDefiStateSignal(ExecutionState state)

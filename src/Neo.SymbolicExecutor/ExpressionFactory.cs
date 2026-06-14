@@ -16,14 +16,61 @@ namespace Neo.SymbolicExecutor;
 /// </summary>
 public static class Expr
 {
+    public const int MaxConcreteModPowExponent = 256;
+    public const string CryptoSha256Op = "crypto.sha256";
+    public const string CryptoRipemd160Op = "crypto.ripemd160";
+    public const string CryptoKeccak256Op = "crypto.keccak256";
+    public const string CryptoMurmur32Op = "crypto.murmur32";
+    public const string CryptoRecoverSecp256K1Op = "crypto.recover_secp256k1";
+    public const string CryptoBlsAddG1Op = "crypto.bls12381.add.g1";
+    public const string CryptoBlsAddG2Op = "crypto.bls12381.add.g2";
+    public const string CryptoBlsAddGtOp = "crypto.bls12381.add.gt";
+    public const string CryptoBlsMulG1Op = "crypto.bls12381.mul.g1";
+    public const string CryptoBlsMulG2Op = "crypto.bls12381.mul.g2";
+    public const string CryptoBlsMulGtOp = "crypto.bls12381.mul.gt";
+    public const string CryptoBlsPairingOp = "crypto.bls12381.pairing";
+    public const string CryptoBlsValidG1Op = "crypto.bls12381.valid.g1";
+    public const string CryptoBlsValidG2Op = "crypto.bls12381.valid.g2";
+    public const string CryptoBlsValidGtOp = "crypto.bls12381.valid.gt";
+    public const string CryptoBlsValidScalarOp = "crypto.bls12381.valid.scalar";
+    public static readonly BigInteger NeoVmIntegerMin = -(BigInteger.One << 255);
+    public static readonly BigInteger NeoVmIntegerMax = (BigInteger.One << 255) - BigInteger.One;
+    private static readonly System.Text.UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
     public static IntConst Int(BigInteger value) => new(value);
     public static IntConst Int(long value) => new(new BigInteger(value));
     public static BoolConst Bool(bool value) => value ? BoolConst.True : BoolConst.False;
     public static BytesConst Bytes(byte[] value) => new(value);
     public static BytesConst Bytes(ReadOnlySpan<byte> value) => new(value.ToArray());
+    public static PointerConst Pointer(int targetOffset) => new(targetOffset);
     public static NullConst Null() => NullConst.Instance;
     public static Symbol Sym(Sort sort, string name) => new(sort, name);
     public static HeapRef Ref(Sort sort, int id) => new(sort, id);
+    public static Expression IsStrictUtf8(Expression value)
+    {
+        if (CanonicalBytes(value) is not { } bytes)
+            return new UnaryExpr(Sort.Bool, "utf8", value);
+
+        try
+        {
+            _ = StrictUtf8.GetString(bytes);
+            return BoolConst.True;
+        }
+        catch (System.Text.DecoderFallbackException)
+        {
+            return BoolConst.False;
+        }
+    }
+
+    public static Expression IsValidEcPoint(Expression value)
+    {
+        if (CanonicalBytes(value) is not { } bytes)
+            return new UnaryExpr(Sort.Bool, "ecpoint", value);
+
+        return Bool(NeoEcPoint.IsValidEncoding(bytes));
+    }
 
     // ---- Comparison: byte-wise canonical equality matching NeoVM's PrimitiveType.GetSpan().
     public static byte[]? CanonicalBytes(Expression e) => e switch
@@ -31,6 +78,22 @@ public static class Expr
         IntConst i => IntegerToBytes(i.Value),
         BoolConst b => b.Value ? new byte[] { 1 } : Array.Empty<byte>(),
         BytesConst by => by.Value,
+        _ => null,
+    };
+
+    public static int? FixedByteSize(Expression e) => e switch
+    {
+        UnaryExpr { Sort: Sort.Bytes, Op: CryptoSha256Op or CryptoKeccak256Op } => 32,
+        UnaryExpr { Sort: Sort.Bytes, Op: CryptoRipemd160Op } => 20,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoMurmur32Op } => 4,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoRecoverSecp256K1Op } => 33,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoBlsAddG1Op } => 48,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoBlsAddG2Op } => 96,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoBlsAddGtOp } => 576,
+        TernaryExpr { Sort: Sort.Bytes, Op: CryptoBlsMulG1Op } => 48,
+        TernaryExpr { Sort: Sort.Bytes, Op: CryptoBlsMulG2Op } => 96,
+        TernaryExpr { Sort: Sort.Bytes, Op: CryptoBlsMulGtOp } => 576,
+        BinaryExpr { Sort: Sort.Bytes, Op: CryptoBlsPairingOp } => 576,
         _ => null,
     };
 
@@ -69,6 +132,117 @@ public static class Expr
         return new BigInteger(bytes, isUnsigned: false, isBigEndian: false);
     }
 
+    public static BigInteger? ConcreteByteAt(Expression bytesExpression, Expression indexExpression)
+    {
+        if (ConcreteInt(indexExpression) is not { } rawIndex
+            || rawIndex.Sign < 0
+            || rawIndex > int.MaxValue)
+        {
+            return null;
+        }
+
+        return TryConcreteByteAt(bytesExpression, (int)rawIndex, out byte value)
+            ? value
+            : null;
+    }
+
+    private static bool TryConcreteByteAt(Expression expression, int index, out byte value)
+    {
+        value = default;
+        if (index < 0)
+            return false;
+        if (CanonicalBytes(expression) is { } bytes)
+        {
+            if (index >= bytes.Length)
+                return false;
+            value = bytes[index];
+            return true;
+        }
+
+        if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "cat" } cat
+            && TryKnownByteLength(cat.Left, out int leftLength))
+        {
+            return index < leftLength
+                ? TryConcreteByteAt(cat.Left, index, out value)
+                : TryConcreteByteAt(cat.Right, index - leftLength, out value);
+        }
+
+        if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "left" } left
+            && ConcreteInt(left.Right) is { } leftCount
+            && leftCount >= 0
+            && leftCount <= int.MaxValue
+            && index < leftCount)
+        {
+            return TryConcreteByteAt(left.Left, index, out value);
+        }
+
+        if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "right" } right
+            && ConcreteInt(right.Right) is { } rightCount
+            && rightCount >= 0
+            && rightCount <= int.MaxValue
+            && index < rightCount
+            && TryKnownByteLength(right.Left, out int sourceLength))
+        {
+            long sourceIndex = (long)sourceLength - (int)rightCount + index;
+            return sourceIndex is >= 0 and <= int.MaxValue
+                && TryConcreteByteAt(right.Left, (int)sourceIndex, out value);
+        }
+
+        if (expression is TernaryExpr { Sort: Sort.Bytes, Op: "substr" } substr
+            && ConcreteInt(substr.B) is { } start
+            && ConcreteInt(substr.C) is { } count
+            && start >= 0
+            && start <= int.MaxValue
+            && count >= 0
+            && count <= int.MaxValue
+            && index < count)
+        {
+            long sourceIndex = (int)start + (long)index;
+            return sourceIndex <= int.MaxValue
+                && TryConcreteByteAt(substr.A, (int)sourceIndex, out value);
+        }
+
+        return false;
+    }
+
+    public static bool TryKnownByteLength(Expression expression, out int length)
+    {
+        if (CanonicalBytes(expression) is { } bytes)
+        {
+            length = bytes.Length;
+            return true;
+        }
+
+        if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "cat" } cat
+            && TryKnownByteLength(cat.Left, out int leftLength)
+            && TryKnownByteLength(cat.Right, out int rightLength))
+        {
+            length = leftLength + rightLength;
+            return true;
+        }
+
+        if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "left" or "right" } side
+            && ConcreteInt(side.Right) is { } sideLength
+            && sideLength >= 0
+            && sideLength <= int.MaxValue)
+        {
+            length = (int)sideLength;
+            return true;
+        }
+
+        if (expression is TernaryExpr { Sort: Sort.Bytes, Op: "substr" } substr
+            && ConcreteInt(substr.C) is { } substrLength
+            && substrLength >= 0
+            && substrLength <= int.MaxValue)
+        {
+            length = (int)substrLength;
+            return true;
+        }
+
+        length = 0;
+        return false;
+    }
+
     // ---- Boolean / truthiness
     // Audit fix (iter-2 wakeup-5 differential): NeoVM's GetBoolean has type-specific rules:
     //   ByteString → any-nonzero-byte (NOT just non-empty — `[0]` is FALSE)
@@ -84,6 +258,13 @@ public static class Expr
         BytesConst by => HasNonZeroByte(by.Value),
         NullConst => false,
         HeapRef => true,
+        // Review fix (#35): NeoVM's Pointer.GetBoolean() and InteropInterface.GetBoolean() always
+        // return true (both are non-null references; only Null is falsy). A bare PointerConst or a
+        // symbolic Pointer/InteropInterface value previously fell through to `null`, forcing an
+        // unnecessary symbolic branch on ASSERT/JMPIF. HeapRef-wrapped interops already returned
+        // true via the HeapRef arm; this covers the non-HeapRef forms.
+        PointerConst => true,
+        Symbol { Sort: Sort.Pointer or Sort.InteropInterface } => true,
         _ => null,
     };
 
@@ -153,6 +334,8 @@ public static class Expr
     /// </summary>
     public static BigInteger NeoTruncatedDivide(BigInteger a, BigInteger b) => a / b;
     public static BigInteger NeoTruncatedModulo(BigInteger a, BigInteger b) => a % b;
+    public static bool IsWithinNeoVmIntegerRange(BigInteger value) =>
+        value >= NeoVmIntegerMin && value <= NeoVmIntegerMax;
 
     public static Expression Neg(Expression a)
     {
@@ -230,6 +413,8 @@ public static class Expr
                 return Int(ModInverse(mp_a, mp_m));
             if (mp_b < 0)
                 throw new VmFaultException($"MODPOW with negative exponent {mp_b}");
+            if (mp_b > MaxConcreteModPowExponent)
+                throw new VmFaultException($"MODPOW exponent {mp_b} exceeds max {MaxConcreteModPowExponent}");
             return Int(BigInteger.ModPow(mp_a, mp_b, mp_m));
         }
         return new TernaryExpr(Sort.Int, "modpow", a, b, m);
@@ -319,6 +504,8 @@ public static class Expr
     // ---- Comparison
     public static Expression Eq(Expression a, Expression b)
     {
+        if (a.Equals(b)) return BoolConst.True;
+
         // Audit fix (iter-2 wakeup-7 differential): NeoVM's Equals is more nuanced than
         // "cross-type byte canonical". Boolean.Equals returns false for any non-Boolean (even
         // bytes [1] vs true). Integer.Equals(ByteString) does byte-level compare; Integer.Equals(
@@ -342,16 +529,7 @@ public static class Expr
         }
         if (a is NullConst && b is NullConst) return BoolConst.True;
         if ((a is NullConst) != (b is NullConst))
-        {
-            // Audit fix (engine M4): only collapse to false when the non-null side is itself
-            // concrete (a constant or HeapRef). For symbolic operands we cannot prove the value
-            // is non-null at runtime, so emit a symbolic equality and let the path-condition
-            // solver decide. The prior code returned BoolConst.False unconditionally, hiding
-            // any branch that depends on a symbolic-null check.
-            var nonNull = a is NullConst ? b : a;
-            if (nonNull.IsConcrete || nonNull is HeapRef) return BoolConst.False;
-            return new BinaryExpr(Sort.Bool, "==", a, b);
-        }
+            return BoolConst.False;
         if (a is HeapRef ah && b is HeapRef bh)
             return Bool(ah.RefSort == bh.RefSort && ah.ObjectId == bh.ObjectId);
         // Audit fix (iter-2 wakeup-5 differential): a HeapRef compared to a concrete primitive
@@ -443,6 +621,19 @@ public static class Expr
         return new TernaryExpr(Sort.Bool, "within", x, lo, hi);
     }
 
+    public static Expression Ite(Expression condition, Expression whenTrue, Expression whenFalse)
+    {
+        if (whenTrue.Sort != whenFalse.Sort)
+            throw new InvalidOperationException("ITE branches must have the same sort");
+
+        if (Truthy(condition) is { } concreteCondition)
+            return concreteCondition ? whenTrue : whenFalse;
+        if (whenTrue.Equals(whenFalse))
+            return whenTrue;
+
+        return new TernaryExpr(whenTrue.Sort, "ite", condition, whenTrue, whenFalse);
+    }
+
     // ---- Logic
     public static Expression Not(Expression a)
     {
@@ -493,6 +684,8 @@ public static class Expr
     {
         var t = Truthy(a);
         if (t.HasValue) return Bool(t.Value);
+        if (a.Sort == Sort.Bool) return a;
+        if (a.Sort is Sort.Int or Sort.Bytes) return Nz(a);
         return new UnaryExpr(Sort.Bool, "tobool", a);
     }
 }

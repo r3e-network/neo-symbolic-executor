@@ -89,14 +89,30 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
             reason = $"non-deterministic budget: {first.BudgetExceeded} vs {second.BudgetExceeded}";
             return false;
         }
-        if (bothDeadlineBound) return true;
+
+        // Review fix (#60): the per-state structural comparison below now runs even when both
+        // runs are deadline-bound. Previously the `if (bothDeadlineBound) return true;` early
+        // return sat HERE and skipped ALL structural checks, contradicting the comment above
+        // (which says only the StepsExecuted/StatesExplored summary counts may legitimately
+        // differ under a wall-clock deadline) and turning the oracle into a near-no-op for any
+        // input that hit the deadline. The structural per-state fields (status / pc / stack
+        // size / path / telemetry counts / gas / path ordering) are unaffected by the exact
+        // stop point when the state counts already matched, so they must still be verified.
+        // The deadline-bound skip now applies ONLY to the summary-count comparison further down.
 
         // Per-state structural equivalence — if every observable field matches across the
         // run pair, the engine explored the same state space. Run this BEFORE the
         // step/states-explored summary checks so a transient book-keeping divergence on
         // those counts does not mask a genuine structural bug, and so structural-equivalent
         // runs can downgrade summary divergences to noise.
-        for (int i = 0; i < first.FinalStates.Length; i++)
+        //
+        // Review fix (#60): for non-deadline-bound runs the state counts are already proven
+        // equal above, so this iterates the full set. For deadline-bound runs the counts may
+        // legitimately differ (the deadline can fire mid-fork), so iterate only the common
+        // prefix — comparing the states both runs produced still catches structural
+        // non-determinism without indexing past the shorter result.
+        int compareCount = System.Math.Min(first.FinalStates.Length, second.FinalStates.Length);
+        for (int i = 0; i < compareCount; i++)
         {
             var a = first.FinalStates[i];
             var b = second.FinalStates[i];
@@ -127,6 +143,13 @@ public sealed class DeterminismOracleTarget : IFuzzTarget
                 }
             }
         }
+
+        // Review fix (#60): skip ONLY the summary-count comparison for deadline-bound runs.
+        // The StepsExecuted/StatesExplored counts can legitimately differ when the wall-clock
+        // deadline fires at slightly different step counts (path-explosion + JIT warmup + GC
+        // make per-step latency non-deterministic). The structural per-state checks above have
+        // already run, which is what the original comment intended.
+        if (bothDeadlineBound) return true;
 
         // Summary-counter checks — only meaningful AFTER structural equivalence is confirmed.
         // When two runs explored the same state space (per the loop above), a small divergence

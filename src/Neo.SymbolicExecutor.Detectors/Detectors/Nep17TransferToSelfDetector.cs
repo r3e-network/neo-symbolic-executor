@@ -32,7 +32,7 @@ public sealed class Nep17TransferToSelfDetector : BaseDetector
     {
         if (context.Manifest is null) yield break;
         if (!context.Manifest.DeclaresStandard("NEP-17")) yield break;
-        var transfer = context.Manifest.FindMethod("transfer");
+        var transfer = ProtocolRiskHelpers.FindStandardNep17TransferMethod(context.Manifest);
         if (transfer is null) yield break;
 
         string fromSym = ProtocolRiskHelpers.MethodArgSymbolName(transfer, index: 0, defaultIfMissing: "arg0");

@@ -254,10 +254,10 @@ public sealed partial class SymbolicEngine
                 state.Pc = inst.EndOffset; return Single(state);
 
             // ---- Bitwise / Arithmetic / Compare
-            case NeoVm.OpCode.INVERT: return Unary(state, inst, Expr.Invert);
-            case NeoVm.OpCode.AND: return Binary(state, inst, Expr.And);
-            case NeoVm.OpCode.OR: return Binary(state, inst, Expr.Or);
-            case NeoVm.OpCode.XOR: return Binary(state, inst, Expr.Xor);
+            case NeoVm.OpCode.INVERT: return UnaryNumeric(state, inst, "INVERT", Expr.Invert);
+            case NeoVm.OpCode.AND: return BinaryNumeric(state, inst, "AND", Expr.And);
+            case NeoVm.OpCode.OR: return BinaryNumeric(state, inst, "OR", Expr.Or);
+            case NeoVm.OpCode.XOR: return BinaryNumeric(state, inst, "XOR", Expr.Xor);
             // Audit fix (iter-2 wakeup-12): EQUAL/NOTEQUAL use NeoVM's `x1.Equals(x2, limits)`
             // which does DEEP structural comparison for Structs (recursively walking fields).
             // The plain Expr.Eq fast-path treats HeapRef==HeapRef as ID equality, which is
@@ -267,9 +267,9 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.EQUAL: return HandleEquality(state, inst, negate: false);
             case NeoVm.OpCode.NOTEQUAL: return HandleEquality(state, inst, negate: true);
 
-            case NeoVm.OpCode.SIGN: return Unary(state, inst, Expr.Sign);
-            case NeoVm.OpCode.ABS: return Unary(state, inst, Expr.Abs);
-            case NeoVm.OpCode.NEGATE: return Unary(state, inst, Expr.Neg);
+            case NeoVm.OpCode.SIGN: return UnaryNumeric(state, inst, "SIGN", Expr.Sign);
+            case NeoVm.OpCode.ABS: return UnaryArith(state, inst, "ABS", Expr.Abs, overflow: true);
+            case NeoVm.OpCode.NEGATE: return UnaryArith(state, inst, "NEGATE", Expr.Neg, overflow: true);
             case NeoVm.OpCode.INC: return UnaryArith(state, inst, "INC", Expr.Inc, overflow: true);
             case NeoVm.OpCode.DEC: return UnaryArith(state, inst, "DEC", Expr.Dec, overflow: true);
             case NeoVm.OpCode.ADD: return BinaryArith(state, inst, "ADD", Expr.Add, overflow: true);
@@ -277,40 +277,58 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.MUL: return BinaryArith(state, inst, "MUL", Expr.Mul, overflow: true);
             case NeoVm.OpCode.DIV: return BinaryArith(state, inst, "DIV", Expr.Div, overflow: false, divisorMatters: true);
             case NeoVm.OpCode.MOD: return BinaryArith(state, inst, "MOD", Expr.Mod, overflow: false, divisorMatters: true);
-            case NeoVm.OpCode.POW: return BinaryArith(state, inst, "POW", (a, b) => Expr.Pow(a, b, _options.MaxPowExponent), overflow: true);
+            case NeoVm.OpCode.POW:
+                return BinaryArith(
+                    state,
+                    inst,
+                    "POW",
+                    (a, b) => Expr.Pow(a, b, _options.MaxPowExponent),
+                    overflow: true,
+                    maxRight: _options.MaxPowExponent);
             case NeoVm.OpCode.SQRT: return UnaryArith(state, inst, "SQRT", Expr.Sqrt, overflow: false);
             case NeoVm.OpCode.MODMUL: return TernaryArith(state, inst, "MODMUL", Expr.ModMul);
-            case NeoVm.OpCode.MODPOW: return TernaryArith(state, inst, "MODPOW", Expr.ModPow);
+            case NeoVm.OpCode.MODPOW:
+                return TernaryArith(
+                    state,
+                    inst,
+                    "MODPOW",
+                    Expr.ModPow,
+                    maxRight: Expr.MaxConcreteModPowExponent);
             // Audit fix (iter-2 wakeup-4 differential): NeoVM's SHL/SHR pop the SHIFT first,
             // then check `if (shift == 0) return;` BEFORE popping x. So a script with stack=[x]
             // and SHL/SHR consuming a 0 shift leaves x on the stack — Neo.VM HALTs cleanly.
             // Our prior `BinaryArith` always popped both unconditionally, producing a spurious
-            // Stack-underflow fault. Keep BinaryArith for symbolic shifts (the divergence is
-            // unobservable when shift is non-zero or symbolic); special-case concrete shift==0.
+            // Stack-underflow fault. Symbolic shifts must also fork a zero-shift path before
+            // popping x, otherwise a feasible shift==0 branch is lost.
             case NeoVm.OpCode.SHL: return HandleShift(state, inst, "SHL", isLeft: true);
             case NeoVm.OpCode.SHR: return HandleShift(state, inst, "SHR", isLeft: false);
 
             case NeoVm.OpCode.NOT: return Unary(state, inst, Expr.Not);
             case NeoVm.OpCode.BOOLAND: return Binary(state, inst, Expr.BoolAnd);
             case NeoVm.OpCode.BOOLOR: return Binary(state, inst, Expr.BoolOr);
-            case NeoVm.OpCode.NZ: return Unary(state, inst, Expr.Nz);
+            case NeoVm.OpCode.NZ: return UnaryNumeric(state, inst, "NZ", Expr.Nz);
             // Audit fix (iter-2 wakeup-10): NUMEQUAL / NUMNOTEQUAL pop both operands as
             // GetInteger and compare numerically — this is DIFFERENT from EQUAL/NOTEQUAL which
             // use type-aware StackItem.Equals (Bool != Int regardless of value). Use NumEq.
-            case NeoVm.OpCode.NUMEQUAL: return Binary(state, inst, Expr.NumEq);
-            case NeoVm.OpCode.NUMNOTEQUAL: return Binary(state, inst, Expr.NumNe);
-            case NeoVm.OpCode.LT: return Binary(state, inst, Expr.Lt);
-            case NeoVm.OpCode.LE: return Binary(state, inst, Expr.Le);
-            case NeoVm.OpCode.GT: return Binary(state, inst, Expr.Gt);
-            case NeoVm.OpCode.GE: return Binary(state, inst, Expr.Ge);
-            case NeoVm.OpCode.MIN: return Binary(state, inst, Expr.Min);
-            case NeoVm.OpCode.MAX: return Binary(state, inst, Expr.Max);
+            case NeoVm.OpCode.NUMEQUAL: return BinaryNumeric(state, inst, "NUMEQUAL", Expr.NumEq);
+            case NeoVm.OpCode.NUMNOTEQUAL: return BinaryNumeric(state, inst, "NUMNOTEQUAL", Expr.NumNe);
+            case NeoVm.OpCode.LT: return BinaryNumeric(state, inst, "LT", Expr.Lt);
+            case NeoVm.OpCode.LE: return BinaryNumeric(state, inst, "LE", Expr.Le);
+            case NeoVm.OpCode.GT: return BinaryNumeric(state, inst, "GT", Expr.Gt);
+            case NeoVm.OpCode.GE: return BinaryNumeric(state, inst, "GE", Expr.Ge);
+            case NeoVm.OpCode.MIN: return BinaryNumeric(state, inst, "MIN", Expr.Min);
+            case NeoVm.OpCode.MAX: return BinaryNumeric(state, inst, "MAX", Expr.Max);
             case NeoVm.OpCode.WITHIN:
                 {
-                    var hi = state.Pop().Expression;
-                    var lo = state.Pop().Expression;
-                    var x = state.Pop().Expression;
-                    state.Push(SymbolicValue.Of(Expr.Within(x, lo, hi)));
+                    var hi = state.Pop();
+                    var lo = state.Pop();
+                    var x = state.Pop();
+                    EnforceNeoVmIntegerInput(state, inst, "WITHIN", x, "value");
+                    EnforceNeoVmIntegerInput(state, inst, "WITHIN", lo, "lower-bound");
+                    EnforceNeoVmIntegerInput(state, inst, "WITHIN", hi, "upper-bound");
+                    state.Push(SymbolicValue.Of(
+                        Expr.Within(x.Expression, lo.Expression, hi.Expression),
+                        x.Taints.Union(lo.Taints).Union(hi.Taints)));
                     state.Pc = inst.EndOffset; return Single(state);
                 }
 
@@ -318,7 +336,12 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.ISNULL:
                 {
                     var v = state.Pop();
-                    state.Push(SymbolicValue.Bool(v.IsConcreteNull));
+                    var result = v.IsConcreteNull
+                        ? SymbolicValue.Bool(true).WithTaints(v.Taints)
+                        : v.Sort == Sort.Unknown
+                            ? SymbolicValue.Of(new UnaryExpr(Sort.Bool, "isnull", v.Expression), v.Taints)
+                            : SymbolicValue.Bool(false).WithTaints(v.Taints);
+                    state.Push(result);
                     state.Pc = inst.EndOffset; return Single(state);
                 }
             case NeoVm.OpCode.ISTYPE:
@@ -353,9 +376,8 @@ public sealed partial class SymbolicEngine
         if (op == NeoVm.OpCode.PUSHNULL) { state.Push(SymbolicValue.Null()); return true; }
         if (op == NeoVm.OpCode.PUSHA)
         {
-            // Audit CRIT-1 fix: never read the raw operand delta as the value; always push the
-            // resolved absolute target (which is 0 when the target is offset 0).
-            state.Push(SymbolicValue.Int(inst.Target));
+            // PUSHA pushes a NeoVM Pointer StackItem to the resolved absolute target.
+            state.Push(SymbolicValue.Pointer(inst.Target));
             return true;
         }
         if (op is NeoVm.OpCode.PUSHINT8 or NeoVm.OpCode.PUSHINT16 or NeoVm.OpCode.PUSHINT32
@@ -417,30 +439,73 @@ public sealed partial class SymbolicEngine
         return Single(state);
     }
 
+    private IEnumerable<ExecutionState> UnaryNumeric(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        Func<Expression, Expression> f)
+    {
+        var v = state.Pop();
+        EnsureArithmeticOperandNotNull(opName, v);
+        EnforceNeoVmIntegerInput(state, inst, opName, v, "operand");
+        state.Push(SymbolicValue.Of(f(v.Expression), v.Taints));
+        state.Pc = inst.EndOffset;
+        return Single(state);
+    }
+
+    private IEnumerable<ExecutionState> BinaryNumeric(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        Func<Expression, Expression, Expression> f)
+    {
+        var b = state.Pop();
+        var a = state.Pop();
+        EnsureArithmeticOperandNotNull(opName, a);
+        EnsureArithmeticOperandNotNull(opName, b);
+        EnforceNeoVmIntegerInput(state, inst, opName, a, "left operand");
+        EnforceNeoVmIntegerInput(state, inst, opName, b, "right operand");
+        state.Push(SymbolicValue.Of(f(a.Expression, b.Expression), a.Taints.Union(b.Taints)));
+        state.Pc = inst.EndOffset;
+        return Single(state);
+    }
+
     private IEnumerable<ExecutionState> UnaryArith(ExecutionState state, Instruction inst, string opName,
                                                    Func<Expression, Expression> f, bool overflow)
     {
         var v = state.Pop();
+        EnsureArithmeticOperandNotNull(opName, v);
+        EnforceNeoVmIntegerInput(state, inst, opName, v, "operand");
         var result = f(v.Expression);
-        state.Push(SymbolicValue.Of(result, v.Taints));
+        var resultValue = SymbolicValue.Of(result, v.Taints);
+        EnsureConcreteIntegerInRange(result, opName);
+        state.Push(resultValue);
         state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
             inst.Offset, opName, v, null,
             OverflowPossible: overflow && !v.IsConcrete,
             DivisorMaybeZero: false,
-            Checked: false));
+            Checked: false,
+            Result: resultValue));
         state.Pc = inst.EndOffset;
         return Single(state);
     }
 
     private IEnumerable<ExecutionState> BinaryArith(ExecutionState state, Instruction inst, string opName,
                                                     Func<Expression, Expression, Expression> f,
-                                                    bool overflow, bool divisorMatters = false)
+                                                    bool overflow, bool divisorMatters = false,
+                                                    int? maxRight = null)
     {
         var b = state.Pop();
         var a = state.Pop();
+        EnsureArithmeticOperandNotNull(opName, a);
+        EnsureArithmeticOperandNotNull(opName, b);
+        EnforceNeoVmIntegerInput(state, inst, opName, a, "left operand");
+        EnforceNeoVmIntegerInput(state, inst, opName, b, "right operand");
         var result = f(a.Expression, b.Expression);
         bool divisorMaybeZero = divisorMatters && !b.IsConcrete;
-        state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
+        var resultValue = SymbolicValue.Of(result, a.Taints.Union(b.Taints));
+        EnsureConcreteIntegerInRange(result, opName);
+        state.Push(resultValue);
         // Audit overflow.py finding: only flag overflow when neither operand is bounded.
         // For now, mark when either is symbolic; the SMT layer will tighten this later.
         bool overflowPossible = overflow && (!a.IsConcrete || !b.IsConcrete);
@@ -448,26 +513,145 @@ public sealed partial class SymbolicEngine
             inst.Offset, opName, a, b,
             OverflowPossible: overflowPossible,
             DivisorMaybeZero: divisorMaybeZero,
-            Checked: false));
+            Checked: false,
+            MaxRight: maxRight,
+            Result: resultValue));
         state.Pc = inst.EndOffset;
         return Single(state);
     }
 
     private IEnumerable<ExecutionState> TernaryArith(ExecutionState state, Instruction inst, string opName,
-                                                     Func<Expression, Expression, Expression, Expression> f)
+                                                     Func<Expression, Expression, Expression, Expression> f,
+                                                     int? maxRight = null)
     {
         var c = state.Pop();
         var b = state.Pop();
         var a = state.Pop();
+        EnsureArithmeticOperandNotNull(opName, a);
+        EnsureArithmeticOperandNotNull(opName, b);
+        EnsureArithmeticOperandNotNull(opName, c);
+        EnforceNeoVmIntegerInput(state, inst, opName, a, "left operand");
+        EnforceNeoVmIntegerInput(state, inst, opName, b, "right operand");
+        EnforceNeoVmIntegerInput(state, inst, opName, c, "modulus operand");
         var result = f(a.Expression, b.Expression, c.Expression);
-        state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints).Union(c.Taints)));
+        var resultValue = SymbolicValue.Of(result, a.Taints.Union(b.Taints).Union(c.Taints));
+        EnsureConcreteIntegerInRange(result, opName);
+        state.Push(resultValue);
+        AddModularArithmeticResultRange(state, opName, result);
         state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
             inst.Offset, opName, a, b,
             OverflowPossible: !a.IsConcrete || !b.IsConcrete || !c.IsConcrete,
             DivisorMaybeZero: false,
-            Checked: false));
+            Checked: false,
+            MaxRight: maxRight,
+            Third: c,
+            Result: resultValue));
         state.Pc = inst.EndOffset;
         return Single(state);
+    }
+
+    private static void EnsureArithmeticOperandNotNull(string opName, SymbolicValue value)
+    {
+        if (value.IsConcreteNull)
+            throw new VmFaultException($"{opName} with null operand");
+    }
+
+    private static void EnforceNeoVmIntegerInput(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        SymbolicValue value,
+        string operandName)
+    {
+        if (value.Sort is Sort.Int or Sort.Bool)
+            return;
+
+        if (value.Sort == Sort.Bytes)
+        {
+            if (value.AsConcreteBytes() is { } bytes)
+            {
+                if (bytes.Length > MaxNeoVmIntegerBytes)
+                    throw new VmFaultException(
+                        $"{opName}: {operandName} ByteString length {bytes.Length} exceeds NeoVM's {MaxNeoVmIntegerBytes}-byte integer input limit");
+                return;
+            }
+
+            AddNeoVmIntegerInputFaultCondition(state, inst, opName, value.Expression, $"ByteString {operandName}");
+            return;
+        }
+
+        if (value.Sort == Sort.Unknown)
+        {
+            AddUnknownNeoVmIntegerInputFaultCondition(state, inst, opName, operandName);
+            return;
+        }
+
+        if (value.Sort != Sort.Buffer)
+            throw new VmFaultException($"{opName}: {operandName} {value.Sort} cannot be converted to NeoVM Integer");
+
+        if (value.Expression is HeapRef href
+            && state.Heap.Objects.TryGetValue(href.ObjectId, out var obj)
+            && obj is BufferObject buffer)
+        {
+            if (buffer.IsSymbolicOpen)
+            {
+                var size = OpenBufferSize(state, buffer);
+                state.Telemetry.FaultConditions.Add(new FaultConditionOp(
+                    inst.Offset,
+                    opName,
+                    Expr.Gt(size.Expression, Expr.Int(MaxNeoVmIntegerBytes)),
+                    $"Buffer {operandName} may exceed {MaxNeoVmIntegerBytes} bytes before NeoVM GetInteger conversion",
+                    "VM opcode precondition holds under requires"));
+                return;
+            }
+
+            if (buffer.Length > MaxNeoVmIntegerBytes)
+                throw new VmFaultException(
+                    $"{opName}: {operandName} Buffer length {buffer.Length} exceeds NeoVM's {MaxNeoVmIntegerBytes}-byte integer input limit");
+            return;
+        }
+
+        AddNeoVmIntegerInputFaultCondition(state, inst, opName, value.Expression, $"Buffer {operandName}");
+    }
+
+    private static void AddUnknownNeoVmIntegerInputFaultCondition(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        string operandName)
+    {
+        var invalidType = Expr.Sym(Sort.Bool, state.NextFreshSymbolName($"invalid_integer_input_{inst.Offset}"));
+        state.Telemetry.FaultConditions.Add(new FaultConditionOp(
+            inst.Offset,
+            opName,
+            invalidType,
+            $"{operandName} may be a non-integer StackItem before NeoVM GetInteger conversion",
+            "VM opcode precondition holds under requires"));
+    }
+
+    private static void AddNeoVmIntegerInputFaultCondition(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        Expression source,
+        string operandLabel)
+    {
+        state.Telemetry.FaultConditions.Add(new FaultConditionOp(
+            inst.Offset,
+            opName,
+            Expr.Gt(new UnaryExpr(Sort.Int, "size", source), Expr.Int(MaxNeoVmIntegerBytes)),
+            $"{operandLabel} may exceed {MaxNeoVmIntegerBytes} bytes before NeoVM GetInteger conversion",
+            "VM opcode precondition holds under requires"));
+    }
+
+    private static void AddModularArithmeticResultRange(ExecutionState state, string opName, Expression result)
+    {
+        if (opName is not ("MODMUL" or "MODPOW") || Expr.ConcreteInt(result) is not null)
+            return;
+
+        state.PathConditions = state.PathConditions
+            .Add(Expr.Ge(result, Expr.Int(Expr.NeoVmIntegerMin)))
+            .Add(Expr.Le(result, Expr.Int(Expr.NeoVmIntegerMax)));
     }
 
     private static string DescribeMessage(SymbolicValue v) =>
@@ -526,28 +710,118 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleShift(ExecutionState state, Instruction inst, string opName, bool isLeft)
     {
         var b = state.Pop();
+        EnforceNeoVmIntegerInput(state, inst, opName, b, "shift operand");
         // Audit fix (iter-2 wakeup-5): NeoVM's GetInteger converts Bool/ByteString to BigInteger
         // before checking shift==0. Use Expr.ConcreteInt for the same cross-type semantics —
         // a PUSH5 NOT SHR (where NOT produces BoolConst.False = shift 0) used to underflow on
         // the second pop because b.AsConcreteInt() returned null on a BoolConst.
-        if (Expr.ConcreteInt(b.Expression) is { } shift && shift == 0)
+        var concreteShift = Expr.ConcreteInt(b.Expression);
+        if (concreteShift is { } shift && shift == 0)
         {
-            state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
-                inst.Offset, opName, b, null,
-                OverflowPossible: false, DivisorMaybeZero: false, Checked: false));
-            state.Pc = inst.EndOffset;
+            CompleteZeroShift(state, inst, opName, b);
             return Single(state);
         }
+        if (concreteShift is null)
+            return HandleSymbolicShift(state, inst, opName, isLeft, b);
+
+        return Single(CompleteNonZeroShift(state, inst, opName, isLeft, b));
+    }
+
+    private IEnumerable<ExecutionState> HandleSymbolicShift(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        bool isLeft,
+        SymbolicValue shift)
+    {
+        var shiftIsZero = Expr.NumEq(shift.Expression, Expr.Int(0));
+        var (zeroSat, nonZeroSat) = ConsultSmt(state, shiftIsZero);
+        if (zeroSat == Smt.SmtOutcome.Unsat && nonZeroSat == Smt.SmtOutcome.Unsat)
+        {
+            state.Terminate(TerminalStatus.Stopped, "both shift branches unsatisfiable");
+            return Single(state);
+        }
+
+        if (zeroSat == Smt.SmtOutcome.Unknown || nonZeroSat == Smt.SmtOutcome.Unknown)
+            state.Telemetry.SmtUnknownOffsets.Add(inst.Offset);
+
+        var states = new List<ExecutionState>(2);
+        if (zeroSat != Smt.SmtOutcome.Unsat)
+        {
+            var zeroState = nonZeroSat == Smt.SmtOutcome.Unsat ? state : state.Clone();
+            zeroState.PathConditions = zeroState.PathConditions.Add(shiftIsZero);
+            CompleteZeroShift(zeroState, inst, opName, shift);
+            states.Add(zeroState);
+        }
+        else
+        {
+            state.Telemetry.SmtPrunedBranches++;
+        }
+
+        if (nonZeroSat != Smt.SmtOutcome.Unsat)
+        {
+            var nonZeroState = state;
+            nonZeroState.PathConditions = nonZeroState.PathConditions.Add(Expr.Not(shiftIsZero));
+            try
+            {
+                states.Add(CompleteNonZeroShift(nonZeroState, inst, opName, isLeft, shift));
+            }
+            catch (VmFaultException vex)
+            {
+                nonZeroState.Terminate(TerminalStatus.Faulted, vex.Message);
+                states.Add(nonZeroState);
+            }
+        }
+        else
+        {
+            state.Telemetry.SmtPrunedBranches++;
+        }
+
+        return states;
+    }
+
+    private static void CompleteZeroShift(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        SymbolicValue shift)
+    {
+        state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
+            inst.Offset, opName, shift, null,
+            OverflowPossible: false, DivisorMaybeZero: false, Checked: false));
+        state.Pc = inst.EndOffset;
+    }
+
+    private ExecutionState CompleteNonZeroShift(
+        ExecutionState state,
+        Instruction inst,
+        string opName,
+        bool isLeft,
+        SymbolicValue b)
+    {
         var a = state.Pop();
+        EnforceNeoVmIntegerInput(state, inst, opName, a, "value operand");
         Expression result = isLeft
             ? Expr.Shl(a.Expression, b.Expression, _options.MaxShiftCount)
             : Expr.Shr(a.Expression, b.Expression, _options.MaxShiftCount);
-        state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
+        var resultValue = SymbolicValue.Of(result, a.Taints.Union(b.Taints));
+        EnsureConcreteIntegerInRange(result, opName);
+        state.Push(resultValue);
         state.Telemetry.ArithmeticOps.Add(new ArithmeticOp(
             inst.Offset, opName, a, b,
             OverflowPossible: isLeft && (!a.IsConcrete || !b.IsConcrete),
-            DivisorMaybeZero: false, Checked: false));
+            DivisorMaybeZero: false,
+            Checked: false,
+            MaxRight: _options.MaxShiftCount,
+            Result: resultValue));
         state.Pc = inst.EndOffset;
-        return Single(state);
+        return state;
+    }
+
+    private static void EnsureConcreteIntegerInRange(Expression result, string opName)
+    {
+        if (Expr.ConcreteInt(result) is { } value && !Expr.IsWithinNeoVmIntegerRange(value))
+            throw new VmFaultException(
+                $"{opName} integer overflow: result exceeds NeoVM's 32-byte signed integer range");
     }
 }

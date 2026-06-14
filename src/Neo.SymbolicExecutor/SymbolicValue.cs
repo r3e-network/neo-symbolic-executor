@@ -23,6 +23,7 @@ public sealed record SymbolicValue(Expression Expression, ImmutableHashSet<strin
     public BigInteger? AsConcreteInt() => Expr.ConcreteInt(Expression);
     public bool? AsConcreteBool() => Expression is BoolConst b ? b.Value : null;
     public byte[]? AsConcreteBytes() => Expression is BytesConst by ? by.Value : null;
+    public int? AsConcretePointer() => Expression is PointerConst pointer ? pointer.TargetOffset : null;
     public bool IsConcreteNull => Expression is NullConst;
 
     public static SymbolicValue Of(Expression expr) =>
@@ -35,6 +36,7 @@ public sealed record SymbolicValue(Expression Expression, ImmutableHashSet<strin
     public static SymbolicValue Int(long value) => Of(Expr.Int(value));
     public static SymbolicValue Bool(bool value) => Of(Expr.Bool(value));
     public static SymbolicValue Bytes(byte[] value) => Of(Expr.Bytes(value));
+    public static SymbolicValue Pointer(int targetOffset) => Of(Expr.Pointer(targetOffset));
     public static SymbolicValue Null() => Of(Expr.Null());
     public static SymbolicValue Symbol(Sort sort, string name) => Of(Expr.Sym(sort, name));
     public static SymbolicValue HeapRef(Sort sort, int id) => Of(Expr.Ref(sort, id));

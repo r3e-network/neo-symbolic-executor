@@ -30,9 +30,13 @@ public static class DefaultDetectorSet
         new PermissionsDetector(),
         new AdminCentralizationDetector(),
         new Nep17ComplianceDetector(),
+        new SupportedStandardsCoverageDetector(),
         new UnknownInstructionsDetector(),
         // 5 new detectors per audit coverage gaps.
         new Nep11ComplianceDetector(),
+        new Nep24ComplianceDetector(),
+        new Nep27ComplianceDetector(),
+        new Nep26ComplianceDetector(),
         new CallbackReentryDetector(),
         new CryptoVerificationBypassDetector(),
         new ReplayAttackDetector(),

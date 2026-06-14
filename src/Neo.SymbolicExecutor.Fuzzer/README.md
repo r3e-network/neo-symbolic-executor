@@ -122,8 +122,9 @@ cat fuzz-corpus/crashes/engine-A1B2C3D4E5F6/crash.txt
 neo-sym-fuzz --target engine --seed 197456258 --seconds 1
 ```
 
-The `--reproduce <input.bin>` flag is wired but its driver is target-dependent and still
-maturing — for now, the seed-driven entry point is the canonical replay.
+The `--reproduce <input.bin>` flag supports direct replay targets such as `decoder`, `nef`,
+`engine`, `engine-cov`, and the Neo.VM differential target. Replay inputs are capped at the
+NEF script-size limit so an oversized crash artifact cannot exhaust memory during triage.
 
 ## Historical throughput baselines
 
@@ -133,7 +134,7 @@ On a developer laptop (4 worker threads, dotnet 10), the original 12-target camp
 - ~5 minutes ≈ 50M iterations
 - ~24 hours ≈ ~14 billion iterations
 
-Current 21-target campaigns include real-NEF, coverage-guided, consistency, heap-invariant,
+Current 23-target campaigns include real-NEF, coverage-guided, consistency, heap-invariant,
 and differential Neo.VM oracles, so throughput depends on the enabled target mix and corpus.
 
 ## Bug-hunting record

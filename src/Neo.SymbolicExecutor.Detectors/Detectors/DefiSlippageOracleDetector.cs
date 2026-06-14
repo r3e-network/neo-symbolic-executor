@@ -24,7 +24,15 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             bool sourceDefiSignal = ProtocolRiskHelpers.HasDefiSourceSignal(context, state);
             if (!swapLike && !defiStateSignal && !sourceDefiSignal) continue;
 
-            bool externalTransfer = state.Telemetry.ExternalCalls.Any(ProtocolRiskHelpers.IsTokenTransferCall);
+            bool concreteTransfer = state.Telemetry.ExternalCalls.Any(call =>
+                !call.ModeledSelfCall && ProtocolRiskHelpers.IsTokenTransferCall(call));
+            // Review fix (#59): also recognize transfer-named calls with a symbolic/dynamic target
+            // (router-style) as a token-transfer signal so the slippage/freshness obligation still
+            // applies. Combined here with the swap/defi signal already required above; surfaced at
+            // reduced confidence because a dynamic target is a weaker indicator than a concrete hash.
+            bool dynamicTransfer = !concreteTransfer && state.Telemetry.ExternalCalls.Any(call =>
+                !call.ModeledSelfCall && ProtocolRiskHelpers.IsDynamicTokenTransferCall(call));
+            bool externalTransfer = concreteTransfer || dynamicTransfer;
             bool writesState = state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite);
             if (!externalTransfer || !writesState) continue;
 
@@ -35,7 +43,9 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             if (hasSlippageSignal && hasFreshnessSignal) continue;
 
             int offset = state.Telemetry.ExternalCalls
-                .Where(ProtocolRiskHelpers.IsTokenTransferCall)
+                .Where(call => !call.ModeledSelfCall)
+                .Where(call => ProtocolRiskHelpers.IsTokenTransferCall(call)
+                            || ProtocolRiskHelpers.IsDynamicTokenTransferCall(call))
                 .Select(c => c.Offset)
                 .DefaultIfEmpty(0)
                 .Min();
@@ -49,17 +59,25 @@ public sealed class DefiSlippageOracleDetector : BaseDetector
             if (defiStateSignal) tags.Add("defi-state");
             if (ProtocolRiskHelpers.HasDynamicStateWrite(state)) tags.Add("dynamic-storage-key");
             if (sourceDefiSignal) tags.Add("source-hint");
+            if (dynamicTransfer) tags.Add("dynamic-transfer-target");
 
             yield return MakeFinding(
                 title: $"DeFi-like method `{methodName}` lacks price-safety signals",
                 description: $"DeFi-like method `{methodName}` performs token transfer(s) and mutates state, "
                            + $"but this path lacks {string.Join(" and ", missing)}. DeFi flows should bound "
                            + "received amount and avoid stale or manipulable price inputs before updating reserves, "
-                           + "vault shares, or balances.",
+                           + "vault shares, or balances."
+                           + (dynamicTransfer
+                                ? " The token transfer targets a dynamic/symbolic address (router-style), so this is "
+                                  + "surfaced at reduced confidence."
+                                : ""),
                 offset: offset,
                 severity: Severity.High,
                 state: state,
-                tags: tags);
+                tags: tags,
+                // Review fix (#59): dynamic-target transfers are a weaker signal than a concrete
+                // token hash, so reduce confidence when only the dynamic path matched.
+                confidenceOverride: dynamicTransfer ? DefaultConfidence * 0.75 : null);
         }
     }
 }

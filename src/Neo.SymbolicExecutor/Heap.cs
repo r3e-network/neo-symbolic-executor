@@ -61,14 +61,22 @@ public sealed class Heap
         return obj;
     }
 
-    public ArrayObject NewArray(IEnumerable<SymbolicValue>? items = null) =>
-        Allocate(id => new ArrayObject(id, items));
+    public ArrayObject NewArray(
+        IEnumerable<SymbolicValue>? items = null,
+        bool isSymbolicOpen = false,
+        int? minCount = null) =>
+        Allocate(id => new ArrayObject(id, items, isSymbolicOpen, minCount));
 
-    public StructObject NewStruct(IEnumerable<SymbolicValue>? fields = null) =>
-        Allocate(id => new StructObject(id, fields));
+    public StructObject NewStruct(
+        IEnumerable<SymbolicValue>? fields = null,
+        bool isSymbolicOpen = false,
+        int? minCount = null) =>
+        Allocate(id => new StructObject(id, fields, isSymbolicOpen, minCount));
 
-    public MapObject NewMap(IEnumerable<(SymbolicValue, SymbolicValue)>? entries = null) =>
-        Allocate(id => new MapObject(id, entries));
+    public MapObject NewMap(
+        IEnumerable<(SymbolicValue, SymbolicValue)>? entries = null,
+        bool isSymbolicOpen = false) =>
+        Allocate(id => new MapObject(id, entries, isSymbolicOpen));
 
     public BufferObject NewBuffer(int length)
     {
@@ -82,6 +90,26 @@ public sealed class Heap
         if (bytes.Length > MaxItemSize)
             throw new VmFaultException($"Buffer size {bytes.Length} exceeds item size limit");
         return Allocate(id => new BufferObject(id, bytes));
+    }
+
+    public BufferObject NewSymbolicBuffer(Expression sourceBytes, Expression symbolicLength, int minLength = 0)
+    {
+        if (minLength < 0 || minLength > MaxItemSize)
+            throw new VmFaultException($"Buffer minimum size {minLength} exceeds item size limit");
+        return Allocate(id => new BufferObject(
+            id,
+            System.Array.Empty<Expression>(),
+            isSymbolicOpen: true,
+            minLength: minLength,
+            symbolicLength: symbolicLength,
+            sourceBytes: sourceBytes));
+    }
+
+    public InteropObject NewInterop(string kind, byte[] payload, SymbolicValue? symbolicPayload = null)
+    {
+        if (payload.Length > MaxItemSize)
+            throw new VmFaultException($"Interop payload size {payload.Length} exceeds item size limit");
+        return Allocate(id => new InteropObject(id, kind, payload, symbolicPayload));
     }
 
     public HeapObject Get(int id) =>
@@ -124,6 +152,43 @@ public sealed class Heap
         return obj is T typed
             ? typed
             : throw new VmFaultException($"Heap object {id} is {obj.Sort}, not {typeof(T).Name}");
+    }
+
+    public SymbolicValue CloneStructValueForCollection(SymbolicValue value) =>
+        CloneStructValueForCollection(value, new Dictionary<int, int>());
+
+    private SymbolicValue CloneStructValueForCollection(
+        SymbolicValue value,
+        Dictionary<int, int> clonedStructs)
+    {
+        if (value.Expression is not HeapRef { RefSort: Sort.Struct } href)
+            return value;
+
+        return SymbolicValue
+            .HeapRef(Sort.Struct, CloneStructObjectForCollection(href.ObjectId, clonedStructs))
+            .WithTaints(value.Taints);
+    }
+
+    private int CloneStructObjectForCollection(int sourceId, Dictionary<int, int> clonedStructs)
+    {
+        if (clonedStructs.TryGetValue(sourceId, out int existingClone))
+            return existingClone;
+
+        var source = Get<StructObject>(sourceId);
+        EnforceCollectionGrowth(source.Fields.Count);
+        var clone = Allocate(id => new StructObject(
+            id,
+            isSymbolicOpen: source.IsSymbolicOpen,
+            minCount: source.MinCount,
+            openSizeOffset: source.OpenSizeOffset));
+        clonedStructs[sourceId] = clone.Id;
+
+        foreach (var field in source.Fields)
+            clone.Fields.Add(CloneStructValueForCollection(field, clonedStructs));
+        foreach (var write in source.OpenWrites)
+            clone.OpenWrites.Add((write.Key, CloneStructValueForCollection(write.Value, clonedStructs)));
+
+        return clone.Id;
     }
 
     /// <summary>

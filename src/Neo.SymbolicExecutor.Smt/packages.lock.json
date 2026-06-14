@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "BouncyCastle.Cryptography": {
+        "type": "Transitive",
+        "resolved": "2.6.2",
+        "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
+      },
+      "Neo.Cryptography.BLS12_381": {
+        "type": "Transitive",
+        "resolved": "3.9.0",
+        "contentHash": "/SE5BJndqRcbk4ri4p6dvttgg3uuQ8Wi5viGxx+Qhs4oRETXG7OM9M5hPQweGcwpErEqK8Qc1Nbx/K37qPxIpw=="
+      },
+      "Neo.VM": {
+        "type": "Transitive",
+        "resolved": "3.9.0",
+        "contentHash": "5QxkGWadGcN0aXcrcJ3MRVIl9PmRnMipsKY22bD+2AA2K/nHEhm91guQTsERIKClNvbdrLyY+6VwnakicZQb0A==",
+        "dependencies": {
+          "System.IO.Hashing": "9.0.10"
+        }
+      },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.8",
+        "contentHash": "+dJsbPJ3FyUbTZNplFj0RCKePFizmv6ewDV46JE9q/IVH4c3xTCftHfHelLsAKf0jryIPqgMb5GpS0x7TAY3mg=="
+      },
+      "neo.symbolicexecutor": {
+        "type": "Project",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "[2.6.2, )",
+          "Neo.Cryptography.BLS12_381": "[3.9.0, )",
+          "Neo.VM": "[3.9.0, )",
+          "System.IO.Hashing": "[10.0.8, )"
+        }
+      }
+    }
+  }
+}

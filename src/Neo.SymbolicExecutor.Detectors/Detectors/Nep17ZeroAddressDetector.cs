@@ -19,6 +19,14 @@ namespace Neo.SymbolicExecutor.Detectors.Detectors;
 /// constrains those symbols via a branch (typically a length-or-equality check vs the zero
 /// address). A state that reaches a storage write while neither symbol appeared in any branch
 /// indicates an unprotected from/to.
+///
+/// Review fix (#18): a spec-compliant NEP-17 <c>transfer</c> authenticates <c>from</c> with
+/// <c>Runtime.CheckWitness(from)</c>, which gates the path without ever placing the <c>from</c>/
+/// <c>to</c> symbols into a branch condition — so the bare symbol-in-path heuristic above
+/// false-positives on every correct implementation. NEP-17 does NOT mandate zero-address
+/// rejection (that is an Ethereum convention), and an enforced witness/caller check on the
+/// principal already prevents the from-zero "mint alias" abuse. We therefore suppress the finding
+/// on any path that carries an enforced authorization signal.
 /// </summary>
 public sealed class Nep17ZeroAddressDetector : BaseDetector
 {
@@ -30,7 +38,7 @@ public sealed class Nep17ZeroAddressDetector : BaseDetector
     {
         if (context.Manifest is null) yield break;
         if (!context.Manifest.DeclaresStandard("NEP-17")) yield break;
-        var transfer = context.Manifest.FindMethod("transfer");
+        var transfer = ProtocolRiskHelpers.FindStandardNep17TransferMethod(context.Manifest);
         if (transfer is null) yield break;
 
         string fromSym = ProtocolRiskHelpers.MethodArgSymbolName(transfer, index: 0, defaultIfMissing: "arg0");
@@ -40,6 +48,10 @@ public sealed class Nep17ZeroAddressDetector : BaseDetector
         {
             if (!ProtocolRiskHelpers.IsEntryStateFor(state, transfer)) continue;
             if (!state.Telemetry.StorageOps.Any(ProtocolRiskHelpers.IsStateWrite)) continue;
+            // Review fix (#18): an enforced witness/caller/signature check on this path satisfies
+            // the authorization obligation for `from`. Witness auth never surfaces from/to in a
+            // branch, so without this guard the detector fires on every compliant transfer.
+            if (ProtocolRiskHelpers.HasAnyEnforcedAuth(state)) continue;
 
             var pathSymbols = new HashSet<string>(
                 state.PathConditions.SelectMany(c => c.FreeSymbols()),

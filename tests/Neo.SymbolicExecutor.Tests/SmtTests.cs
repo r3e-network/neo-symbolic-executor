@@ -45,6 +45,93 @@ public class SmtTests
     }
 
     [Fact]
+    public void Z3_SymbolicAdditionUsesMathematicalIntegerSemantics()
+    {
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var max = (System.Numerics.BigInteger.One << 255) - System.Numerics.BigInteger.One;
+        var conds = new List<Expression>
+        {
+            Expr.Gt(Expr.Add(Expr.Int(max), x), Expr.Int(max)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(conds);
+        witness.Should().NotBeNull();
+        witness!.Should().ContainKey("x");
+        ((System.Numerics.BigInteger)witness["x"]).Should().BeGreaterThan(System.Numerics.BigInteger.Zero);
+    }
+
+    [Fact]
+    public void Z3_NonNegativeSymbolicAdditionCannotUnderflowBelowNeoIntegerMinimum()
+    {
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var min = -(System.Numerics.BigInteger.One << 255);
+        var max = (System.Numerics.BigInteger.One << 255) - System.Numerics.BigInteger.One;
+        var conds = new List<Expression>
+        {
+            Expr.Ge(x, Expr.Int(0)),
+            Expr.Lt(Expr.Add(Expr.Int(max), x), Expr.Int(min)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Z3_ReusesOpaqueSymbolForRepeatedUnsupportedExpression()
+    {
+        using var backend = new Z3Backend();
+        if (!backend.IsExternalSolver)
+            return;
+
+        var x = Expr.Sym(Sort.Int, "x");
+        var opaque = new TernaryExpr(Sort.Int, "modmul", Expr.Int(2), Expr.Int(3), x);
+        var conds = new List<Expression>
+        {
+            Expr.Le(opaque, Expr.Int(10)),
+            Expr.Gt(opaque, Expr.Int(10)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_SymbolicAdditionUsesMathematicalIntegerSemantics_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var max = (System.Numerics.BigInteger.One << 255) - System.Numerics.BigInteger.One;
+        var conds = new List<Expression>
+        {
+            Expr.Gt(Expr.Add(Expr.Int(max), x), Expr.Int(max)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(conds);
+        witness.Should().NotBeNull();
+        witness!.Should().ContainKey("x");
+        ((System.Numerics.BigInteger)witness["x"]).Should().BeGreaterThan(System.Numerics.BigInteger.Zero);
+    }
+
+    [Fact]
+    public void Fallback_ReusesOpaqueSymbolForRepeatedUnsupportedExpression_WhenZ3ExecutableMissing()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var opaque = new TernaryExpr(Sort.Int, "modmul", Expr.Int(2), Expr.Int(3), x);
+        var conds = new List<Expression>
+        {
+            Expr.Le(opaque, Expr.Int(10)),
+            Expr.Gt(opaque, Expr.Int(10)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
     public void Fallback_ProvesBasicConstraints_WhenZ3ExecutableMissing()
     {
         using var _ = ForceMissingZ3();
@@ -279,6 +366,52 @@ fi
 
             backend.ConcretizeInt(new List<Expression> { Expr.Eq(x, Expr.Int(7)) }, x)
                 .Should().Be(new System.Numerics.BigInteger(7));
+        }
+        finally
+        {
+            File.Delete(fakeZ3);
+        }
+    }
+
+    [Fact]
+    public void Z3_ConcreteBytePickIsTranslatedWithoutOpaqueFallback()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var fakeZ3 = Path.Combine(Path.GetTempPath(), $"fake-z3-{Guid.NewGuid():N}.sh");
+        File.WriteAllText(fakeZ3, """
+#!/usr/bin/env bash
+if [[ "$*" == *"-version"* ]]; then
+  echo "Z3 version fake"
+  exit 0
+fi
+
+input="$(cat)"
+if [[ "$input" == *"__opaque_int"* ]]; then
+  echo "unknown"
+elif [[ "$input" == *"(not (= 66 66))"* ]]; then
+  echo "unsat"
+else
+  echo "unknown"
+fi
+""");
+        File.SetUnixFileMode(fakeZ3, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        try
+        {
+            using var restore = SetZ3Path(fakeZ3);
+            using var backend = new Z3Backend();
+            var picked = new BinaryExpr(
+                Sort.Int,
+                "pick",
+                Expr.Bytes(new byte[] { 65, 66 }),
+                Expr.Int(1));
+
+            backend.IsSatisfiable(new List<Expression>
+            {
+                Expr.Ne(picked, Expr.Int(66)),
+            }).Should().Be(SmtOutcome.Unsat);
         }
         finally
         {

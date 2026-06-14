@@ -123,10 +123,10 @@ public class AuditFixesTests
     }
 
     [Fact]
-    public void Manifest_TolaratesNonObjectArrayItems_AuditFinding28()
+    public void Manifest_RejectsNonObjectArrayItems_AuditFinding28()
     {
-        // Numbers / strings / arrays inside what should be object arrays should be skipped,
-        // not crash with InvalidOperationException.
+        // Numbers / strings / arrays inside what should be object arrays must fail closed,
+        // not crash with InvalidOperationException or silently shrink the analyzed surface.
         var manifestJson = """
         {
           "name":"X","groups":[1,2,"hi"],"features":{},"supportedstandards":["NEP-17", 5],
@@ -137,12 +137,7 @@ public class AuditFixesTests
         }
         """;
         var act = () => Nef.ContractManifest.FromJson(manifestJson);
-        act.Should().NotThrow();
-        var m = Nef.ContractManifest.FromJson(manifestJson);
-        m.Abi.Methods.Should().ContainSingle();
-        m.Abi.Events.Should().ContainSingle();
-        m.Permissions.Should().ContainSingle();
-        m.SupportedStandards.Should().Contain("NEP-17");
+        act.Should().Throw<FormatException>().WithMessage("*groups[0]*object*");
     }
 
     [Fact]
@@ -333,6 +328,25 @@ public class AuditFixesTests
     }
 
     [Fact]
+    public void Arithmetic_FaultsWhenOperandIsNull()
+    {
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSHNULL,
+            (byte)NeoVm.OpCode.PUSH1,
+            (byte)NeoVm.OpCode.ADD,
+            (byte)NeoVm.OpCode.RET,
+        };
+
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+
+        result.FinalStates.Should().ContainSingle();
+        result.FinalStates[0].Status.Should().Be(TerminalStatus.Faulted);
+        result.FinalStates[0].TerminationReason.Should().Contain("ADD");
+        result.FinalStates[0].TerminationReason.Should().Contain("null");
+    }
+
+    [Fact]
     public void Initslot_FaultsOnDoubleInit_EngineAuditM1()
     {
         // Audit engine M1: INITSLOT could be called twice, growing the slot table silently.
@@ -386,12 +400,12 @@ public class AuditFixesTests
     }
 
     [Fact]
-    public void Eq_NullVsSymbolicBytes_RemainsSymbolic_EngineAuditM4()
+    public void Eq_NullVsSymbolicBytes_IsFalseForKnownNonNullPrimitive_EngineAuditM4()
     {
-        // Audit engine M4: Eq used to collapse to BoolConst.False when one side is Null and the
-        // other is symbolic, hiding any contract that branches on a maybe-null argument.
+        // A symbolic ByteString value is still a non-null primitive StackItem. Nullable method
+        // inputs are represented by separate Any/Null entry states, not by Bytes symbols.
         var symBytes = Expr.Sym(Sort.Bytes, "arg0");
-        var result = Expr.Eq(symBytes, Expr.Null());
-        result.Should().BeOfType<BinaryExpr>("symbolic operand prevents proving non-null at compile time");
+        Expr.Eq(symBytes, Expr.Null()).Should().Be(BoolConst.False);
+        Expr.Eq(Expr.Null(), symBytes).Should().Be(BoolConst.False);
     }
 }

@@ -49,13 +49,15 @@ public sealed class DetectorEngine
         var smt = context.SmtBackend!;
         foreach (var f in findings)
         {
-            // Prefer the source state's path conditions captured when the detector emitted the
-            // finding. Fall back to the old offset heuristic only for hand-built findings.
-            var conds = f.PathConditions.IsDefault
-                ? (context.States.FirstOrDefault(s => s.Path.Contains(f.Offset))
-                   ?? context.States.FirstOrDefault())?.PathConditions.ToList()
-                : f.PathConditions.ToList();
-            if (conds is null) { yield return f; continue; }
+            // Static findings are not scoped to any execution path. Do not attach an arbitrary
+            // path for SMT filtering, or --smt-drop-unsat can hide manifest-only risks.
+            if (f.PathConditions.IsDefault)
+            {
+                yield return f;
+                continue;
+            }
+
+            var conds = f.PathConditions.ToList();
             var outcome = smt.IsSatisfiable(conds);
             if (outcome == Smt.SmtOutcome.Sat)
             {
@@ -100,6 +102,8 @@ public sealed class DetectorEngine
                 Confidence = System.Math.Max(existing.Confidence, f.Confidence),
                 ConfidenceReason = winner.Confidence >= f.Confidence ? winner.ConfidenceReason : f.ConfidenceReason,
                 Tags = existing.Tags.Union(f.Tags),
+                PathSatisfiable = MergePathSatisfiability(existing.PathSatisfiable, f.PathSatisfiable),
+                Witness = PickWitness(existing, f, winner),
             };
         }
         // Findings render directly into JSON/Markdown reports; sort with Ordinal so a non-en-US
@@ -109,5 +113,19 @@ public sealed class DetectorEngine
             .ThenBy(f => f.Detector, System.StringComparer.Ordinal)
             .ThenBy(f => f.Offset)
             .ToImmutableArray();
+    }
+
+    private static bool? MergePathSatisfiability(bool? left, bool? right)
+    {
+        if (left == true || right == true) return true;
+        if (left is null || right is null) return null;
+        return false;
+    }
+
+    private static IReadOnlyDictionary<string, object>? PickWitness(Finding left, Finding right, Finding fallback)
+    {
+        if (left.PathSatisfiable == true && left.Witness is { Count: > 0 }) return left.Witness;
+        if (right.PathSatisfiable == true && right.Witness is { Count: > 0 }) return right.Witness;
+        return fallback.Witness;
     }
 }

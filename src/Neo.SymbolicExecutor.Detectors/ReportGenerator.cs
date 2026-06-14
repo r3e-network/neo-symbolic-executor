@@ -32,6 +32,8 @@ public sealed record AnalysisMeta(
     int StepsExecuted = 0,
     bool BudgetExceeded = false,
     string? BudgetReason = null,
+    bool CoverageIncomplete = false,
+    string? CoverageReason = null,
     bool SmtAvailable = false,
     bool SmtEngaged = false)
 {
@@ -48,6 +50,12 @@ public sealed record AnalysisMeta(
     /// field is what makes that claim true).
     /// </summary>
     public Smt.SmtStats? SmtStats { get; init; }
+
+    /// <summary>
+    /// Manifest ABI entrypoints skipped because their declared offsets were outside the script.
+    /// Non-empty means the analysis did not cover every manifest-declared entrypoint.
+    /// </summary>
+    public ImmutableArray<string> SkippedEntrypoints { get; init; } = ImmutableArray<string>.Empty;
 
     public static readonly string CurrentVersion = ResolveAssemblyVersion();
 
@@ -105,7 +113,13 @@ public static class ReportGenerator
         sb.AppendLine($"- **States explored:** {report.Meta.StatesExplored}");
         sb.AppendLine($"- **Steps executed:** {report.Meta.StepsExecuted}");
         if (report.Meta.BudgetExceeded)
-            sb.AppendLine($"- **Budget exceeded:** {report.Meta.BudgetReason ?? "(unspecified)"}");
+            sb.AppendLine($"- **Budget exceeded:** {Md(report.Meta.BudgetReason ?? "(unspecified)")}");
+        if (report.Meta.CoverageIncomplete)
+        {
+            sb.AppendLine($"- **Coverage incomplete:** {Md(report.Meta.CoverageReason ?? "(unspecified)")}");
+            if (!report.Meta.SkippedEntrypoints.IsDefaultOrEmpty)
+                sb.AppendLine($"- **Skipped entrypoints:** {string.Join(", ", report.Meta.SkippedEntrypoints.OrderBy(x => x, System.StringComparer.Ordinal).Select(Code))}");
+        }
         sb.AppendLine($"- **SMT available:** {report.Meta.SmtAvailable} · **SMT engaged:** {report.Meta.SmtEngaged}");
         if (report.Meta.SmtStats is { } stats)
         {
@@ -148,7 +162,7 @@ public static class ReportGenerator
                          .ThenBy(kv => kv.Key, System.StringComparer.Ordinal))
             {
                 double conf = report.Risk.DetectorAverageConfidence.TryGetValue(det, out double c) ? c : 0;
-                sb.AppendLine($"| `{det}` | {sev.ToLowerString()} | {conf.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} |");
+                sb.AppendLine($"| {Code(det)} | {sev.ToLowerString()} | {conf.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} |");
             }
             sb.AppendLine();
         }
@@ -161,12 +175,12 @@ public static class ReportGenerator
         {
             sb.AppendLine("- **Active policies:**");
             foreach (var (k, v) in report.Gate.Policies.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
-                sb.AppendLine($"  - `{k}`: `{v}`");
+                sb.AppendLine($"  - {Code(k)}: {Code(v)}");
         }
         if (!report.Gate.Passed)
         {
             sb.AppendLine("- **Violations:**");
-            foreach (var v in report.Gate.Violations) sb.AppendLine($"  - {v}");
+            foreach (var v in report.Gate.Violations) sb.AppendLine($"  - {Md(v)}");
         }
         sb.AppendLine();
 
@@ -181,18 +195,18 @@ public static class ReportGenerator
         foreach (var f in report.Findings)
         {
             sb.AppendLine();
-            sb.AppendLine($"### `{f.Detector}` — {f.Title}");
+            sb.AppendLine($"### {Code(f.Detector)} — {Md(f.Title)}");
             sb.AppendLine();
             sb.AppendLine($"- **Severity:** `{f.Severity.ToLowerString()}`");
             sb.AppendLine($"- **Offset:** `0x{f.Offset:X4}`");
             sb.AppendLine($"- **Confidence:** {f.Confidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}");
-            sb.AppendLine($"- **Confidence rationale:** {f.ConfidenceReason}");
+            sb.AppendLine($"- **Confidence rationale:** {Md(f.ConfidenceReason)}");
             if (f.PathSatisfiable.HasValue)
                 sb.AppendLine($"- **Path satisfiable:** {f.PathSatisfiable.Value}");
             if (f.Tags.Count > 0)
-                sb.AppendLine($"- **Tags:** {string.Join(", ", f.Tags.OrderBy(t => t, System.StringComparer.Ordinal).Select(t => $"`{t}`"))}");
+                sb.AppendLine($"- **Tags:** {string.Join(", ", f.Tags.OrderBy(t => t, System.StringComparer.Ordinal).Select(Code))}");
             sb.AppendLine();
-            sb.AppendLine(f.Description);
+            sb.AppendLine(Md(f.Description));
             if (f.Witness is { Count: > 0 } w)
             {
                 sb.AppendLine();
@@ -201,7 +215,7 @@ public static class ReportGenerator
                 sb.AppendLine("| Symbol | Concrete value |");
                 sb.AppendLine("|---|---|");
                 foreach (var (k, v) in w.OrderBy(kv => kv.Key, System.StringComparer.Ordinal))
-                    sb.AppendLine($"| `{k}` | `{FormatWitnessValue(v)}` |");
+                    sb.AppendLine($"| {Code(k)} | {Code(FormatWitnessValue(v))} |");
             }
         }
         return sb.ToString();
@@ -223,9 +237,18 @@ public static class ReportGenerator
             ["steps_executed"] = report.Meta.StepsExecuted,
             ["budget_exceeded"] = report.Meta.BudgetExceeded,
             ["budget_reason"] = report.Meta.BudgetReason,
+            ["coverage_incomplete"] = report.Meta.CoverageIncomplete,
+            ["coverage_reason"] = report.Meta.CoverageReason,
             ["smt_available"] = report.Meta.SmtAvailable,
             ["smt_engaged"] = report.Meta.SmtEngaged,
         };
+        var skipped = new JsonArray();
+        var skippedEntries = report.Meta.SkippedEntrypoints.IsDefault
+            ? Enumerable.Empty<string>()
+            : report.Meta.SkippedEntrypoints.OrderBy(x => x, System.StringComparer.Ordinal);
+        foreach (var entry in skippedEntries)
+            skipped.Add(entry);
+        meta["skipped_entrypoints"] = skipped;
         if (report.Meta.SmtStats is { } s)
         {
             meta["smt_stats"] = new JsonObject
@@ -334,4 +357,44 @@ public static class ReportGenerator
         IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
         _ => v?.ToString() ?? "<null>",
     };
+
+    private static string Code(string value) => $"`{Md(value)}`";
+
+    private static string Md(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        var sb = new StringBuilder(value.Length);
+        bool lastWasSpace = false;
+        foreach (char c in value)
+        {
+            if (c is '\r' or '\n' or '\t' || char.IsControl(c))
+            {
+                if (!lastWasSpace)
+                {
+                    sb.Append(' ');
+                    lastWasSpace = true;
+                }
+                continue;
+            }
+
+            lastWasSpace = c == ' ';
+            switch (c)
+            {
+                case '\\': sb.Append(@"\\"); break;
+                case '`': sb.Append(@"\`"); break;
+                case '*': sb.Append(@"\*"); break;
+                case '_': sb.Append(@"\_"); break;
+                case '[': sb.Append(@"\["); break;
+                case ']': sb.Append(@"\]"); break;
+                case '(': sb.Append(@"\("); break;
+                case ')': sb.Append(@"\)"); break;
+                case '#': sb.Append(@"\#"); break;
+                case '|': sb.Append(@"\|"); break;
+                case '<': sb.Append("&lt;"); break;
+                case '>': sb.Append("&gt;"); break;
+                default: sb.Append(c); break;
+            }
+        }
+        return sb.ToString().Trim();
+    }
 }

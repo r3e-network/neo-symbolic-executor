@@ -9,7 +9,10 @@ public sealed record ExecutionResult(
     int StatesExplored,
     int StepsExecuted,
     bool BudgetExceeded,
-    string? BudgetReason)
+    string? BudgetReason,
+    bool CoverageIncomplete = false,
+    string? CoverageReason = null,
+    ImmutableArray<string> SkippedEntrypoints = default)
 {
     public IEnumerable<ExecutionState> Halted => FinalStates.Where(s => s.Status == TerminalStatus.Halted);
     public IEnumerable<ExecutionState> Faulted => FinalStates.Where(s => s.Status == TerminalStatus.Faulted);

@@ -83,14 +83,15 @@ public sealed class FuzzCampaign
                 if (cancel.IsCancellationRequested || _memoryCapBreached) return;
                 int seed = unchecked((int)Interlocked.Increment(ref _seedCounter));
                 _stats.RecordIteration(target.Name);
+                byte[]? reproFromInitialRun = null;
                 try
                 {
-                    bool ok = target.RunOnce(seed, out var reason, out var repro);
+                    bool ok = target.RunOnce(seed, out var reason, out reproFromInitialRun);
                     if (!ok)
                     {
                         var ex = new InvalidOperationException(reason ?? "<no reason>");
                         if (_recorder.Record(target.Name, seed, _stats.IterationsFor(target.Name),
-                                              repro ?? Array.Empty<byte>(), ex, reason))
+                                              reproFromInitialRun ?? Array.Empty<byte>(), ex, reason))
                         {
                             _stats.RecordCrash(target.Name);
                             Log($"  [INVARIANT] {target.Name} seed={seed} reason={reason}");
@@ -100,19 +101,17 @@ public sealed class FuzzCampaign
                 }
                 catch (Exception ex) when (!IsExpected(target, ex))
                 {
-                    // Fall through with whatever input we have. We don't have access to the
-                    // failing input bytes from inside catch — many targets capture them via
-                    // out-param BEFORE throwing. For targets that do, we minimize.
-                    byte[] reproBytes = Array.Empty<byte>();
+                    byte[] reproBytes = reproFromInitialRun ?? Array.Empty<byte>();
                     string targetName = target.Name;
-                    // Try to retrieve the seed-derived input by re-invoking RunOnce defensively;
-                    // if it succeeds the second time, fall back to an empty byte array.
-                    try
+                    // Try to retrieve the seed-derived input by re-invoking RunOnce defensively.
+                    // Keep out-param bytes even when replay throws again after assigning them.
+                    if (reproBytes.Length == 0)
                     {
-                        target.RunOnce(seed, out _, out var captured);
+                        byte[]? captured = null;
+                        try { target.RunOnce(seed, out _, out captured); }
+                        catch { /* expected: same crash on replay; keep any captured bytes */ }
                         if (captured is not null) reproBytes = captured;
                     }
-                    catch { /* expected: same crash on replay; we still need bytes */ }
                     // Apply CrashMinimizer when the target supports direct replay.
                     if (target.SupportsDirectReplay && reproBytes.Length > 1)
                     {

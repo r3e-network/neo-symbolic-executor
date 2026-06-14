@@ -13,9 +13,6 @@ public sealed class ManifestParserTarget : IFuzzTarget
     {
         typeof(FormatException),
         typeof(JsonException),
-        typeof(InvalidOperationException),
-        typeof(ArgumentException),
-        typeof(NotSupportedException),
     };
 
     public bool RunOnce(int seed, out string? reason, out byte[]? reproInput)
@@ -27,8 +24,5 @@ public sealed class ManifestParserTarget : IFuzzTarget
         try { _ = ContractManifest.FromJson(json); return true; }
         catch (FormatException) { return true; }
         catch (JsonException) { return true; }
-        catch (InvalidOperationException) { return true; }
-        catch (ArgumentException) { return true; }
-        catch (NotSupportedException) { return true; }
     }
 }

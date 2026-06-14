@@ -25,7 +25,10 @@ public sealed class AdminCentralizationDetector : BaseDetector
                 { hasSensitive = true; break; }
             if (!hasSensitive)
                 foreach (var c in state.Telemetry.ExternalCalls)
-                { hasSensitive = true; break; }
+                {
+                    if (c.ModeledSelfCall) continue;
+                    hasSensitive = true; break;
+                }
             if (!hasSensitive) continue;
 
             // Audit fix: WitnessChecksEnforced is a HashSet — `foreach { break; }` reads an

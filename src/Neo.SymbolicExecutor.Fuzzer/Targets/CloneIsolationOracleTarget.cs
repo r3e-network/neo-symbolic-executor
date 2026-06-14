@@ -68,9 +68,16 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
         clone.Telemetry.WitnessChecksEnforced.Add(0x5678);
         clone.Telemetry.CallerHashChecks.Add(0xAAAA);
         clone.Telemetry.SignatureChecks.Add(0xBBBB);
+        clone.Telemetry.SignatureChecksEnforced.Add(0xBBBB);
         clone.Telemetry.TimeAccesses.Add(0xCCCC);
         clone.Telemetry.RandomnessAccesses.Add(0xDDDD);
         clone.Telemetry.EventsEmitted.Add(0xEEEE);
+        clone.Telemetry.Notifications.Add(new RuntimeNotification(
+            0xEEEE,
+            SymbolicValue.Bytes(new byte[20]),
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("Transfer")),
+            SymbolicValue.Null(),
+            "Transfer"));
         clone.Telemetry.LoopsDetected.Add(0xFFFF);
         clone.Telemetry.VisitCapsHit.Add(0x7777);
         clone.Telemetry.IteratorLoops.Add(0x1111);
@@ -127,9 +134,11 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
         private readonly int WitEnfCount;
         private readonly int CallerCount;
         private readonly int SigCount;
+        private readonly int SigEnfCount;
         private readonly int TimeCount;
         private readonly int RandCount;
         private readonly int EventCount;
+        private readonly int NotificationCount;
         private readonly int LoopsCount;
         private readonly int VisitCapsCount;
         private readonly int ItLoopsCount;
@@ -143,6 +152,16 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
         private readonly bool Guard;
         private readonly int FrameLocalsTotal;
         private readonly int FrameArgsTotal;
+        // Review fix (#61): element-level identity snapshot. Container .Count alone cannot
+        // detect a count-preserving in-place / shared-buffer clone leak (where the clone's
+        // list IS the source's list, so a `clone.X[0] = sentinel` write also overwrites the
+        // SOURCE's element[0] without changing any Count). Capturing element[0] of the
+        // EvaluationStack and StaticFields lets us assert the source's element[0] is unchanged
+        // after the clone is mutated — catching a shared-list-reference regression.
+        private readonly SymbolicValue? Stack0;
+        private readonly bool HadStack0;
+        private readonly SymbolicValue? Static0;
+        private readonly bool HadStatic0;
 
         public Snapshot(ExecutionState s)
         {
@@ -163,9 +182,11 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             WitEnfCount = s.Telemetry.WitnessChecksEnforced.Count;
             CallerCount = s.Telemetry.CallerHashChecks.Count;
             SigCount = s.Telemetry.SignatureChecks.Count;
+            SigEnfCount = s.Telemetry.SignatureChecksEnforced.Count;
             TimeCount = s.Telemetry.TimeAccesses.Count;
             RandCount = s.Telemetry.RandomnessAccesses.Count;
             EventCount = s.Telemetry.EventsEmitted.Count;
+            NotificationCount = s.Telemetry.Notifications.Count;
             LoopsCount = s.Telemetry.LoopsDetected.Count;
             VisitCapsCount = s.Telemetry.VisitCapsHit.Count;
             ItLoopsCount = s.Telemetry.IteratorLoops.Count;
@@ -181,6 +202,12 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             foreach (var f in s.CallStack) { locals += f.Locals.Count; args += f.Args.Count; }
             FrameLocalsTotal = locals;
             FrameArgsTotal = args;
+
+            // Review fix (#61): capture element[0] identity before the clone is mutated.
+            HadStack0 = s.EvaluationStack.Count > 0;
+            Stack0 = HadStack0 ? s.EvaluationStack[0] : null;
+            HadStatic0 = s.StaticFields.Count > 0;
+            Static0 = HadStatic0 ? s.StaticFields[0] : null;
         }
 
         public bool MatchesOrExplain(ExecutionState s, out string? reason)
@@ -195,8 +222,16 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             if (s.Status != Status) { reason = Bad("Status", Status, s.Status); return false; }
             if (s.TerminationReason != Reason) { reason = Bad("TerminationReason", Reason ?? "<null>", s.TerminationReason ?? "<null>"); return false; }
             if (s.EvaluationStack.Count != StackCount) { reason = Bad("EvaluationStack.Count", StackCount, s.EvaluationStack.Count); return false; }
+            // Review fix (#61): element-level identity. A shared-buffer clone leak preserves
+            // Count but lets `clone.EvaluationStack[0] = sentinel` overwrite the source's
+            // element[0]. Compare the snapshotted value (record value-equality) to catch it.
+            if (HadStack0 && s.EvaluationStack.Count > 0 && s.EvaluationStack[0] != Stack0)
+            { reason = Bad("EvaluationStack[0]", Stack0?.ToString() ?? "<null>", s.EvaluationStack[0]?.ToString() ?? "<null>"); return false; }
             if (s.CallStack.Count != CallStackCount) { reason = Bad("CallStack.Count", CallStackCount, s.CallStack.Count); return false; }
             if (s.StaticFields.Count != StaticsCount) { reason = Bad("StaticFields.Count", StaticsCount, s.StaticFields.Count); return false; }
+            // Review fix (#61): same element-level identity check for StaticFields[0].
+            if (HadStatic0 && s.StaticFields.Count > 0 && s.StaticFields[0] != Static0)
+            { reason = Bad("StaticFields[0]", Static0?.ToString() ?? "<null>", s.StaticFields[0]?.ToString() ?? "<null>"); return false; }
             if (s.VisitCounts.Count != VisitCount) { reason = Bad("VisitCounts.Count", VisitCount, s.VisitCounts.Count); return false; }
             if (s.Path.Count != PathCount) { reason = Bad("Path.Count", PathCount, s.Path.Count); return false; }
             if (s.InteropContext.Count != InteropCount) { reason = Bad("InteropContext.Count", InteropCount, s.InteropContext.Count); return false; }
@@ -207,9 +242,11 @@ public sealed class CloneIsolationOracleTarget : IFuzzTarget
             if (s.Telemetry.WitnessChecksEnforced.Count != WitEnfCount) { reason = Bad("Telemetry.WitnessChecksEnforced", WitEnfCount, s.Telemetry.WitnessChecksEnforced.Count); return false; }
             if (s.Telemetry.CallerHashChecks.Count != CallerCount) { reason = Bad("Telemetry.CallerHashChecks", CallerCount, s.Telemetry.CallerHashChecks.Count); return false; }
             if (s.Telemetry.SignatureChecks.Count != SigCount) { reason = Bad("Telemetry.SignatureChecks", SigCount, s.Telemetry.SignatureChecks.Count); return false; }
+            if (s.Telemetry.SignatureChecksEnforced.Count != SigEnfCount) { reason = Bad("Telemetry.SignatureChecksEnforced", SigEnfCount, s.Telemetry.SignatureChecksEnforced.Count); return false; }
             if (s.Telemetry.TimeAccesses.Count != TimeCount) { reason = Bad("Telemetry.TimeAccesses", TimeCount, s.Telemetry.TimeAccesses.Count); return false; }
             if (s.Telemetry.RandomnessAccesses.Count != RandCount) { reason = Bad("Telemetry.RandomnessAccesses", RandCount, s.Telemetry.RandomnessAccesses.Count); return false; }
             if (s.Telemetry.EventsEmitted.Count != EventCount) { reason = Bad("Telemetry.EventsEmitted", EventCount, s.Telemetry.EventsEmitted.Count); return false; }
+            if (s.Telemetry.Notifications.Count != NotificationCount) { reason = Bad("Telemetry.Notifications", NotificationCount, s.Telemetry.Notifications.Count); return false; }
             if (s.Telemetry.LoopsDetected.Count != LoopsCount) { reason = Bad("Telemetry.LoopsDetected", LoopsCount, s.Telemetry.LoopsDetected.Count); return false; }
             if (s.Telemetry.VisitCapsHit.Count != VisitCapsCount) { reason = Bad("Telemetry.VisitCapsHit", VisitCapsCount, s.Telemetry.VisitCapsHit.Count); return false; }
             if (s.Telemetry.IteratorLoops.Count != ItLoopsCount) { reason = Bad("Telemetry.IteratorLoops", ItLoopsCount, s.Telemetry.IteratorLoops.Count); return false; }

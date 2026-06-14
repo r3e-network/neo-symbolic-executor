@@ -36,7 +36,8 @@ public sealed class UpgradeabilityDetector : BaseDetector
             // `destroy` invocation, which only resolves to ContractManagement at runtime). This
             // eliminates the false-positive class while keeping coverage of native-call dispatch.
             var sensitive = state.Telemetry.ExternalCalls
-                .Where(c => SensitiveMethods.Contains(c.Method)
+                .Where(c => !c.ModeledSelfCall
+                            && SensitiveMethods.Contains(c.Method)
                             && (c.TargetHash is null
                                 || (c.TargetHash.AsConcreteBytes() is byte[] hb
                                     && IsContractManagement(natives, hb))))

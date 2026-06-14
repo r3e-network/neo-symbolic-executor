@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
+using Neo.SymbolicExecutor.Nef;
 
 namespace Neo.SymbolicExecutor.Fuzzer.Coverage;
 
@@ -28,6 +30,7 @@ public sealed class InterestingCorpus
     /// of files in a week. We stop persisting after this cap is reached; existing entries
     /// remain available for load on the next chunk.</summary>
     public const int MaxPersistedEntries = 8_192;
+    public const int MaxPersistedInputBytes = NefFile.MaxScriptSize;
 
     private readonly object _lock = new();
     private readonly int _capacity;
@@ -107,22 +110,25 @@ public sealed class InterestingCorpus
             // disk-side dedup + cap check accounts for prior chunks' work. Without this, a
             // restart that finds 8000 files on disk would still try to persist 8000 more
             // until the soft cap kicks in.
-            int onDisk = 0;
-            foreach (var path in Directory.EnumerateFiles(_persistDir!, "*.bin"))
+            foreach (var path in Directory.EnumerateFiles(_persistDir!, "*.bin").Take(MaxPersistedEntries))
             {
                 _persistedNames.Add(Path.GetFileName(path));
-                onDisk++;
             }
             // Step 2: load up to _capacity files into the in-memory ring. We sample the first
             // ones EnumerateFiles returns; this is fine since coverage progress is per-file
             // independent — any subset will seed the next chunk's mutation pool.
             int loaded = 0;
-            foreach (var path in Directory.EnumerateFiles(_persistDir!, "*.bin"))
+            foreach (var path in Directory.EnumerateFiles(_persistDir!, "*.bin").Take(MaxPersistedEntries))
             {
                 if (loaded >= _capacity) break;
                 byte[] bytes;
-                try { bytes = File.ReadAllBytes(path); }
+                try
+                {
+                    if (new FileInfo(path).Length > MaxPersistedInputBytes) continue;
+                    bytes = File.ReadAllBytes(path);
+                }
                 catch (IOException) { continue; }
+                catch (UnauthorizedAccessException) { continue; }
                 if (bytes.Length == 0) continue;
                 lock (_lock)
                 {

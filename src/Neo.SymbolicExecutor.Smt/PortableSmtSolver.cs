@@ -8,7 +8,19 @@ namespace Neo.SymbolicExecutor.Smt.Z3;
 /// <summary>
 /// Conservative in-process fallback for hosts without a z3 executable. It proves scaled single-
 /// symbol linear constraints, bounded two-symbol affine constraints, symbol-offset equalities,
-/// and bounds; unsupported formulas return Unknown unless a contradiction has already been proven.
+/// repeated opaque integer-expression bounds, finite-domain exclusions, and conservative OR
+/// branches whose every disjunct contradicts the current model; unsupported formulas return
+/// Unknown unless a contradiction has already been proven.
+///
+/// Documented precision limitations (review #38/#39) — these only ever cost completeness (return
+/// Unknown where a full solver would prove UNSAT); they never produce an unsound UNSAT:
+///  - Single-symbol inequalities tighten persistent per-symbol <see cref="IntDomain"/> bounds, but
+///    MULTI-symbol affine inequalities are evaluated transiently against current bounds and not
+///    recorded, so a conjunction of affine inequalities that is jointly UNSAT can return Unknown.
+///  - Cross-equality not-equals propagation and the finite-interval-exhausted check are not run to
+///    a mutual fixpoint, and there is no general affine-equality cycle (Gaussian) consistency check,
+///    so some genuinely-UNSAT not-equals/equality cycles return Unknown.
+/// Install z3 (the external backend) for full-precision proofs over these shapes.
 /// </summary>
 internal sealed class PortableSmtSolver
 {
@@ -68,10 +80,60 @@ internal sealed class PortableSmtSolver
     private sealed class ConstraintModel
     {
         private const int MaxAffineSymbols = 2;
+        private const string OpaqueIntPrefix = "__opaque_int:";
 
         private readonly Dictionary<string, IntDomain> _ints = new(StringComparer.Ordinal);
+        private readonly Dictionary<Expression, string> _opaqueInts = new();
+        private readonly HashSet<Expression> _trueUtf8Predicates = new();
+        private readonly HashSet<Expression> _falseUtf8Predicates = new();
+        private readonly HashSet<Expression> _trueEcPointPredicates = new();
+        private readonly HashSet<Expression> _falseEcPointPredicates = new();
+        private readonly HashSet<string> _trueBoolSymbols = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _falseBoolSymbols = new(StringComparer.Ordinal);
         private readonly List<SymbolEquality> _equalities = new();
         private readonly List<AffineTerm> _affineEqualities = new();
+
+        private ConstraintModel Clone()
+        {
+            var clone = new ConstraintModel();
+            clone.CopyFrom(this);
+            return clone;
+        }
+
+        private void CopyFrom(ConstraintModel other)
+        {
+            _ints.Clear();
+            foreach (var (name, domain) in other._ints)
+                _ints[name] = domain.Clone();
+
+            _opaqueInts.Clear();
+            foreach (var (expression, name) in other._opaqueInts)
+                _opaqueInts[expression] = name;
+
+            _trueUtf8Predicates.Clear();
+            _trueUtf8Predicates.UnionWith(other._trueUtf8Predicates);
+
+            _falseUtf8Predicates.Clear();
+            _falseUtf8Predicates.UnionWith(other._falseUtf8Predicates);
+
+            _trueEcPointPredicates.Clear();
+            _trueEcPointPredicates.UnionWith(other._trueEcPointPredicates);
+
+            _falseEcPointPredicates.Clear();
+            _falseEcPointPredicates.UnionWith(other._falseEcPointPredicates);
+
+            _trueBoolSymbols.Clear();
+            _trueBoolSymbols.UnionWith(other._trueBoolSymbols);
+
+            _falseBoolSymbols.Clear();
+            _falseBoolSymbols.UnionWith(other._falseBoolSymbols);
+
+            _equalities.Clear();
+            _equalities.AddRange(other._equalities);
+
+            _affineEqualities.Clear();
+            _affineEqualities.AddRange(other._affineEqualities);
+        }
 
         public IntDomain GetIntDomain(string name)
         {
@@ -88,24 +150,100 @@ internal sealed class PortableSmtSolver
             return expression switch
             {
                 BoolConst b => ApplyBool(b.Value, negated),
+                Symbol { Sort: Sort.Bool } symbol => ApplyBoolSymbol(symbol.Name, negated),
                 UnaryExpr { Op: "not" } unary => Apply(unary.Operand, !negated),
-                BinaryExpr { Op: "and" } binary when !negated => ApplyAnd(binary),
+                UnaryExpr { Sort: Sort.Bool, Op: "utf8" } unary => ApplyUtf8Predicate(unary, negated),
+                UnaryExpr { Sort: Sort.Bool, Op: "ecpoint" } unary => ApplyEcPointPredicate(unary, negated),
+                BinaryExpr { Op: "and" } binary => negated
+                    ? ApplyOr(binary.Left, true, binary.Right, true)
+                    : ApplyAnd(binary.Left, false, binary.Right, false),
+                BinaryExpr { Op: "or" } binary => negated
+                    ? ApplyAnd(binary.Left, true, binary.Right, true)
+                    : ApplyOr(binary.Left, false, binary.Right, false),
                 BinaryExpr { Sort: Sort.Bool } binary => ApplyPredicate(binary, negated),
                 _ => ConstraintStatus.Unsupported,
             };
         }
 
-        private ConstraintStatus ApplyAnd(BinaryExpr binary)
+        private ConstraintStatus ApplyBoolSymbol(string name, bool negated)
         {
-            var left = Apply(binary.Left, negated: false);
+            var targetSet = negated ? _falseBoolSymbols : _trueBoolSymbols;
+            var oppositeSet = negated ? _trueBoolSymbols : _falseBoolSymbols;
+            if (oppositeSet.Contains(name))
+                return ConstraintStatus.Contradiction;
+
+            targetSet.Add(name);
+            return ConstraintStatus.Supported;
+        }
+
+        private ConstraintStatus ApplyUtf8Predicate(Expression expression, bool negated)
+        {
+            var targetSet = negated ? _falseUtf8Predicates : _trueUtf8Predicates;
+            var oppositeSet = negated ? _trueUtf8Predicates : _falseUtf8Predicates;
+            if (oppositeSet.Contains(expression))
+                return ConstraintStatus.Contradiction;
+
+            targetSet.Add(expression);
+            return ConstraintStatus.Supported;
+        }
+
+        private ConstraintStatus ApplyEcPointPredicate(Expression expression, bool negated)
+        {
+            var targetSet = negated ? _falseEcPointPredicates : _trueEcPointPredicates;
+            var oppositeSet = negated ? _trueEcPointPredicates : _falseEcPointPredicates;
+            if (oppositeSet.Contains(expression))
+                return ConstraintStatus.Contradiction;
+
+            targetSet.Add(expression);
+            return ConstraintStatus.Supported;
+        }
+
+        private ConstraintStatus ApplyAnd(
+            Expression leftExpression,
+            bool leftNegated,
+            Expression rightExpression,
+            bool rightNegated)
+        {
+            var left = Apply(leftExpression, leftNegated);
             if (left == ConstraintStatus.Contradiction) return left;
 
-            var right = Apply(binary.Right, negated: false);
+            var right = Apply(rightExpression, rightNegated);
             if (right == ConstraintStatus.Contradiction) return right;
 
             return left == ConstraintStatus.Unsupported || right == ConstraintStatus.Unsupported
                 ? ConstraintStatus.Unsupported
                 : ConstraintStatus.Supported;
+        }
+
+        private ConstraintStatus ApplyOr(
+            Expression leftExpression,
+            bool leftNegated,
+            Expression rightExpression,
+            bool rightNegated)
+        {
+            var leftModel = Clone();
+            var left = leftModel.Apply(leftExpression, leftNegated);
+            var rightModel = Clone();
+            var right = rightModel.Apply(rightExpression, rightNegated);
+
+            bool leftPossible = left != ConstraintStatus.Contradiction;
+            bool rightPossible = right != ConstraintStatus.Contradiction;
+            if (!leftPossible && !rightPossible)
+                return ConstraintStatus.Contradiction;
+
+            if (left == ConstraintStatus.Supported && !rightPossible)
+            {
+                CopyFrom(leftModel);
+                return ConstraintStatus.Supported;
+            }
+
+            if (right == ConstraintStatus.Supported && !leftPossible)
+            {
+                CopyFrom(rightModel);
+                return ConstraintStatus.Supported;
+            }
+
+            return ConstraintStatus.Unsupported;
         }
 
         /// <summary>
@@ -127,6 +265,10 @@ internal sealed class PortableSmtSolver
             var op = negated ? Negate(binary.Op) : binary.Op;
             if (op is null) return ConstraintStatus.Unsupported;
 
+            var byteEqualityStatus = TryApplyByteSequenceEquality(binary, op);
+            if (byteEqualityStatus != ConstraintStatus.Unsupported)
+                return byteEqualityStatus;
+
             var affineStatus = TryApplyAffinePath(binary, op);
             if (affineStatus != ConstraintStatus.Unsupported)
                 return affineStatus;
@@ -134,10 +276,30 @@ internal sealed class PortableSmtSolver
             return ApplyLinearPath(binary, op);
         }
 
+        private ConstraintStatus TryApplyByteSequenceEquality(BinaryExpr binary, string op)
+        {
+            if (op is not ("==" or "!=")
+                || binary.Left.Sort != Sort.Bytes
+                || binary.Right.Sort != Sort.Bytes)
+            {
+                return ConstraintStatus.Unsupported;
+            }
+
+            var byteSequenceEqual = Expr.BoolAnd(
+                Expr.Eq(
+                    new UnaryExpr(Sort.Int, "size", binary.Left),
+                    new UnaryExpr(Sort.Int, "size", binary.Right)),
+                Expr.Eq(
+                    new UnaryExpr(Sort.Int, "b2i", binary.Left),
+                    new UnaryExpr(Sort.Int, "b2i", binary.Right)));
+            return Apply(byteSequenceEqual, negated: op == "!=");
+        }
+
         private ConstraintStatus TryApplyAffinePath(BinaryExpr binary, string op)
         {
-            if (!TryAffineTerm(binary.Left, out var affineLeft)) return ConstraintStatus.Unsupported;
-            if (!TryAffineTerm(binary.Right, out var affineRight)) return ConstraintStatus.Unsupported;
+            bool allowByteSymbol = AllowsNumericByteConversion(op);
+            if (!TryAffineTerm(binary.Left, out var affineLeft, allowByteSymbol, allowOpaqueInt: true)) return ConstraintStatus.Unsupported;
+            if (!TryAffineTerm(binary.Right, out var affineRight, allowByteSymbol, allowOpaqueInt: true)) return ConstraintStatus.Unsupported;
             if (!affineLeft.TrySubtract(affineRight, out var affineRelation)) return ConstraintStatus.Unsupported;
             if (!TryRelationOp(op, out var affineOp)) return ConstraintStatus.Unsupported;
             return ApplyAffineRelation(affineRelation, affineOp);
@@ -145,7 +307,9 @@ internal sealed class PortableSmtSolver
 
         private ConstraintStatus ApplyLinearPath(BinaryExpr binary, string op)
         {
-            if (!TryAsLinearTerm(binary.Left, out var left) || !TryAsLinearTerm(binary.Right, out var right))
+            bool allowByteSymbol = AllowsNumericByteConversion(op);
+            if (!TryAsLinearTerm(binary.Left, out var left, allowByteSymbol, allowOpaqueInt: true)
+                || !TryAsLinearTerm(binary.Right, out var right, allowByteSymbol, allowOpaqueInt: true))
                 return ConstraintStatus.Unsupported;
             if (!left.TrySubtract(right, out var relation))
             {
@@ -178,7 +342,7 @@ internal sealed class PortableSmtSolver
         public bool TryConcretize(Expression target, BigInteger? lo, BigInteger? hi, out BigInteger? value)
         {
             value = null;
-            if (!TryAsLinearTerm(target, out var term))
+            if (!TryAsLinearTerm(target, out var term, allowOpaqueInt: false))
                 return false;
 
             if (term.Symbol is null || term.Coefficient.IsZero)
@@ -217,9 +381,9 @@ internal sealed class PortableSmtSolver
                 values[name] = value;
             }
 
-            // Bound matches PropagateEqualities (line 377). The asymmetric absence of
-            // `_ints.Count` here was a latent bug — the witness loop could terminate one or
-            // more rounds early on dense chains involving many symbol domains.
+            // Bound matches PropagateEqualities (both call MaxPropagationRounds()). The asymmetric
+            // absence of `_ints.Count` here was a latent bug — the witness loop could terminate one
+            // or more rounds early on dense chains involving many symbol domains.
             int maxRounds = MaxPropagationRounds();
             for (var i = 0; i < maxRounds; i++)
             {
@@ -264,9 +428,28 @@ internal sealed class PortableSmtSolver
                 }
             }
 
+            // Review fix (#40): structurally verify every SymbolEquality (Left == Right + Offset) in
+            // the final model, mirroring the affine-equality verification above. A within-round value
+            // clobber could otherwise leave a linked pair inconsistent yet still be returned as a
+            // witness; failing closed to Unknown (return false) is the sound outcome.
+            foreach (var equality in _equalities)
+            {
+                if (values.TryGetValue(equality.Left, out var leftValue)
+                    && values.TryGetValue(equality.Right, out var rightValue)
+                    && leftValue != rightValue + equality.Offset)
+                {
+                    witness = new Dictionary<string, object>();
+                    return false;
+                }
+            }
+
             var result = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var (name, value) in values)
+            {
+                if (name.StartsWith(OpaqueIntPrefix, StringComparison.Ordinal))
+                    continue;
                 result[name] = value;
+            }
             witness = result;
             return true;
         }
@@ -583,9 +766,13 @@ internal sealed class PortableSmtSolver
         /// because the legacy TryLinearTerm's add/sub paths failed on any two-symbol sum
         /// (different symbols → TryAdd false), exactly matching this wrapper's collapse-or-fail.
         /// </summary>
-        private static bool TryAsLinearTerm(Expression expression, out LinearTerm term)
+        private bool TryAsLinearTerm(
+            Expression expression,
+            out LinearTerm term,
+            bool allowByteSymbol = false,
+            bool allowOpaqueInt = false)
         {
-            if (!TryAffineTerm(expression, out var affine))
+            if (!TryAffineTerm(expression, out var affine, allowByteSymbol, allowOpaqueInt))
             {
                 term = default;
                 return false;
@@ -610,11 +797,43 @@ internal sealed class PortableSmtSolver
             return false;
         }
 
-        private static bool TryAffineTerm(Expression expression, out AffineTerm term)
+        private bool TryAffineTerm(
+            Expression expression,
+            out AffineTerm term,
+            bool allowByteSymbol = false,
+            bool allowOpaqueInt = false)
         {
             if (Expr.ConcreteInt(expression) is { } concrete)
             {
                 term = AffineTerm.ConstantTerm(concrete);
+                return true;
+            }
+
+            if (expression is UnaryExpr { Sort: Sort.Int, Op: "b2i" } b2iUnary)
+            {
+                if (Expr.ConcreteInt(b2iUnary.Operand) is { } converted)
+                {
+                    term = AffineTerm.ConstantTerm(converted);
+                    return true;
+                }
+
+                if (b2iUnary.Operand is Symbol { Sort: Sort.Bytes } byteSymbol)
+                {
+                    term = AffineTerm.SymbolTerm(ByteIntSymbolName(byteSymbol.Name));
+                    return true;
+                }
+            }
+
+            if (expression is UnaryExpr { Sort: Sort.Int, Op: "size" } sizeUnary &&
+                TryByteSizeTerm(sizeUnary.Operand, out term))
+            {
+                return true;
+            }
+
+            if (expression is BinaryExpr { Sort: Sort.Int, Op: "pick" } pickBinary
+                && Expr.ConcreteByteAt(pickBinary.Left, pickBinary.Right) is { } picked)
+            {
+                term = AffineTerm.ConstantTerm(picked);
                 return true;
             }
 
@@ -624,8 +843,14 @@ internal sealed class PortableSmtSolver
                 return true;
             }
 
+            if (allowByteSymbol && expression is Symbol { Sort: Sort.Bytes } byteSymbolDirect)
+            {
+                term = AffineTerm.SymbolTerm(ByteIntSymbolName(byteSymbolDirect.Name));
+                return true;
+            }
+
             if (expression is UnaryExpr { Sort: Sort.Int, Op: "neg" } unary &&
-                TryAffineTerm(unary.Operand, out var operand))
+                TryAffineTerm(unary.Operand, out var operand, allowByteSymbol, allowOpaqueInt))
             {
                 term = operand.Negate();
                 return true;
@@ -634,34 +859,99 @@ internal sealed class PortableSmtSolver
             if (expression is BinaryExpr { Sort: Sort.Int } binary)
             {
                 if (binary.Op == "+" &&
-                    TryAffineTerm(binary.Left, out var left) &&
-                    TryAffineTerm(binary.Right, out var right) &&
+                    TryAffineTerm(binary.Left, out var left, allowByteSymbol, allowOpaqueInt) &&
+                    TryAffineTerm(binary.Right, out var right, allowByteSymbol, allowOpaqueInt) &&
                     left.TryAdd(right, MaxAffineSymbols, out term))
                 {
                     return true;
                 }
 
                 if (binary.Op == "-" &&
-                    TryAffineTerm(binary.Left, out left) &&
-                    TryAffineTerm(binary.Right, out right) &&
+                    TryAffineTerm(binary.Left, out left, allowByteSymbol, allowOpaqueInt) &&
+                    TryAffineTerm(binary.Right, out right, allowByteSymbol, allowOpaqueInt) &&
                     left.TryAdd(right.Negate(), MaxAffineSymbols, out term))
                 {
                     return true;
                 }
 
                 if (binary.Op == "*" &&
-                    TryAffineTerm(binary.Left, out left) &&
-                    TryAffineTerm(binary.Right, out right) &&
+                    TryAffineTerm(binary.Left, out left, allowByteSymbol, allowOpaqueInt) &&
+                    TryAffineTerm(binary.Right, out right, allowByteSymbol, allowOpaqueInt) &&
                     left.TryMultiply(right, MaxAffineSymbols, out term))
                 {
                     return true;
                 }
             }
 
+            if (allowOpaqueInt && expression.Sort == Sort.Int)
+            {
+                term = AffineTerm.SymbolTerm(OpaqueIntSymbolName(expression));
+                return true;
+            }
+
             term = default!;
             return false;
         }
 
+        private string OpaqueIntSymbolName(Expression expression)
+        {
+            if (_opaqueInts.TryGetValue(expression, out var name))
+                return name;
+
+            name = $"{OpaqueIntPrefix}{_opaqueInts.Count}";
+            _opaqueInts[expression] = name;
+            return name;
+        }
+
+        private static string ByteIntSymbolName(string name) => "b2i:" + name;
+        private static string ByteSizeSymbolName(string name) => "size:" + name;
+
+        private static bool AllowsNumericByteConversion(string op) =>
+            op is "num==" or "num!=" or "<" or "<=" or ">" or ">=";
+
+        private bool TryByteSizeTerm(Expression expression, out AffineTerm term)
+        {
+            if (Expr.FixedByteSize(expression) is { } fixedByteSize)
+            {
+                term = AffineTerm.ConstantTerm(fixedByteSize);
+                return true;
+            }
+
+            if (Expr.CanonicalBytes(expression) is { } bytes)
+            {
+                term = AffineTerm.ConstantTerm(bytes.Length);
+                return true;
+            }
+
+            if (expression is Symbol { Sort: Sort.Bytes } byteSymbol)
+            {
+                term = AffineTerm.SymbolTerm(ByteSizeSymbolName(byteSymbol.Name));
+                return true;
+            }
+
+            if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "cat" } binary
+                && TryByteSizeTerm(binary.Left, out var left)
+                && TryByteSizeTerm(binary.Right, out var right)
+                && left.TryAdd(right, MaxAffineSymbols, out term))
+            {
+                return true;
+            }
+
+            if (expression is BinaryExpr { Sort: Sort.Bytes, Op: "left" or "right" } fixedSide
+                && TryAffineTerm(fixedSide.Right, out term))
+            {
+                return true;
+            }
+
+            if (expression is TernaryExpr { Sort: Sort.Bytes, Op: "substr" } substring
+                && TryAffineTerm(substring.C, out term))
+            {
+                return true;
+            }
+
+            term = default!;
+            return false;
+        }
 
         private static bool TrySymbolEquality(LinearTerm left, LinearTerm right, out SymbolEquality equality)
         {
@@ -752,6 +1042,7 @@ internal sealed class PortableSmtSolver
 
     internal sealed class IntDomain
     {
+        private const int ExhaustiveFiniteIntervalCheckLimit = 1024;
         private readonly HashSet<BigInteger> _notEquals = new();
         private BigInteger? _lower;
         private BigInteger? _upper;
@@ -889,6 +1180,26 @@ internal sealed class PortableSmtSolver
             if (_lower.HasValue && _upper.HasValue && _lower.Value == _upper.Value &&
                 _notEquals.Contains(_lower.Value))
                 return false;
+            if (_lower.HasValue && _upper.HasValue)
+            {
+                var width = _upper.Value - _lower.Value + BigInteger.One;
+                if (width > BigInteger.Zero
+                    && width <= ExhaustiveFiniteIntervalCheckLimit
+                    && IsFiniteIntervalFullyExcluded(_lower.Value, _upper.Value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private bool IsFiniteIntervalFullyExcluded(BigInteger lower, BigInteger upper)
+        {
+            for (var value = lower; value <= upper; value += BigInteger.One)
+            {
+                if (!_notEquals.Contains(value))
+                    return false;
+            }
             return true;
         }
     }

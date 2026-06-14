@@ -39,15 +39,14 @@ public sealed class ReplayAttackDetector : BaseDetector
 
             // Audit C# #9 fix: only count Storage.Get reads as nonce-presence signals. Writes
             // alone don't prove the contract checks a previous nonce — an attacker-replay path
-            // would still write a nonce key without first reading it. Cache the decoded UTF-8
-            // string per StorageOp instead of allocating per-hint.
+            // would still write a nonce key without first reading it.
+            //
+            // Review fix (#19): the dominant per-account nonce-map pattern is
+            // `Storage.Get(concat(prefix, user))`, whose key is NOT fully concrete — only the
+            // prefix literal is. Inspect every concrete `BytesConst` sub-fragment of the key
+            // expression (not just a whole-key concrete value) for a nonce-shaped literal.
             bool nonceLooking = state.Telemetry.StorageOps.Any(o =>
-            {
-                if (o.Kind != StorageOpKind.Get) return false;
-                if (o.Key.AsConcreteBytes() is not byte[] kb) return false;
-                string keyStr = System.Text.Encoding.UTF8.GetString(kb);
-                return NonceHints.Any(h => keyStr.Contains(h, System.StringComparison.OrdinalIgnoreCase));
-            });
+                o.Kind == StorageOpKind.Get && KeyHasNonceLiteralFragment(o.Key.Expression));
             if (nonceLooking) continue;
 
             int firstSensitive = state.Telemetry.StorageOps
@@ -63,6 +62,44 @@ public sealed class ReplayAttackDetector : BaseDetector
                 severity: Severity.Medium,
                 state: state,
                 tags: new[] { "replay" });
+        }
+    }
+
+    /// <summary>
+    /// Review fix (#19): true iff any concrete <see cref="BytesConst"/> sub-fragment of the storage
+    /// key expression decodes to text containing a nonce hint. This matches the per-account
+    /// nonce-map shape <c>Storage.Get(concat(prefix, user))</c> where only the prefix literal is
+    /// concrete, rather than requiring the whole key to be concrete.
+    /// </summary>
+    private static bool KeyHasNonceLiteralFragment(Expression key) =>
+        ConcreteByteFragments(key).Any(LiteralLooksLikeNonce);
+
+    private static bool LiteralLooksLikeNonce(byte[] literal)
+    {
+        if (literal.Length == 0) return false;
+        string text = System.Text.Encoding.UTF8.GetString(literal);
+        return NonceHints.Any(h => text.Contains(h, System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<byte[]> ConcreteByteFragments(Expression expr)
+    {
+        switch (expr)
+        {
+            case BytesConst bytes:
+                yield return bytes.Value;
+                break;
+            case UnaryExpr u:
+                foreach (var f in ConcreteByteFragments(u.Operand)) yield return f;
+                break;
+            case BinaryExpr b:
+                foreach (var f in ConcreteByteFragments(b.Left)) yield return f;
+                foreach (var f in ConcreteByteFragments(b.Right)) yield return f;
+                break;
+            case TernaryExpr t:
+                foreach (var f in ConcreteByteFragments(t.A)) yield return f;
+                foreach (var f in ConcreteByteFragments(t.B)) yield return f;
+                foreach (var f in ConcreteByteFragments(t.C)) yield return f;
+                break;
         }
     }
 }

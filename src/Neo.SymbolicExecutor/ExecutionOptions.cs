@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Neo.SymbolicExecutor;
 
 /// <summary>
@@ -26,6 +28,9 @@ public sealed record ExecutionOptions
     public int MaxHeapObjects { get; init; } = 1_024;
     public int MaxShiftCount { get; init; } = 256;
     public int MaxPowExponent { get; init; } = 256;
+    public int InitialCallFlags { get; init; } = NeoCallFlags.All;
+    public int RuntimeTrigger { get; init; } = NeoTriggerTypes.Application;
+    public ImmutableArray<byte> CurrentScriptHash { get; init; } = ImmutableArray<byte>.Empty;
 
     /// <summary>
     /// Cap on worklist size. Without this, deeply-forking symbolic loops can drive worklist
@@ -64,5 +69,22 @@ public sealed record ExecutionOptions
     /// </summary>
     public System.TimeSpan? PerRunDeadline { get; init; }
 
+    /// <summary>
+    /// Optional manifest-aware resolver for same-contract <c>System.Contract.Call</c> targets.
+    /// The core engine stays manifest-agnostic by default; formal verification supplies a
+    /// resolver so concrete self-calls can execute the callee body instead of becoming opaque
+    /// external proof surface.
+    /// </summary>
+    public ContractSelfCallResolver? SelfCallResolver { get; init; }
+
     public static ExecutionOptions Default { get; } = new();
 }
+
+public sealed record ContractSelfCallTarget(
+    string Method,
+    int Offset,
+    int ParameterCount,
+    bool HasReturnValue,
+    bool Safe);
+
+public delegate ContractSelfCallTarget? ContractSelfCallResolver(string method, int argumentCount);

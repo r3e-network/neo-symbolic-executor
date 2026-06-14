@@ -7,29 +7,47 @@ namespace Neo.SymbolicExecutor;
 /// <summary>
 /// Symbolic expression IR. Immutable record hierarchy.
 ///
-/// Concrete leaves: <see cref="IntConst"/>, <see cref="BoolConst"/>, <see cref="BytesConst"/>, <see cref="NullConst"/>.
+/// Concrete leaves: <see cref="IntConst"/>, <see cref="BoolConst"/>, <see cref="BytesConst"/>, <see cref="PointerConst"/>, <see cref="NullConst"/>.
 /// Symbolic leaves: <see cref="Symbol"/>.
 /// Heap leaves: <see cref="HeapRef"/> (object identity for arrays/structs/maps/buffers).
 /// Composites: <see cref="UnaryExpr"/>, <see cref="BinaryExpr"/>, <see cref="TernaryExpr"/>.
 /// </summary>
 public abstract record Expression(Sort Sort)
 {
-    public bool IsConcrete => this is IntConst or BoolConst or BytesConst or NullConst;
+    public bool IsConcrete => this is IntConst or BoolConst or BytesConst or PointerConst or NullConst;
 
     /// <summary>Approximate complexity score used by path-uncertainty calibration.</summary>
     public abstract int Complexity { get; }
 
-    /// <summary>Recursively gather names of all <see cref="Symbol"/> leaves.</summary>
-    public IEnumerable<string> FreeSymbols() => CollectSymbols(this);
-
-    private static IEnumerable<string> CollectSymbols(Expression expr) => expr switch
+    /// <summary>Recursively gather names of all <see cref="Symbol"/> leaves, in depth-first order.</summary>
+    public IEnumerable<string> FreeSymbols()
     {
-        Symbol s => new[] { s.Name },
-        UnaryExpr u => CollectSymbols(u.Operand),
-        BinaryExpr b => CollectSymbols(b.Left).Concat(CollectSymbols(b.Right)),
-        TernaryExpr t => CollectSymbols(t.A).Concat(CollectSymbols(t.B)).Concat(CollectSymbols(t.C)),
-        _ => Enumerable.Empty<string>(),
-    };
+        // Review fix (#71): accumulate into a single list rather than building nested LINQ Concat
+        // iterator chains (which allocate an iterator per composite node and re-enumerate on each
+        // access). The produced sequence is identical — same depth-first order, same duplicates — so
+        // all existing call sites (membership checks, ToArray, etc.) are unaffected.
+        var acc = new List<string>();
+        CollectSymbolsInto(this, acc);
+        return acc;
+    }
+
+    private static void CollectSymbolsInto(Expression expr, List<string> acc)
+    {
+        switch (expr)
+        {
+            case Symbol s: acc.Add(s.Name); break;
+            case UnaryExpr u: CollectSymbolsInto(u.Operand, acc); break;
+            case BinaryExpr b:
+                CollectSymbolsInto(b.Left, acc);
+                CollectSymbolsInto(b.Right, acc);
+                break;
+            case TernaryExpr t:
+                CollectSymbolsInto(t.A, acc);
+                CollectSymbolsInto(t.B, acc);
+                CollectSymbolsInto(t.C, acc);
+                break;
+        }
+    }
 }
 
 public sealed record IntConst(BigInteger Value) : Expression(Sort.Int)
@@ -75,6 +93,11 @@ public sealed record NullConst() : Expression(Sort.Null)
 {
     public override int Complexity => 1;
     public static readonly NullConst Instance = new();
+}
+
+public sealed record PointerConst(int TargetOffset) : Expression(Sort.Pointer)
+{
+    public override int Complexity => 1;
 }
 
 public sealed record HeapRef(Sort RefSort, int ObjectId) : Expression(RefSort)

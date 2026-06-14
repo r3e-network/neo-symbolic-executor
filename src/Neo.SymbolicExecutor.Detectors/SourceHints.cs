@@ -31,6 +31,11 @@ namespace Neo.SymbolicExecutor.Detectors;
 /// </summary>
 public sealed class SourceHints
 {
+    public const int MaxSourceFileBytes = 1_048_576;
+    public const int MaxSourceFiles = 2_048;
+    public const int MaxTotalSourceBytes = 16 * 1_048_576;
+    public const int MaxDirectoryDepth = 64;
+
     private static readonly HashSet<string> IgnoredSourceDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".omx", ".vs", "bin", "obj", "node_modules", "packages"
@@ -96,42 +101,83 @@ public sealed class SourceHints
 
     private static IEnumerable<string> EnumerateSourceTexts(IEnumerable<string> paths)
     {
+        int fileCount = 0;
+        long totalBytes = 0;
         foreach (string path in paths)
         {
-            if (File.Exists(path))
+            foreach (string file in EnumerateSourceFiles(path))
             {
-                yield return File.ReadAllText(path);
-            }
-            else if (Directory.Exists(path))
-            {
-                foreach (string file in EnumerateProjectSourceFiles(path).OrderBy(p => p, StringComparer.Ordinal))
-                    yield return File.ReadAllText(file);
-            }
-            else
-            {
-                throw new ArgumentException($"source path does not exist: {path}");
+                fileCount++;
+                if (fileCount > MaxSourceFiles)
+                    throw new ArgumentException($"source file count exceeds max {MaxSourceFiles}");
+
+                var info = new FileInfo(file);
+                if (info.Length > MaxSourceFileBytes)
+                    throw new ArgumentException(
+                        $"source file '{file}' is {info.Length} bytes, exceeds max {MaxSourceFileBytes} bytes");
+
+                totalBytes += info.Length;
+                if (totalBytes > MaxTotalSourceBytes)
+                    throw new ArgumentException($"source input exceeds total max {MaxTotalSourceBytes} bytes");
+
+                yield return File.ReadAllText(file);
             }
         }
     }
 
+    private static IEnumerable<string> EnumerateSourceFiles(string path)
+    {
+        if (File.Exists(path))
+        {
+            yield return path;
+            yield break;
+        }
+        if (Directory.Exists(path))
+        {
+            foreach (string file in EnumerateProjectSourceFiles(path).OrderBy(p => p, StringComparer.Ordinal))
+                yield return file;
+            yield break;
+        }
+        throw new ArgumentException($"source path does not exist: {path}");
+    }
+
     private static IEnumerable<string> EnumerateProjectSourceFiles(string root)
     {
-        var pending = new Stack<string>();
-        pending.Push(root);
+        var pending = new Stack<(string Path, int Depth)>();
+        pending.Push((root, 0));
 
         while (pending.Count > 0)
         {
-            string current = pending.Pop();
+            var (current, depth) = pending.Pop();
+            if (depth > MaxDirectoryDepth)
+                throw new ArgumentException($"source directory depth exceeds max {MaxDirectoryDepth}: {current}");
 
             foreach (string file in Directory.EnumerateFiles(current, "*.cs"))
                 yield return file;
 
             foreach (string directory in Directory.EnumerateDirectories(current))
             {
+                if (IsReparsePoint(directory)) continue;
                 string name = Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 if (!IgnoredSourceDirectories.Contains(name))
-                    pending.Push(directory);
+                    pending.Push((directory, depth + 1));
             }
+        }
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
         }
     }
 

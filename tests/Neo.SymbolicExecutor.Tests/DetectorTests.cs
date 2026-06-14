@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Neo.SymbolicExecutor.Detectors;
 using Neo.SymbolicExecutor.Detectors.Detectors;
+using Neo.SymbolicExecutor.Nef;
+using NeoVm = Neo.VM;
 
 namespace Neo.SymbolicExecutor.Tests;
 
@@ -100,6 +102,76 @@ public class DetectorTests
         new ReentrancyDetector().Analyze(Ctx(s)).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("keccak256")]
+    [InlineData("recoverSecp256K1")]
+    [InlineData("verifyWithEd25519")]
+    public void NativeContractRegistry_CryptoLibReadOnlyMethodsCoverCurrentNeoFrameworkSurface(string method)
+    {
+        var cryptoLibHash = System.Convert.FromHexString("726CB6E0CD8628A1350A611384688911AB75F51B");
+        var call = new ExternalCall
+        {
+            Offset = 0x10,
+            Method = method,
+            TargetHash = SymbolicValue.Bytes(cryptoLibHash),
+            HasReturnValue = true,
+        };
+
+        NativeContractRegistry.Default.IsBenignReadOnlyCall(call).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("strLen")]
+    [InlineData("stringSplit")]
+    public void NativeContractRegistry_StdLibStringReadOnlyMethodsCoverCurrentNeoFrameworkSurface(string method)
+    {
+        var stdLibHash = System.Convert.FromHexString("ACCE6FD80D44E1796AA0C2C625E9E4E0CE39EFC0");
+        var call = new ExternalCall
+        {
+            Offset = 0x10,
+            Method = method,
+            TargetHash = SymbolicValue.Bytes(stdLibHash),
+            HasReturnValue = true,
+        };
+
+        NativeContractRegistry.Default.IsBenignReadOnlyCall(call).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("isContract")]
+    public void NativeContractRegistry_ContractManagementReadOnlyMethodsCoverCurrentNeoFrameworkSurface(string method)
+    {
+        var contractManagementHash = System.Convert.FromHexString("FFFDC93764DBADDD97C48F252A53EA4643FAA3FD");
+        var call = new ExternalCall
+        {
+            Offset = 0x10,
+            Method = method,
+            TargetHash = SymbolicValue.Bytes(contractManagementHash),
+            HasReturnValue = true,
+        };
+
+        NativeContractRegistry.Default.IsBenignReadOnlyCall(call).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("getCandidateVote")]
+    [InlineData("getCommittee")]
+    [InlineData("getCommitteeAddress")]
+    [InlineData("getNextBlockValidators")]
+    public void NativeContractRegistry_NeoTokenGovernanceReadsCoverCurrentNeoFrameworkSurface(string method)
+    {
+        var neoTokenHash = System.Convert.FromHexString("EF4073A0F2B305A38EC4050E4D3D28BC40EA63F5");
+        var call = new ExternalCall
+        {
+            Offset = 0x10,
+            Method = method,
+            TargetHash = SymbolicValue.Bytes(neoTokenHash),
+            HasReturnValue = true,
+        };
+
+        NativeContractRegistry.Default.IsBenignReadOnlyCall(call).Should().BeTrue();
+    }
+
     [Fact]
     public void AccessControl_FlagsMissingAuth()
     {
@@ -130,7 +202,8 @@ public class DetectorTests
     [Fact]
     public void AccessControl_RespectsManifestSafeFlag()
     {
-        // Audit detector audit #18: when manifest declares method `safe=true`, downgrade.
+        // Manifest safe=true is only a trust assertion: keep the evidence visible,
+        // but downgrade the severity so gates can decide how to treat it.
         var s = NewState();
         s.Path.Add(0xA0);  // entry offset
         s.Telemetry.StorageOps.Add(new StorageOp(0x20, StorageOpKind.Put,
@@ -146,7 +219,10 @@ public class DetectorTests
         var manifest = Nef.ContractManifest.FromJson(manifestJson);
 
         var ctx = new AnalysisContext { States = new[] { s }, Manifest = manifest };
-        new AccessControlDetector().Analyze(ctx).Should().BeEmpty();
+        var finding = new AccessControlDetector().Analyze(ctx).Should().ContainSingle().Subject;
+        finding.Severity.Should().Be(Severity.Info);
+        finding.Tags.Should().Contain("manifest-safe-assertion");
+        finding.Tags.Should().Contain("missing-auth");
     }
 
     [Fact]
@@ -247,6 +323,24 @@ public class DetectorTests
             ReturnChecked = true,
         });
         new UncheckedReturnDetector().Analyze(Ctx(s)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void UncheckedReturn_DowngradesModeledNativeReturn()
+    {
+        var s = NewState();
+        s.Telemetry.ExternalCalls.Add(new ExternalCall
+        {
+            Offset = 0x10,
+            Method = "strLen",
+            HasReturnValue = true,
+            ReturnModeledNative = true,
+            ReturnChecked = false,
+        });
+
+        var finding = new UncheckedReturnDetector().Analyze(Ctx(s)).Should().ContainSingle().Which;
+        finding.Severity.Should().Be(Severity.Low);
+        finding.Tags.Should().Contain("modeled-native-return");
     }
 
     [Fact]
@@ -374,6 +468,49 @@ public class DetectorTests
     }
 
     [Fact]
+    public void TaintFlowUpgrade_FiresWhenAbiParameterFlowsThroughContractCall()
+    {
+        byte[] contractManagement = Convert.FromHexString("fffdc93764dbaddd97c48f252a53ea4643faa3fd");
+        byte[] script = Concat(
+            new[]
+            {
+                (byte)NeoVm.OpCode.INITSLOT, (byte)0x00, (byte)0x03,
+            },
+            Pushdata1(contractManagement),
+            Pushdata1(System.Text.Encoding.UTF8.GetBytes("update")),
+            new[]
+            {
+                (byte)NeoVm.OpCode.PUSH15,
+                (byte)NeoVm.OpCode.LDARG0,
+                (byte)NeoVm.OpCode.LDARG1,
+                (byte)NeoVm.OpCode.LDARG2,
+                (byte)NeoVm.OpCode.PUSH3,
+                (byte)NeoVm.OpCode.PACK,
+            },
+            Syscall("System.Contract.Call"),
+            new[] { (byte)NeoVm.OpCode.RET });
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[]
+        {
+            new ContractParameterDefinition("newNef", "ByteArray"),
+            new ContractParameterDefinition("newManifest", "ByteArray"),
+            new ContractParameterDefinition("data", "Any"),
+        });
+
+        var result = engine.Run(entry);
+
+        result.FinalStates.Should().ContainSingle();
+        var state = result.FinalStates.Single();
+        state.Status.Should().Be(TerminalStatus.Halted);
+        state.Telemetry.ExternalCalls.Should().ContainSingle()
+            .Which.Args.SelectMany(arg => arg.Taints)
+            .Should().Contain("arg_newNef");
+        var findings = new TaintFlowUpgradeDetector().Analyze(Ctx(state)).ToList();
+        findings.Should().ContainSingle();
+        findings[0].Severity.Should().Be(Severity.Critical);
+    }
+
+    [Fact]
     public void TaintFlowUpgrade_NoFinding_WhenUpdateArgIsConcrete()
     {
         // A hard-coded NEF blob being passed to update() is NOT a taint-flow finding even though
@@ -431,5 +568,34 @@ public class DetectorTests
     {
         public override string Name => "dummy";
         public override IEnumerable<Finding> Analyze(AnalysisContext context) => System.Linq.Enumerable.Empty<Finding>();
+    }
+
+    private static byte[] Concat(params byte[][] parts)
+    {
+        int len = parts.Sum(p => p.Length);
+        byte[] result = new byte[len];
+        int offset = 0;
+        foreach (var part in parts)
+        {
+            System.Array.Copy(part, 0, result, offset, part.Length);
+            offset += part.Length;
+        }
+        return result;
+    }
+
+    private static byte[] Pushdata1(byte[] data)
+    {
+        byte[] result = new byte[data.Length + 2];
+        result[0] = (byte)NeoVm.OpCode.PUSHDATA1;
+        result[1] = (byte)data.Length;
+        System.Array.Copy(data, 0, result, 2, data.Length);
+        return result;
+    }
+
+    private static byte[] Syscall(string name)
+    {
+        uint hash = SyscallRegistry.ComputeHash(name);
+        byte[] bytes = System.BitConverter.GetBytes(hash);
+        return new[] { (byte)NeoVm.OpCode.SYSCALL, bytes[0], bytes[1], bytes[2], bytes[3] };
     }
 }

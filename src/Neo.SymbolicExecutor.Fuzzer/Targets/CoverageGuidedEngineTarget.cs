@@ -17,6 +17,16 @@ namespace Neo.SymbolicExecutor.Fuzzer.Targets;
 /// the corpus + tracker are stateful and are reused across iterations and workers. Keeping
 /// the dependency local to one target means other engine targets can stay stateless and
 /// remain reproducible from a single seed.
+///
+/// Review fix (#65): REPRODUCIBILITY CAVEAT. Unlike the stateless engine targets, this
+/// coverage-guided/corpus target is NOT reproducible via <c>--seed</c>. <see cref="RunOnce"/>
+/// derives its input from the shared, mutating <see cref="GlobalCorpus"/> (and across-worker
+/// ordering), so the same seed produces different inputs depending on prior coverage state.
+/// The general "Same seeds reproduce" guarantee in the CLI help applies to the stateless
+/// targets only. To reproduce a finding from THIS target, replay the recorded bytes with
+/// <c>--reproduce &lt;crash-dir&gt;/input.bin --target engine-cov</c> (the byte-level repro path,
+/// gated by <see cref="SupportsDirectReplay"/>, is deterministic and is the supported way to
+/// reproduce coverage-guided crashes).
 /// </summary>
 public sealed class CoverageGuidedEngineTarget : IFuzzTarget
 {
@@ -84,6 +94,37 @@ public sealed class CoverageGuidedEngineTarget : IFuzzTarget
         {
             reason = "engine-cov produced state with status=Running after Run()";
             return false;
+        }
+
+        // Review fix (#62): the "no Running status" property above is a crash/termination
+        // oracle only — it proves Run() drained the worklist, NOT that any individual result
+        // is correct. Add real well-formedness invariants that a correct run must satisfy on
+        // EVERY final state, so this target can catch a class of wrong results (malformed
+        // terminal state) rather than only outright crashes / hangs:
+        //   (a) A Stopped or Faulted state must carry a non-null TerminationReason. The engine
+        //       always terminates those statuses with a reason string (budget message, fault
+        //       message, etc.); a null reason means a code path terminated a state without
+        //       recording why it stopped, which is a real book-keeping bug.
+        //   (b) Steps must stay within [0, MaxSteps]. The step loop checks Steps >= MaxSteps
+        //       before incrementing, so a final state reporting more steps than the budget (or
+        //       a negative count) indicates the budget was not honored.
+        // Note: a tighter Pc-bounds invariant is intentionally NOT asserted here — an
+        // out-of-range JMP target legitimately leaves a Faulted state with a Pc below 0 or
+        // beyond the script (it faults as "PC at unaligned offset" on the next decode), so a
+        // Pc bound would false-positive.
+        foreach (var s in result.FinalStates)
+        {
+            if ((s.Status == TerminalStatus.Stopped || s.Status == TerminalStatus.Faulted)
+                && s.TerminationReason is null)
+            {
+                reason = $"engine-cov: {s.Status} state has null TerminationReason (pc=0x{s.Pc:X4})";
+                return false;
+            }
+            if (s.Steps < 0 || s.Steps > _engineOptions.MaxSteps)
+            {
+                reason = $"engine-cov: state Steps={s.Steps} outside [0, {_engineOptions.MaxSteps}] budget";
+                return false;
+            }
         }
 
         // Aggregate visited offsets and report to the global tracker.

@@ -42,6 +42,7 @@ public sealed class UnsafeDeserializationDetector : BaseDetector
         {
             foreach (var call in state.Telemetry.ExternalCalls)
             {
+                if (call.ModeledSelfCall) continue;
                 if (!DeserializeMethods.Contains(call.Method)) continue;
                 // Restrict to StdLib. DApps occasionally implement their own contract method
                 // also named "deserialize" that already validates input; surfacing every such

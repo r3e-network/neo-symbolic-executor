@@ -68,6 +68,39 @@ public class PortableSmtSolverCoverageTests
         backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
     }
 
+    // ---- review #27: anti-false-UNSAT pins (must never return a false UNSAT) --------
+
+    [Fact]
+    public void Fallback_SatisfiableNonlinearProduct_IsNeverUnsat()
+    {
+        // Review fix (#27): the portable solver must NEVER return a false UNSAT on a satisfiable
+        // formula — a false UNSAT would let the verifier declare a vulnerable path infeasible
+        // (unsound "proven safe"). A nonlinear product it cannot reason about precisely must
+        // degrade to Unknown/Sat, never Unsat.
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var y = Expr.Sym(Sort.Int, "y");
+        backend.IsSatisfiable(new List<Expression> { Expr.Gt(Expr.Mul(x, y), Expr.Int(0)) })
+            .Should().NotBe(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_SatisfiableMultiSymbolSum_IsNeverUnsat()
+    {
+        // x + y + z == 7 is satisfiable (e.g. 1 + 2 + 4); a regression that mis-folds the
+        // multi-symbol affine term into a false contradiction would surface here as an UNSAT.
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+        var y = Expr.Sym(Sort.Int, "y");
+        var z = Expr.Sym(Sort.Int, "z");
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(Expr.Add(Expr.Add(x, y), z), Expr.Int(7)),
+        }).Should().NotBe(SmtOutcome.Unsat);
+    }
+
     // ---- disjoint-range UNSAT (new precision win) ----------------------------------
 
     [Fact]
@@ -135,6 +168,49 @@ public class PortableSmtSolverCoverageTests
         ((System.Numerics.BigInteger)witness!["x"]).Should().BeInRange(10, 20);
     }
 
+    [Fact]
+    public void Fallback_IntDomain_IsUnsatWhenFiniteIntervalIsFullyExcludedByNotEquals()
+    {
+        // x in [0, 1] with both possible values excluded has no integer solution. The portable
+        // solver used to only notice the single-point version and reported SAT here, which can
+        // make infeasible verification requires look reachable when z3 is unavailable.
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var x = Expr.Sym(Sort.Int, "x");
+
+        var conds = new List<Expression>
+        {
+            Expr.Ge(x, Expr.Int(0)),
+            Expr.Le(x, Expr.Int(1)),
+            Expr.Ne(x, Expr.Int(0)),
+            Expr.Ne(x, Expr.Int(1)),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_Or_IsUnsatWhenEveryDisjunctContradictsCurrentDomain()
+    {
+        // Fault obligations often arrive as `(x < lo || x > hi)` under already-known bounds.
+        // Without OR splitting the fallback returned Unknown here, so no-z3 proof runs could not
+        // discharge simple enum/range safety checks such as Neo call flags.
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var flags = Expr.Sym(Sort.Int, "flags");
+
+        var conds = new List<Expression>
+        {
+            Expr.Ge(flags, Expr.Int(0)),
+            Expr.Le(flags, Expr.Int(15)),
+            Expr.BoolOr(
+                Expr.Lt(flags, Expr.Int(0)),
+                Expr.Gt(flags, Expr.Int(15))),
+        };
+
+        backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
     // ---- multi-step witness fixup (the _ints.Count round-bound fix) ---------------
 
     [Fact]
@@ -185,6 +261,35 @@ public class PortableSmtSolverCoverageTests
         backend.IsSatisfiable(new List<Expression> { BoolConst.False }).Should().Be(SmtOutcome.Unsat);
     }
 
+    [Fact]
+    public void Fallback_OpaqueBoolPredicate_ContradictsItsNegation()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var bytes = Expr.Sym(Sort.Bytes, "message");
+        var validUtf8 = new UnaryExpr(Sort.Bool, "utf8", bytes);
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            validUtf8,
+            Expr.Not(validUtf8),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_BoolSymbol_ContradictsItsNegation()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var exists = Expr.Sym(Sort.Bool, "storage_exists_39");
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            exists,
+            Expr.Not(exists),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
     // ---- redundant double-negation -------------------------------------------------
 
     [Fact]
@@ -201,6 +306,166 @@ public class PortableSmtSolverCoverageTests
             Expr.Eq(x, Expr.Int(0)),
         };
         backend.IsSatisfiable(conds).Should().Be(SmtOutcome.Unsat);
+    }
+
+    // ---- NeoVM byte-to-integer conversion ------------------------------------------
+
+    [Fact]
+    public void Fallback_ByteToIntegerSymbol_ProvesZeroContradiction()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var account = Expr.Sym(Sort.Bytes, "account");
+        var accountInt = new UnaryExpr(Sort.Int, "b2i", account);
+
+        var contradictory = new List<Expression>
+        {
+            Expr.Ne(accountInt, Expr.Int(0)),
+            Expr.Eq(accountInt, Expr.Int(0)),
+        };
+        backend.IsSatisfiable(contradictory).Should().Be(SmtOutcome.Unsat);
+
+        var zeroReachable = new List<Expression>
+        {
+            Expr.Eq(accountInt, Expr.Int(0)),
+        };
+        backend.IsSatisfiable(zeroReachable).Should().Be(SmtOutcome.Sat);
+        var witness = backend.BuildWitness(zeroReachable);
+        witness.Should().NotBeNull();
+        witness.Should().ContainKey("b2i:account");
+    }
+
+    [Fact]
+    public void Fallback_RawByteEquality_DoesNotUseNumericConversion()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var bytes = Expr.Sym(Sort.Bytes, "bytes");
+
+        var rawByteConditions = new List<Expression>
+        {
+            Expr.Eq(bytes, Expr.Bytes(new byte[] { 1, 0 })),
+            Expr.Ne(bytes, Expr.Bytes(new byte[] { 1 })),
+        };
+        backend.IsSatisfiable(rawByteConditions).Should().Be(
+            SmtOutcome.Sat,
+            "raw ByteString equality is byte-level, so [01 00] and [01] are numerically equal but byte-distinct");
+
+        var contradictoryRawByteConditions = new List<Expression>
+        {
+            Expr.Eq(bytes, Expr.Bytes(new byte[] { 1, 0 })),
+            Expr.Eq(bytes, Expr.Bytes(new byte[] { 1 })),
+        };
+        backend.IsSatisfiable(contradictoryRawByteConditions).Should().Be(
+            SmtOutcome.Unsat,
+            "byte-sequence equality must include length, not just numeric ByteString conversion");
+
+        var numericByteConditions = new List<Expression>
+        {
+            Expr.NumEq(bytes, Expr.Int(1)),
+            Expr.NumNe(bytes, Expr.Int(1)),
+        };
+        backend.IsSatisfiable(numericByteConditions).Should().Be(
+            SmtOutcome.Unsat,
+            "numeric byte comparisons deliberately use NeoVM GetInteger semantics");
+    }
+
+    [Fact]
+    public void Fallback_ByteSize_KnowsConcreteLengthSpliceExpressions()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var data = Expr.Sym(Sort.Bytes, "data");
+        var substr = new TernaryExpr(Sort.Bytes, "substr", data, Expr.Int(1), Expr.Int(2));
+        var left = new BinaryExpr(Sort.Bytes, "left", data, Expr.Int(3));
+        var right = new BinaryExpr(Sort.Bytes, "right", data, Expr.Int(4));
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", substr), Expr.Int(2)),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", left), Expr.Int(3)),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", right), Expr.Int(4)),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_ByteSize_KnowsSymbolicLengthSpliceExpressions()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var data = Expr.Sym(Sort.Bytes, "data");
+        var n = Expr.Sym(Sort.Int, "n");
+        var substr = new TernaryExpr(Sort.Bytes, "substr", data, Expr.Int(1), n);
+        var left = new BinaryExpr(Sort.Bytes, "left", data, n);
+        var right = new BinaryExpr(Sort.Bytes, "right", data, n);
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", substr), n),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", left), n),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new UnaryExpr(Sort.Int, "size", right), n),
+        }).Should().Be(SmtOutcome.Unsat);
+    }
+
+    [Fact]
+    public void Fallback_ByteSize_FixedAbiLengthExcludesNeoVmIntegerLimitFault()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var account = Expr.Sym(Sort.Bytes, "arg_account");
+        var size = new UnaryExpr(Sort.Int, "size", account);
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Eq(size, Expr.Int(20)),
+            Expr.Gt(size, Expr.Int(32)),
+        }).Should().Be(
+            SmtOutcome.Unsat,
+            "Hash160 ABI entry constraints must discharge NeoVM GetInteger's 32-byte input guard");
+    }
+
+    [Fact]
+    public void Fallback_BytePick_KnowsConcreteAndSpliceBytes()
+    {
+        using var _ = ForceMissingZ3();
+        using var backend = new Z3Backend();
+        var concrete = Expr.Bytes(new byte[] { 65, 66, 67 });
+        var concat = new BinaryExpr(
+            Sort.Bytes,
+            "cat",
+            Expr.Bytes(new byte[] { 1, 2 }),
+            Expr.Bytes(new byte[] { 3, 4 }));
+        var substr = new TernaryExpr(Sort.Bytes, "substr", concrete, Expr.Int(1), Expr.Int(2));
+        var right = new BinaryExpr(Sort.Bytes, "right", concrete, Expr.Int(2));
+
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new BinaryExpr(Sort.Int, "pick", concrete, Expr.Int(1)), Expr.Int(66)),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new BinaryExpr(Sort.Int, "pick", concat, Expr.Int(2)), Expr.Int(3)),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new BinaryExpr(Sort.Int, "pick", substr, Expr.Int(0)), Expr.Int(66)),
+        }).Should().Be(SmtOutcome.Unsat);
+        backend.IsSatisfiable(new List<Expression>
+        {
+            Expr.Ne(new BinaryExpr(Sort.Int, "pick", right, Expr.Int(0)), Expr.Int(66)),
+        }).Should().Be(SmtOutcome.Unsat);
     }
 
     // ---- helpers --------------------------------------------------------------------

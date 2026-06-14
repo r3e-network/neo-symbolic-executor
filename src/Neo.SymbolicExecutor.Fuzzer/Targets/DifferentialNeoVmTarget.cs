@@ -104,46 +104,64 @@ public sealed class DifferentialNeoVmTarget : IFuzzTarget
         var result = new SymbolicEngine(program, _engineOptions).Run();
         if (result.FinalStates.Length == 0) return true;
 
-        // If any final state Halted, the symbolic engine agrees with Neo.VM. Done.
-        if (result.FinalStates.Any(s => s.Status == TerminalStatus.Halted)) return true;
-        // If all final states are Stopped (budget), we cannot decide.
-        if (result.FinalStates.All(s => s.Status == TerminalStatus.Stopped)) return true;
-        // If any state Faulted but at least one Stopped, we still cannot decide.
-        if (result.FinalStates.Any(s => s.Status == TerminalStatus.Stopped)) return true;
+        // Review fix (#63): do NOT treat the run as "agreement" just because SOME forked path
+        // Halted. NeoVM ran this input single-path (the scope above skips SYSCALL/CALLT/CALLA,
+        // so inputs are largely concrete and forks are concretely-identical). If NeoVM HALTed
+        // but a sibling symbolic state FAULTed with a non-cap (semantic) reason, that fault is
+        // a real divergence the oracle must report — a Halted sibling masking it would let an
+        // engine bug slip through. So we look for a semantic (non-cap) fault FIRST, before
+        // crediting any Halted state as agreement.
+        var semanticFault = result.FinalStates.FirstOrDefault(s =>
+            s.Status == TerminalStatus.Faulted
+            && !IsExpectedDivergence(s.TerminationReason ?? "<no reason>"));
+        if (semanticFault is null)
+        {
+            // No semantic fault on any path. A Halted state now legitimately means agreement;
+            // Stopped (budget) / cap-only faults are undecidable and skipped.
+            return true;
+        }
 
-        // All paths Faulted, Neo.VM Halted -> divergence.
-        var fault = result.FinalStates.First(s => s.Status == TerminalStatus.Faulted);
-        var faultReason = fault.TerminationReason ?? "<no reason>";
-
-        // Skip "expected" divergences — symbolic-engine-only limitations or budget caps that
-        // are tighter than NeoVM's at the analyzer level. These are not engine semantic bugs:
-        //   - "out of range" / "out of bounds": fuzz target's Heap caps are tighter than NeoVM's
-        //   - "exceeds limit": MaxItemSize cap
-        //   - "Heap object limit": MaxHeapObjects cap
-        //   - "stack overflow": MaxStackSize cap
-        //   - "max paths" / "max queued": symbolic-fuzz scheduler cap
-        //   - "requires concrete": symbolic-only refusal to execute on a non-concrete operand
-        //   - "uncaught": catchable exception that the test bytecode didn't TRY-wrap; not a
-        //     semantic divergence (NeoVM also throws, just routes to ExecuteThrow which the
-        //     bytecode here doesn't observe)
-        if (IsExpectedDivergence(faultReason)) return true;
+        // NeoVM Halted but a symbolic path Faulted for a non-cap reason -> divergence.
+        // (IsExpectedDivergence was already applied when selecting semanticFault above.)
+        var faultReason = semanticFault.TerminationReason ?? "<no reason>";
 
         reason = $"{faultReason}: Neo.VM HALT but symbolic engine FAULTED";
         return false;
     }
 
+    /// <summary>
+    /// Returns true when a symbolic FAULT reason is an *expected* analyzer-level cap or
+    /// symbolic-only limitation — not a NeoVM-semantic divergence. These are skipped so the
+    /// oracle does not produce false divergence reports for legitimate analyzer caps.
+    ///
+    /// Review fix (#24): the prior filter used free substrings ("out of range",
+    /// "out of bounds", and the "size" &amp;&amp; "exceeds" combo) that SWALLOWED genuine
+    /// VM-semantic faults — slot/XDROP/ROLL/PICK/Peek "out of range" and "exceeds ... range",
+    /// exactly the off-by-one bounds-bug class this differential oracle exists to catch. The
+    /// filter now matches SPECIFIC analyzer-cap strings only. Genuine VM-bound faults such as
+    /// "slot index ... out of range", "XDROP index ... out of range", "Peek depth ... out of
+    /// range", and "ROLL index ... out of range" are NO LONGER skipped and surface as
+    /// divergences.
+    /// </summary>
     private static bool IsExpectedDivergence(string r) =>
-        r.Contains("out of range")
-        || r.Contains("out of bounds")
-        || r.Contains("exceeds limit")
+        // MaxItemSize cap (analyzer-tighter than NeoVM): "... exceeds item size limit ..."
+        r.Contains("exceeds item size limit")
+        // Generic NeoVM hard limits modeled as analyzer caps.
+        || r.Contains("exceeds NeoVM limit")
+        // MaxHeapObjects cap.
         || r.Contains("Heap object limit")
-        || r.Contains("stack overflow")
+        // MaxStackSize / MaxInvocationStackDepth caps.
+        || r.Contains("evaluation stack overflow")
+        || r.Contains("invocation stack overflow")
+        // Symbolic-fuzz scheduler / budget caps.
+        || r.Contains("budget:")
         || r.Contains("max paths")
         || r.Contains("max queued")
+        // Symbolic-only refusal to execute on a non-concrete operand.
         || r.Contains("requires concrete")
+        // Catchable exception that the test bytecode didn't TRY-wrap; not a semantic divergence
+        // (NeoVM also throws, just routes to ExecuteThrow which the bytecode here doesn't observe).
         || r.Contains("uncaught")
-        || r.Contains("budget:")
-        || r.Contains("size") && r.Contains("exceeds")
         || r.Contains("PC at unaligned");   // see iter-2 wakeup-4: JIT decode covers most cases
                                             // but corner cases (post-RET PC overshoot etc.) remain
 }

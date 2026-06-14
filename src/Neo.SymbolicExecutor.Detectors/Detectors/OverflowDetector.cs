@@ -14,8 +14,14 @@ namespace Neo.SymbolicExecutor.Detectors.Detectors;
 /// - INC, DEC, SHL, POW must be tracked (audit found Python missed these in `arithmetic_ops`).
 ///   Our engine adds them via UnaryArith/BinaryArith.
 /// - DIV/MOD by symbolic divisor adds a divide-by-zero finding even when overflow is unlikely.
-/// - When the result is consumed by an ASSERT/JMPIF or stored back via STLOC and immediately
-///   asserted, mark `Checked=true` and skip — implemented via expression flow tagging.
+/// - The engine does NOT presently tag arithmetic results consumed by a downstream ASSERT/JMPIF
+///   as <see cref="ArithmeticOp.Checked"/> (the flag is reserved for a future flow pass and is
+///   currently only set when an operand is provably bounded). Because of that, the bare
+///   <see cref="ArithmeticOp.OverflowPossible"/> flag fires on guarded/bounded code too. Review
+///   fix (#15): when an SMT backend is available we additionally require the overflow predicate
+///   (result &gt; NeoVmIntegerMax OR result &lt; NeoVmIntegerMin) to be satisfiable under the op's
+///   own path conditions before reporting, which suppresses paths where a guard already bounds
+///   the result. UNKNOWN still reports, preserving the over-approximation invariant.
 /// </summary>
 public sealed class OverflowDetector : BaseDetector
 {
@@ -31,7 +37,7 @@ public sealed class OverflowDetector : BaseDetector
             {
                 if (op.Checked) continue;
 
-                if (op.OverflowPossible)
+                if (op.OverflowPossible && OverflowFeasible(context, op))
                 {
                     yield return MakeFinding(
                         title: $"Unchecked {op.Operation} may overflow",
@@ -57,5 +63,31 @@ public sealed class OverflowDetector : BaseDetector
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Review fix (#15): gate the overflow report on an SMT feasibility query. We conjoin the op's
+    /// path conditions with the actual overflow predicate (result outside the NeoVM 256-bit signed
+    /// integer range) and only report when the conjunction is SAT or UNKNOWN. When no SMT backend
+    /// is available, or the op carries no concrete result expression to constrain, we fall back to
+    /// the previous over-approximating behavior (report).
+    /// </summary>
+    private static bool OverflowFeasible(AnalysisContext context, ArithmeticOp op)
+    {
+        var smt = context.SmtBackend;
+        if (smt is null || !smt.IsAvailable) return true;
+        if (op.Result is not { } result || result.Sort != Sort.Int) return true;
+
+        var conditions = op.PathConditions.IsDefault
+            ? new List<Expression>()
+            : op.PathConditions.ToList();
+
+        Expression overflowPredicate = Expr.BoolOr(
+            Expr.Gt(result.Expression, Expr.Int(Expr.NeoVmIntegerMax)),
+            Expr.Lt(result.Expression, Expr.Int(Expr.NeoVmIntegerMin)));
+
+        // Sound by the ISmtBackend contract: UNSAT means the result is provably bounded under the
+        // guards on this path, so suppress. SAT/UNKNOWN both preserve over-approximation.
+        return smt.IsSatisfiable(conditions, overflowPredicate) != Smt.SmtOutcome.Unsat;
     }
 }

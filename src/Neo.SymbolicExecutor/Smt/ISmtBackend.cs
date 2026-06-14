@@ -78,4 +78,12 @@ public sealed record SmtStats(
     // integer encoding). Sound — the constraint set is over-approximated, never under — but a
     // non-zero value means SAT/UNSAT outcomes for queries on this run lost precision. Surfaced
     // in JSON reports so consumers can tell when SMT verdicts depend on opacified subterms.
+    //
+    // Soundness invariant (review #41/#47): an opaque substitution only RELAXES a formula (a fresh
+    // unconstrained variable can take any value), so it can turn a real-UNSAT formula into SAT/UNKNOWN
+    // but NEVER a real-SAT formula into UNSAT. Because the verifier concludes safety ("proved") only
+    // from an UNSAT counterexample query — never from a SAT/feasible outcome — opacity can at worst
+    // downgrade a Proved verdict to Unknown/Incomplete or surface a spurious (witness-backed, hence
+    // auditable) Violated; it cannot manufacture an unsound Proved. The per-expression translation
+    // cache keeps repeated opaque subterms identical, which is required for this monotonicity to hold.
     long OpaqueTranslations = 0);

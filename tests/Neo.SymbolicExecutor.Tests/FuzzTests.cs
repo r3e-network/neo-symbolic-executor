@@ -68,9 +68,6 @@ public class FuzzTests
             try { _ = Nef.ContractManifest.FromJson(input); }
             catch (FormatException) { /* expected */ }
             catch (System.Text.Json.JsonException) { /* expected */ }
-            catch (InvalidOperationException) { /* expected */ }
-            catch (NotSupportedException) { /* expected */ }
-            catch (ArgumentException) { /* expected */ }
             catch (Exception ex) { throw new Xunit.Sdk.XunitException($"unexpected {ex.GetType().Name} on iter {i}: {ex.Message}"); }
         }
     }
@@ -195,9 +192,16 @@ public class FuzzTests
         t.WitnessChecksEnforced.Add(0x40);
         t.CallerHashChecks.Add(0x50);
         t.SignatureChecks.Add(0x60);
+        t.SignatureChecksEnforced.Add(0x60);
         t.TimeAccesses.Add(0x70);
         t.RandomnessAccesses.Add(0x80);
         t.EventsEmitted.Add(0x90);
+        t.Notifications.Add(new RuntimeNotification(
+            0x90,
+            SymbolicValue.Bytes(new byte[20]),
+            SymbolicValue.Bytes("Transfer"u8.ToArray()),
+            SymbolicValue.Null(),
+            "Transfer"));
         t.LoopsDetected.Add(0xA0);
         t.IteratorLoops.Add(0xB0);
         t.ExceptionsThrown.Add(0xC0);

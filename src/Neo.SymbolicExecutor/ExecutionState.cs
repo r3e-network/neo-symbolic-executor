@@ -35,6 +35,11 @@ public sealed class ExecutionState
     public List<int> Path { get; init; }
     public SymbolicValue? UncaughtException { get; set; }
     public Dictionary<string, SymbolicValue> InteropContext { get; init; }
+    public Dictionary<Expression, SymbolicValue> StorageValues { get; init; }
+    public Dictionary<int, int> UnknownStorageReadCounts { get; init; }
+    public int CurrentCallFlags { get; set; } = NeoCallFlags.All;
+    public int RuntimeTrigger { get; set; } = NeoTriggerTypes.Application;
+    public int FreshSymbolCounter { get; set; }
 
     public ExecutionState()
     {
@@ -43,9 +48,12 @@ public sealed class ExecutionState
         StaticFields = new List<SymbolicValue?>();
         Heap = new Heap();
         Telemetry = new Telemetry();
+        Telemetry.BindPathConditions(() => PathConditions.ToImmutableArray());
         VisitCounts = new Dictionary<int, int>();
         Path = new List<int>();
         InteropContext = new Dictionary<string, SymbolicValue>();
+        StorageValues = new Dictionary<Expression, SymbolicValue>();
+        UnknownStorageReadCounts = new Dictionary<int, int>();
     }
 
     private ExecutionState(
@@ -62,7 +70,12 @@ public sealed class ExecutionState
         Dictionary<int, int> visits,
         List<int> path,
         SymbolicValue? exception,
-        Dictionary<string, SymbolicValue> interop)
+        Dictionary<string, SymbolicValue> interop,
+        Dictionary<Expression, SymbolicValue> storageValues,
+        Dictionary<int, int> unknownStorageReadCounts,
+        int currentCallFlags,
+        int runtimeTrigger,
+        int freshSymbolCounter)
     {
         Pc = pc;
         EvaluationStack = stack;
@@ -71,6 +84,7 @@ public sealed class ExecutionState
         Heap = heap;
         PathConditions = conditions;
         Telemetry = telemetry;
+        Telemetry.BindPathConditions(() => PathConditions.ToImmutableArray());
         Status = status;
         TerminationReason = reason;
         Steps = steps;
@@ -78,6 +92,11 @@ public sealed class ExecutionState
         Path = path;
         UncaughtException = exception;
         InteropContext = interop;
+        StorageValues = storageValues;
+        UnknownStorageReadCounts = unknownStorageReadCounts;
+        CurrentCallFlags = currentCallFlags;
+        RuntimeTrigger = runtimeTrigger;
+        FreshSymbolCounter = freshSymbolCounter;
     }
 
     public ExecutionState Clone() => new(
@@ -94,7 +113,15 @@ public sealed class ExecutionState
         new Dictionary<int, int>(VisitCounts),
         new List<int>(Path),
         UncaughtException,
-        new Dictionary<string, SymbolicValue>(InteropContext));
+        new Dictionary<string, SymbolicValue>(InteropContext),
+        new Dictionary<Expression, SymbolicValue>(StorageValues),
+        new Dictionary<int, int>(UnknownStorageReadCounts),
+        CurrentCallFlags,
+        RuntimeTrigger,
+        FreshSymbolCounter);
+
+    public string NextFreshSymbolName(string prefix) =>
+        $"{prefix}_{FreshSymbolCounter++}";
 
     public CallFrame CurrentFrame =>
         CallStack.Count == 0

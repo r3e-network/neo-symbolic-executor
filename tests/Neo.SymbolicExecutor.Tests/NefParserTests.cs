@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using Neo.SymbolicExecutor;
 using Neo.SymbolicExecutor.Nef;
 
 namespace Neo.SymbolicExecutor.Tests;
@@ -76,11 +78,22 @@ public class NefParserTests
         // bubble an EndOfStreamException out of BinaryReader (audit C# #29 lineage).
         var script = new byte[] { 0x40 };
         byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), script);
-        // Drop the trailing checksum + half the script's varbytes prefix to simulate truncation.
-        var truncated = bytes.AsSpan(0, bytes.Length - 6).ToArray();
+        var truncated = bytes.AsSpan(0, 3).ToArray();
         var act = () => NefFile.Parse(truncated, verifyChecksum: false);
-        act.Should().Throw<System.Exception>(
-            "any failure mode is acceptable as long as the parser doesn't accept a truncated file");
+        act.Should().Throw<FormatException>().WithMessage("*truncated*");
+    }
+
+    [Fact]
+    public void Parse_TrailingBytes_ThrowsEvenWithoutChecksumVerification()
+    {
+        var script = new byte[] { 0x40 };
+        byte[] bytes = BuildNef("dotnet", "", System.Array.Empty<MethodToken>(), script)
+            .Concat(new byte[] { 0x00 })
+            .ToArray();
+
+        var act = () => NefFile.Parse(bytes, verifyChecksum: false);
+
+        act.Should().Throw<FormatException>().WithMessage("*trailing*");
     }
 
     [Fact]
@@ -113,6 +126,36 @@ public class NefParserTests
     }
 
     [Fact]
+    public void Parse_MethodTokenInvalidUtf8Name_ThrowsFormatException()
+    {
+        byte[] bytes = BuildNefWithRawTokenName(new byte[] { 0xFF, 0xFE });
+
+        var act = () => NefFile.Parse(bytes, verifyChecksum: true);
+
+        act.Should().Throw<FormatException>().WithMessage("*strict UTF-8*");
+    }
+
+    [Fact]
+    public void Parse_MethodTokenNonCanonicalBoolean_ThrowsFormatException()
+    {
+        byte[] bytes = BuildNefWithRawTokenFields(hasReturnValue: 2, callFlags: 0x01);
+
+        var act = () => NefFile.Parse(bytes, verifyChecksum: true);
+
+        act.Should().Throw<FormatException>().WithMessage("*hasReturnValue*0 or 1*");
+    }
+
+    [Fact]
+    public void Parse_MethodTokenInvalidCallFlags_ThrowsFormatException()
+    {
+        byte[] bytes = BuildNefWithRawTokenFields(hasReturnValue: 1, callFlags: 0x80);
+
+        var act = () => NefFile.Parse(bytes, verifyChecksum: true);
+
+        act.Should().Throw<FormatException>().WithMessage("*callFlags*unsupported*");
+    }
+
+    [Fact]
     public void Parse_VerifyChecksumFalse_AcceptsTamperedNef()
     {
         // The verifyChecksum=false code path is used by the fuzzer's structured-mutation target
@@ -123,6 +166,24 @@ public class NefParserTests
         bytes[bytes.Length - 5] = (byte)(bytes[bytes.Length - 5] ^ 0xFF);
         var nef = NefFile.Parse(bytes, verifyChecksum: false);
         nef.Compiler.Should().Be("dotnet");
+    }
+
+    [Fact]
+    public void ContractIdentity_ComputesNativeStdLibHash()
+    {
+        var nef = new NefFile
+        {
+            Compiler = "",
+            Source = "",
+            Tokens = System.Array.Empty<MethodToken>(),
+            Script = new byte[] { 0x40 },
+            Checksum = 0,
+        };
+        var manifest = new ContractManifest { Name = "StdLib" };
+
+        string hash = ContractIdentity.ComputeContractHashHex(nef, manifest, new byte[20]);
+
+        hash.Should().Be(NeoNativeContractHashes.StdLib);
     }
 
     private static byte[] BuildNef(string compiler, string source, MethodToken[] tokens, byte[] script)
@@ -143,6 +204,63 @@ public class NefParserTests
             WriteVarBytes(bw, script);
         }
         // Now compute checksum over the prefix.
+        byte[] prefix = ms.ToArray();
+        uint checksum = NefFile.ComputeChecksum(prefix);
+        byte[] full = new byte[prefix.Length + 4];
+        System.Array.Copy(prefix, full, prefix.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(full.AsSpan(prefix.Length), checksum);
+        return full;
+    }
+
+    private static byte[] BuildNefWithRawTokenName(byte[] nameBytes)
+    {
+        using var ms = new MemoryStream();
+        using (var bw = new BinaryWriter(ms, System.Text.Encoding.ASCII, leaveOpen: true))
+        {
+            bw.Write(NefFile.MagicValue);
+            bw.Write(new byte[64]);
+            WriteVarBytes(bw, System.Array.Empty<byte>());
+            bw.Write((byte)0);
+            WriteVarInt(bw, 1);
+            bw.Write(new byte[20]);
+            WriteVarInt(bw, (ulong)nameBytes.Length);
+            bw.Write(nameBytes);
+            bw.Write((ushort)0);
+            bw.Write((byte)0);
+            bw.Write((byte)0);
+            bw.Write((ushort)0);
+            WriteVarBytes(bw, new byte[] { 0x40 });
+        }
+
+        byte[] prefix = ms.ToArray();
+        uint checksum = NefFile.ComputeChecksum(prefix);
+        byte[] full = new byte[prefix.Length + 4];
+        System.Array.Copy(prefix, full, prefix.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(full.AsSpan(prefix.Length), checksum);
+        return full;
+    }
+
+    private static byte[] BuildNefWithRawTokenFields(byte hasReturnValue, byte callFlags)
+    {
+        using var ms = new MemoryStream();
+        using (var bw = new BinaryWriter(ms, System.Text.Encoding.ASCII, leaveOpen: true))
+        {
+            bw.Write(NefFile.MagicValue);
+            bw.Write(new byte[64]);
+            WriteVarBytes(bw, System.Array.Empty<byte>());
+            bw.Write((byte)0);
+            WriteVarInt(bw, 1);
+            bw.Write(new byte[20]);
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes("balanceOf");
+            WriteVarInt(bw, (ulong)nameBytes.Length);
+            bw.Write(nameBytes);
+            bw.Write((ushort)1);
+            bw.Write(hasReturnValue);
+            bw.Write(callFlags);
+            bw.Write((ushort)0);
+            WriteVarBytes(bw, new byte[] { 0x40 });
+        }
+
         byte[] prefix = ms.ToArray();
         uint checksum = NefFile.ComputeChecksum(prefix);
         byte[] full = new byte[prefix.Length + 4];

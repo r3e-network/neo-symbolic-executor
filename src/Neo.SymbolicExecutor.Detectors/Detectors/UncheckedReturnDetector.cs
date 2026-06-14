@@ -25,6 +25,7 @@ public sealed class UncheckedReturnDetector : BaseDetector
         {
             foreach (var call in state.Telemetry.ExternalCalls)
             {
+                if (call.ModeledSelfCall) continue;
                 if (!call.HasReturnValue) continue;
                 if (call.ReturnChecked) continue;
 
@@ -34,9 +35,11 @@ public sealed class UncheckedReturnDetector : BaseDetector
                                  "is not subsequently checked via ASSERT, equality, or a conditional branch. " +
                                  "Failure of the callee can go unnoticed.",
                     offset: call.Offset,
-                    severity: Severity.Medium,
+                    severity: call.ReturnModeledNative ? Severity.Low : Severity.Medium,
                     state: state,
-                    tags: new[] { "unchecked-return" });
+                    tags: call.ReturnModeledNative
+                        ? new[] { "unchecked-return", "modeled-native-return" }
+                        : new[] { "unchecked-return" });
             }
         }
     }

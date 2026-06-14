@@ -23,6 +23,8 @@ namespace Neo.SymbolicExecutor.Fuzzer.Targets;
 /// </summary>
 public sealed class RealNefTarget : IFuzzTarget
 {
+    private const long MaxRealNefFileBytes = 1_048_576;
+
     public string Name => "real-nef";
     public Type[] ExpectedExceptions => Type.EmptyTypes;
 
@@ -40,6 +42,7 @@ public sealed class RealNefTarget : IFuzzTarget
         try
         {
             _files = Directory.EnumerateFiles(dir, "*.nef", SearchOption.AllDirectories)
+                .Where(path => SafeLength(path) <= MaxRealNefFileBytes)
                 .Take(2048)
                 .ToImmutableArray();
         }
@@ -60,6 +63,12 @@ public sealed class RealNefTarget : IFuzzTarget
 
         var rng = new Random(seed);
         string path = _files[rng.Next(_files.Length)];
+        if (SafeLength(path) > MaxRealNefFileBytes)
+        {
+            reproInput = Array.Empty<byte>();
+            reason = null;
+            return true;
+        }
         byte[] bytes;
         try { bytes = File.ReadAllBytes(path); }
         catch (IOException) { reproInput = Array.Empty<byte>(); reason = null; return true; }
@@ -128,5 +137,12 @@ public sealed class RealNefTarget : IFuzzTarget
         string md = ReportGenerator.ToMarkdown(report);
         if (!md.StartsWith("# Neo Symbolic Executor")) { reason = $"real-nef {path}: Markdown missing H1"; return false; }
         return true;
+    }
+
+    private static long SafeLength(string path)
+    {
+        try { return new FileInfo(path).Length; }
+        catch (IOException) { return long.MaxValue; }
+        catch (UnauthorizedAccessException) { return long.MaxValue; }
     }
 }

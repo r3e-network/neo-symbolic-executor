@@ -36,6 +36,7 @@ public sealed class ToctouStorageDetector : BaseDetector
             // StdLib.*, CryptoLib.*) cannot mutate any contract's storage and therefore cannot
             // create the TOCTOU window we're warning about.
             var nonBenignCalls = calls
+                .Where(c => !c.ModeledSelfCall)
                 .Where(c => !context.Natives.IsBenignReadOnlyCall(c))
                 .ToList();
             if (nonBenignCalls.Count == 0) continue;
@@ -45,11 +46,15 @@ public sealed class ToctouStorageDetector : BaseDetector
                 if (!ProtocolRiskHelpers.IsStateWrite(write)) continue;
                 if (write.Value is null) continue;
 
-                // Symbol carried by every Storage.Get result is `storage_value_<offset>`.
+                // Symbol carried by every Storage.Get result is `storage_value_<offset>`. Re-reads
+                // of the same offset get an `_<occurrence>` suffix (e.g. `storage_value_1_2`), so a
+                // whole-suffix int.TryParse would reject the suffixed forms.
                 foreach (var sym in write.Value.Expression.FreeSymbols())
                 {
-                    if (!sym.StartsWith("storage_value_", System.StringComparison.Ordinal)) continue;
-                    if (!int.TryParse(sym.AsSpan("storage_value_".Length), out int readOffset)) continue;
+                    // Review fix (#16): parse the leading digit run of the offset (stop at the first
+                    // non-digit), mirroring the verifier's TryParseStorageReadSymbolOffset, so
+                    // suffixed re-read symbols like `storage_value_1_2` are matched on offset 1.
+                    if (!TryParseStorageReadSymbolOffset(sym, "storage_value_", out int readOffset)) continue;
 
                     // Look for an external call strictly between the read and the write.
                     var interposingCall = nonBenignCalls
@@ -74,5 +79,25 @@ public sealed class ToctouStorageDetector : BaseDetector
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Review fix (#16): digit-PREFIX parse of a storage-read symbol's offset. Strips
+    /// <paramref name="prefix"/>, consumes the leading run of decimal digits, and parses that —
+    /// so an occurrence-suffixed symbol such as <c>storage_value_1_2</c> resolves to offset 1.
+    /// Equivalent to the verifier's <c>TryParseStorageReadSymbolOffset</c>.
+    /// </summary>
+    private static bool TryParseStorageReadSymbolOffset(string symbolName, string prefix, out int offset)
+    {
+        offset = 0;
+        if (!symbolName.StartsWith(prefix, System.StringComparison.Ordinal)) return false;
+
+        int start = prefix.Length;
+        int end = start;
+        while (end < symbolName.Length && char.IsDigit(symbolName[end]))
+            end++;
+
+        return end > start
+            && int.TryParse(symbolName.AsSpan(start, end - start), out offset);
     }
 }

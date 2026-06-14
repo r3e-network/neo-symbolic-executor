@@ -18,13 +18,25 @@ public sealed class GatePolicy
     public IReadOnlyDictionary<string, Severity>? FailOnDetectorSeverity { get; init; }
     public IReadOnlyDictionary<Severity, double>? MinConfidence { get; init; }
     public bool FailOnBudgetExceeded { get; init; }
+    public bool FailOnIncompleteCoverage { get; init; }
 
-    public GateEvaluation Evaluate(IReadOnlyList<Finding> findings, RiskProfile profile, bool budgetExceeded = false)
+    public GateEvaluation Evaluate(
+        IReadOnlyList<Finding> findings,
+        RiskProfile profile,
+        bool budgetExceeded = false,
+        bool coverageIncomplete = false,
+        string? coverageReason = null)
     {
         var violations = new List<string>();
 
         if (FailOnBudgetExceeded && budgetExceeded)
             violations.Add("analysis budget exceeded — results may be incomplete");
+
+        if (FailOnIncompleteCoverage && coverageIncomplete)
+        {
+            string suffix = string.IsNullOrWhiteSpace(coverageReason) ? "" : $" — {coverageReason}";
+            violations.Add("analysis coverage incomplete" + suffix);
+        }
 
         // Audit fix: a clean run (zero findings) returns OverallMaxSeverity = Info as a sentinel,
         // which would falsely trip a `FailOnMaxSeverity = Info` gate. Skip the max-severity check
@@ -104,6 +116,7 @@ public sealed class GatePolicy
                 mc.OrderBy(kv => (int)kv.Key)
                   .Select(kv => $"{kv.Key.ToLowerString()}={kv.Value.ToString("0.00", inv)}"));
         if (FailOnBudgetExceeded) b["fail-on-budget-exceeded"] = "true";
+        if (FailOnIncompleteCoverage) b["fail-on-incomplete-coverage"] = "true";
         return b.ToImmutable();
     }
 }

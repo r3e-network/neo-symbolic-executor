@@ -21,15 +21,17 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleCallA(ExecutionState state, Instruction inst)
     {
         var ptr = state.Pop();
-        var concreteTarget = TryConcretizeIndex(state, ptr,
-            lo: 0, hi: System.Math.Max(0, _program.Bytes.Length - 1));
+        if (ptr.Sort != Sort.Pointer)
+            throw new VmFaultException($"CALLA requires Pointer StackItem, got {ptr.Sort}");
+
+        var concreteTarget = ptr.AsConcretePointer();
         if (concreteTarget is null)
         {
-            state.Terminate(TerminalStatus.Stopped, "CALLA requires concrete target (no SMT model)");
+            state.Terminate(TerminalStatus.Stopped, "CALLA requires concrete Pointer target (no SMT model)");
             return Single(state);
         }
-        if (concreteTarget.Value < 0 || concreteTarget.Value > int.MaxValue)
-            throw new VmFaultException($"CALLA target {concreteTarget.Value} out of Int32 range");
+        if (concreteTarget.Value < 0 || concreteTarget.Value >= _program.Bytes.Length)
+            throw new VmFaultException($"CALLA target {concreteTarget.Value} outside script bytes");
         if (state.CallStack.Count >= _options.MaxInvocationStackDepth)
             throw new VmFaultException("invocation stack overflow (CALLA)");
         var frame = new CallFrame(returnPc: inst.EndOffset);
@@ -69,7 +71,7 @@ public sealed partial class SymbolicEngine
         var truthy = cond.Truthy();
         if (truthy == true)
         {
-            MarkConditionalEnforcement(state, cond, taken: true);
+            MarkConditionalEnforcement(state, cond, taken: true, inst.Offset);
             state.Pc = inst.EndOffset;
             return Single(state);
         }
@@ -80,7 +82,8 @@ public sealed partial class SymbolicEngine
             return Single(state);
         }
 
-        var (passSat, failSat) = ConsultSmt(state, cond.Expression);
+        var condTruthy = Expr.ToBool(cond.Expression);
+        var (passSat, failSat) = ConsultSmt(state, condTruthy);
         if (passSat == Smt.SmtOutcome.Unsat && failSat == Smt.SmtOutcome.Unsat)
         {
             state.Terminate(TerminalStatus.Stopped, "both ASSERT outcomes unsatisfiable");
@@ -88,7 +91,7 @@ public sealed partial class SymbolicEngine
         }
         if (passSat == Smt.SmtOutcome.Unsat)
         {
-            state.PathConditions = state.PathConditions.Add(Expr.Not(cond.Expression));
+            state.PathConditions = state.PathConditions.Add(Expr.Not(condTruthy));
             string reason = msg is null ? "ASSERT failed (symbolic)" : "ASSERT failed: " + DescribeMessage(msg);
             state.Terminate(TerminalStatus.Faulted, reason);
             return Single(state);
@@ -96,8 +99,8 @@ public sealed partial class SymbolicEngine
         if (failSat == Smt.SmtOutcome.Unsat)
         {
             state.Telemetry.SmtPrunedBranches++;
-            state.PathConditions = state.PathConditions.Add(cond.Expression);
-            MarkConditionalEnforcement(state, cond, taken: true);
+            state.PathConditions = state.PathConditions.Add(condTruthy);
+            MarkConditionalEnforcement(state, cond, taken: true, inst.Offset);
             state.Pc = inst.EndOffset;
             return Single(state);
         }
@@ -106,12 +109,12 @@ public sealed partial class SymbolicEngine
 
         // Symbolic assertion: fork into the success path (continue) and failure path (faulted).
         var pass = state.Clone();
-        pass.PathConditions = pass.PathConditions.Add(cond.Expression);
-        MarkConditionalEnforcement(pass, cond, taken: true);
+        pass.PathConditions = pass.PathConditions.Add(condTruthy);
+        MarkConditionalEnforcement(pass, cond, taken: true, inst.Offset);
         pass.Pc = inst.EndOffset;
 
         var fail = state;
-        fail.PathConditions = fail.PathConditions.Add(Expr.Not(cond.Expression));
+        fail.PathConditions = fail.PathConditions.Add(Expr.Not(condTruthy));
         string failReason = msg is null ? "ASSERT failed (symbolic)" : "ASSERT failed: " + DescribeMessage(msg);
         fail.Terminate(TerminalStatus.Faulted, failReason);
 
@@ -182,7 +185,7 @@ public sealed partial class SymbolicEngine
     /// </summary>
     private static void MarkExternalCallReturnChecked(ExecutionState state, SymbolicValue v)
     {
-        foreach (var name in v.Expression.FreeSymbols())
+        foreach (var name in v.Expression.FreeSymbols().Concat(v.Taints))
         {
             if (!name.StartsWith("ext_ret_", System.StringComparison.Ordinal)) continue;
             if (!int.TryParse(name.AsSpan("ext_ret_".Length), out int off)) continue;

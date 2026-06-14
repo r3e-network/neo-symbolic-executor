@@ -25,6 +25,7 @@ public sealed class DynamicCallTargetDetector : BaseDetector
         {
             foreach (var call in state.Telemetry.ExternalCalls)
             {
+                if (call.ModeledSelfCall) continue;
                 if (!call.TargetHashDynamic && !call.MethodDynamic) continue;
 
                 Severity sev = (call.TargetHashDynamic, call.MethodDynamic) switch

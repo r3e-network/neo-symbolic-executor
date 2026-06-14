@@ -22,3 +22,4 @@ coverage*.xml
 fuzz-corpus/
 *-corpus/
 .omx/
+artifacts/

@@ -208,13 +208,15 @@ public class Iter4DetectorTests
         var manifest = Nef.ContractManifest.FromJson(manifestJson);
 
         var findings = new OracleResponseValidationDetector().Analyze(Ctx(s, manifest)).ToList();
-        findings.Should().ContainSingle();
-        findings[0].Tags.Should().Contain("oracle");
-        findings[0].Tags.Should().Contain("missing-code-check");
+        // Review fix (#21): this callback neither checks the oracle response code nor verifies the
+        // calling script hash is the Oracle native contract, so the detector emits both a
+        // missing-code-check finding and a forged-caller finding.
+        findings.Should().Contain(f => f.Tags.Contains("oracle") && f.Tags.Contains("missing-code-check"));
+        findings.Should().Contain(f => f.Tags.Contains("forged-caller"));
     }
 
     [Fact]
-    public void OracleResponse_SilentWhenCodeBranched()
+    public void OracleResponse_FlagsForgedCallerWhenCodeBranchedButCallerUnverified()
     {
         var s = NewState();
         s.Path.Add(0xE0);
@@ -240,7 +242,13 @@ public class Iter4DetectorTests
         """;
         var manifest = Nef.ContractManifest.FromJson(manifestJson);
 
-        new OracleResponseValidationDetector().Analyze(Ctx(s, manifest)).Should().BeEmpty();
+        // Review fix (#21): the response code IS checked here (arg_code branch), so there is no
+        // missing-code-check finding — but the callback does not verify
+        // Runtime.CallingScriptHash == Oracle, so the forged-caller attack vector (a non-Oracle
+        // caller invoking the callback with attacker-controlled result data) is now flagged.
+        var findings = new OracleResponseValidationDetector().Analyze(Ctx(s, manifest)).ToList();
+        findings.Should().NotContain(f => f.Tags.Contains("missing-code-check"));
+        findings.Should().Contain(f => f.Tags.Contains("forged-caller"));
     }
 
     // ---- toctou_storage -------------------------------------------------------------

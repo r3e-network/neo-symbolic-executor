@@ -28,11 +28,10 @@ public sealed class AccessControlDetector : BaseDetector
             var sensitiveOps = CollectSensitiveOps(context, state);
             if (sensitiveOps.Count == 0) continue;
 
-            // Suppress all findings when the entry method is manifest-declared safe. Delegating to
-            // ProtocolRiskHelpers.MethodForState keeps a single source of truth for the
-            // entry-method attribution rule (Path[0] under per-method analysis, fallback to
-            // highest-offset manifest visit for legacy run-from-0).
-            if (ProtocolRiskHelpers.MethodForState(context, state)?.Safe == true) continue;
+            // A `safe=true` manifest assertion is useful precision evidence, but it is still
+            // attacker-/author-controlled metadata. If bytecode telemetry shows a sensitive write
+            // or call, keep a visible INFO finding instead of fully suppressing it.
+            bool manifestSafe = ProtocolRiskHelpers.MethodForState(context, state)?.Safe == true;
 
             int firstSensitive = sensitiveOps.Min(op => op.Offset);
             var witnessChecks = state.Telemetry.WitnessChecks;
@@ -46,42 +45,52 @@ public sealed class AccessControlDetector : BaseDetector
             // The unenforced-witness finding fires when witness was invoked but never consumed,
             // regardless of what other auth signals exist; the deduper merges with related findings.
             bool witnessUnenforced = witnessChecks.Count > 0 && enforced.Count == 0;
-            bool authBeforeSensitive = enforced.Any(o => o < firstSensitive)
-                                        || callerChecks.Any(o => o < firstSensitive)
-                                        || sigChecks.Any(o => o < firstSensitive);
+            // Review fix (#56): the "auth precedes the sensitive op" inference compares raw bytecode
+            // offsets, which only tracks execution order on a path with no back-edges. On a state
+            // with a detected loop a lower-offset check may run after the op (or be skipped on some
+            // iterations), so we do not let offset order clear the late-auth finding there. Loop-free
+            // states keep the original behavior.
+            bool offsetOrderTrustworthy = state.Telemetry.LoopsDetected.Count == 0;
+            bool authBeforeSensitive = offsetOrderTrustworthy
+                && (enforced.Any(o => o < firstSensitive)
+                    || callerChecks.Any(o => o < firstSensitive)
+                    || sigChecks.Any(o => o < firstSensitive));
 
             if (noAuthAtAll)
             {
                 yield return MakeFinding(
                     title: "Sensitive operation lacks authorization check",
                     description: $"Sensitive operation at 0x{firstSensitive:X4} executes without any "
-                               + "Runtime.CheckWitness, GetCallingScriptHash, or signature verification.",
+                               + "Runtime.CheckWitness, GetCallingScriptHash, or signature verification."
+                               + ManifestSafeSuffix(manifestSafe),
                     offset: firstSensitive,
-                    severity: Severity.High,
+                    severity: manifestSafe ? Severity.Info : Severity.High,
                     state: state,
-                    tags: new[] { "missing-auth" });
+                    tags: Tags("missing-auth", manifestSafe));
             }
             else if (witnessUnenforced)
             {
                 yield return MakeFinding(
                     title: "Authorization check is unenforced (fail-open)",
                     description: $"Runtime.CheckWitness invoked at 0x{witnessChecks[0]:X4} but its "
-                               + "result is not consumed by ASSERT or a branch instruction. The check is fail-open.",
+                               + "result is not consumed by ASSERT or a branch instruction. The check is fail-open."
+                               + ManifestSafeSuffix(manifestSafe),
                     offset: witnessChecks[0],
-                    severity: Severity.High,
+                    severity: manifestSafe ? Severity.Info : Severity.High,
                     state: state,
-                    tags: new[] { "unenforced-witness" });
+                    tags: Tags("unenforced-witness", manifestSafe));
             }
             else if (!authBeforeSensitive)
             {
                 yield return MakeFinding(
                     title: "Authorization check happens after sensitive operation",
                     description: $"Sensitive operation at 0x{firstSensitive:X4} runs before any "
-                               + "enforced authorization check.",
+                               + "enforced authorization check."
+                               + ManifestSafeSuffix(manifestSafe),
                     offset: firstSensitive,
-                    severity: Severity.Medium,
+                    severity: manifestSafe ? Severity.Info : Severity.Medium,
                     state: state,
-                    tags: new[] { "late-auth" });
+                    tags: Tags("late-auth", manifestSafe));
             }
         }
     }
@@ -93,10 +102,20 @@ public sealed class AccessControlDetector : BaseDetector
             if (ProtocolRiskHelpers.IsStateWrite(s))
                 ops.Add(new SensitiveOp(s.Offset, "storage-write"));
         foreach (var c in state.Telemetry.ExternalCalls)
-            if (!context.Natives.IsBenignReadOnlyCall(c))
+            if (!c.ModeledSelfCall && !context.Natives.IsBenignReadOnlyCall(c))
                 ops.Add(new SensitiveOp(c.Offset, "external-call"));
         return ops;
     }
 
     private sealed record SensitiveOp(int Offset, string Kind);
+
+    private static string ManifestSafeSuffix(bool manifestSafe) =>
+        manifestSafe
+            ? " Manifest marks the entrypoint safe=true, so this is downgraded but kept visible because telemetry reached a sensitive operation."
+            : "";
+
+    private static string[] Tags(string primary, bool manifestSafe) =>
+        manifestSafe
+            ? new[] { primary, "manifest-safe-assertion" }
+            : new[] { primary };
 }

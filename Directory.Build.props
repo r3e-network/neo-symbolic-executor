@@ -7,6 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
     <NuGetAudit Condition="'$(CI)' != 'true'">false</NuGetAudit>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <NoWarn>$(NoWarn);CS1591</NoWarn>

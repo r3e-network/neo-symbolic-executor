@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -19,6 +20,8 @@ namespace Neo.SymbolicExecutor.Fuzzer;
 /// </summary>
 public sealed class CrashRecorder
 {
+    private const int MaxPreloadedCrashSignatures = 8_192;
+
     private readonly string _root;
     private readonly ConcurrentDictionary<string, byte> _seen = new();
 
@@ -29,7 +32,7 @@ public sealed class CrashRecorder
         // Pre-load any previously-seen signatures so re-runs don't double-record.
         if (Directory.Exists(_root))
         {
-            foreach (var dir in Directory.EnumerateDirectories(_root))
+            foreach (var dir in Directory.EnumerateDirectories(_root).Take(MaxPreloadedCrashSignatures))
             {
                 _seen.TryAdd(Path.GetFileName(dir), 1);
             }

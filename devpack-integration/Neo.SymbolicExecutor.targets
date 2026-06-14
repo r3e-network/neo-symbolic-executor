@@ -1,6 +1,7 @@
 <Project>
   <!--
-    Post-build target that runs neo-sym analyze against each compiled .nef artifact
+    Post-build target that runs neo-sym analyze and, by default, the Neo N3
+    security formal verification profile against each compiled .nef artifact
     produced by the Neo C# compiler.
 
     The Neo C# compiler emits files like `bin/sc/<ContractName>.nef` and
@@ -11,10 +12,78 @@
 
   <Target Name="NeoSymAnalyze"
           AfterTargets="Build"
-          Condition="'$(NeoSymEnabled)' == 'true'">
-    <ItemGroup>
-      <_NeoSymNefFile Include="$(OutputPath)sc/*.nef" />
+          Condition="'$(NeoSymEnabled)' != 'false'">
+    <Error Text="NeoSymEnabled must be true or false."
+           Condition="'$(NeoSymEnabled)' != 'true' And '$(NeoSymEnabled)' != 'false'" />
+    <Error Text="NeoSymFormat must be 'markdown' or 'json'."
+           Condition="'$(NeoSymFormat)' != 'markdown' And '$(NeoSymFormat)' != 'json'" />
+    <Error Text="NeoSymFailOnMaxSeverity must be empty or one of info, low, medium, high, critical."
+           Condition="'$(NeoSymFailOnMaxSeverity)' != '' And '$(NeoSymFailOnMaxSeverity)' != 'info' And '$(NeoSymFailOnMaxSeverity)' != 'low' And '$(NeoSymFailOnMaxSeverity)' != 'medium' And '$(NeoSymFailOnMaxSeverity)' != 'high' And '$(NeoSymFailOnMaxSeverity)' != 'critical'" />
+    <Error Text="NeoSymFailOnIncompleteCoverage must be true or false."
+           Condition="'$(NeoSymFailOnIncompleteCoverage)' != 'true' And '$(NeoSymFailOnIncompleteCoverage)' != 'false'" />
+    <Error Text="NeoSymFailOnBudgetExceeded must be true or false."
+           Condition="'$(NeoSymFailOnBudgetExceeded)' != 'true' And '$(NeoSymFailOnBudgetExceeded)' != 'false'" />
+    <Error Text="NeoSymRequireArtifacts must be true or false."
+           Condition="'$(NeoSymRequireArtifacts)' != 'true' And '$(NeoSymRequireArtifacts)' != 'false'" />
+    <Error Text="NeoSymUseSmt must be true or false."
+           Condition="'$(NeoSymUseSmt)' != 'true' And '$(NeoSymUseSmt)' != 'false'" />
+    <Error Text="NeoSymSmtDropUnsat must be true or false."
+           Condition="'$(NeoSymSmtDropUnsat)' != 'true' And '$(NeoSymSmtDropUnsat)' != 'false'" />
+    <Error Text="NeoSymVerifyEnabled must be true or false."
+           Condition="'$(NeoSymVerifyEnabled)' != 'true' And '$(NeoSymVerifyEnabled)' != 'false'" />
+    <Error Text="NeoSymVerifyAllowUnproved must be true or false."
+           Condition="'$(NeoSymVerifyAllowUnproved)' != 'true' And '$(NeoSymVerifyAllowUnproved)' != 'false'" />
+    <Error Text="NeoSymVerifyRequireExternalSmt must be true or false."
+           Condition="'$(NeoSymVerifyRequireExternalSmt)' != 'true' And '$(NeoSymVerifyRequireExternalSmt)' != 'false'" />
+    <Error Text="NeoSymVerifyTrustDependencyProofSummaries must be true or false."
+           Condition="'$(NeoSymVerifyTrustDependencyProofSummaries)' != 'true' And '$(NeoSymVerifyTrustDependencyProofSummaries)' != 'false'" />
+    <Error Text="NeoSymVerifyAllowUnboundDependencyProofSummaries must be true or false."
+           Condition="'$(NeoSymVerifyAllowUnboundDependencyProofSummaries)' != 'true' And '$(NeoSymVerifyAllowUnboundDependencyProofSummaries)' != 'false'" />
+    <Error Text="NeoSymVerifyRequireUnqualifiedProofs must be true or false."
+           Condition="'$(NeoSymVerifyRequireUnqualifiedProofs)' != 'true' And '$(NeoSymVerifyRequireUnqualifiedProofs)' != 'false'" />
+    <Error Text="NeoSymVerifyAllowAssumptionBackedProofs must be true or false."
+           Condition="'$(NeoSymVerifyAllowAssumptionBackedProofs)' != 'true' And '$(NeoSymVerifyAllowAssumptionBackedProofs)' != 'false'" />
+    <Error Text="NeoSymMaxEntrypoints must be a positive integer."
+           Condition="'$(NeoSymMaxEntrypoints)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymMaxEntrypoints)', '^[1-9][0-9]*$')) != 'True'" />
+    <Error Text="NeoSymMaxPaths must be a positive integer."
+           Condition="'$(NeoSymMaxPaths)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymMaxPaths)', '^[1-9][0-9]*$')) != 'True'" />
+    <Error Text="NeoSymMaxSteps must be a positive integer."
+           Condition="'$(NeoSymMaxSteps)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymMaxSteps)', '^[1-9][0-9]*$')) != 'True'" />
+    <Error Text="NeoSymPerRunDeadlineMs must be a positive integer."
+           Condition="'$(NeoSymPerRunDeadlineMs)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymPerRunDeadlineMs)', '^[1-9][0-9]*$')) != 'True'" />
+    <Error Text="NeoSymVerifyProfile must be empty or a single profile identifier."
+           Condition="'$(NeoSymVerifyProfile)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymVerifyProfile)', '^[A-Za-z0-9_.-]+$')) != 'True'" />
+    <Error Text="NeoSymVerifyEnabled=true requires NeoSymVerifyProfile or NeoSymVerifySpec. Set NeoSymVerifyEnabled=false for analyze-only builds."
+           Condition="'$(NeoSymVerifyEnabled)' == 'true' And '$(NeoSymVerifySpec)' == '' And '$(NeoSymVerifyProfile)' == ''" />
+    <Error Text="NeoSymDeploySenderHash must be a 20-byte UInt160 hex string."
+           Condition="'$(NeoSymDeploySenderHash)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(NeoSymDeploySenderHash)', '^(0[xX])?[0-9a-fA-F]{40}$')) != 'True'" />
+
+    <ItemGroup Condition="'$(NeoSymNefDir)' == ''">
+      <_NeoSymPrimaryNefFile Include="$(OutputPath)sc/*.nef" />
+      <_NeoSymFallbackNefFile Include="$(MSBuildProjectDirectory)/bin/sc/*.nef" />
     </ItemGroup>
+
+    <PropertyGroup>
+      <_NeoSymPrimaryNefFileCount>@(_NeoSymPrimaryNefFile->Count())</_NeoSymPrimaryNefFileCount>
+      <_NeoSymFallbackNefFileCount>@(_NeoSymFallbackNefFile->Count())</_NeoSymFallbackNefFileCount>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_NeoSymNefFile Include="$([MSBuild]::EnsureTrailingSlash('$(NeoSymNefDir)'))*.nef"
+                      Condition="'$(NeoSymNefDir)' != ''" />
+      <_NeoSymNefFile Include="@(_NeoSymPrimaryNefFile)"
+                      Condition="'$(NeoSymNefDir)' == '' And '$(_NeoSymPrimaryNefFileCount)' != '0' And '$(_NeoSymFallbackNefFileCount)' == '0'" />
+      <_NeoSymNefFile Include="@(_NeoSymFallbackNefFile)"
+                      Condition="'$(NeoSymNefDir)' == '' And '$(_NeoSymPrimaryNefFileCount)' == '0' And '$(_NeoSymFallbackNefFileCount)' != '0'" />
+      <_NeoSymDependencyProofSummary Include="$(NeoSymVerifyDependencyProofSummaries)"
+                                     Condition="'$(NeoSymVerifyDependencyProofSummaries)' != ''" />
+      <_NeoSymDependencyProofArtifact Include="$(NeoSymVerifyDependencyProofArtifacts)"
+                                      Condition="'$(NeoSymVerifyDependencyProofArtifacts)' != ''" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <_NeoSymNefFileCount>@(_NeoSymNefFile->Count())</_NeoSymNefFileCount>
+    </PropertyGroup>
 
     <PropertyGroup>
       <_NeoSymOutputDirRaw Condition="'$(NeoSymOutputDir)' == ''">$(OutputPath)neo-sym/</_NeoSymOutputDirRaw>
@@ -27,21 +96,71 @@
       <_NeoSymSmtDropUnsatFlag Condition="'$(NeoSymUseSmt)' == 'true' And '$(NeoSymSmtDropUnsat)' == 'true'"> --smt-drop-unsat</_NeoSymSmtDropUnsatFlag>
       <_NeoSymGateSeverityFlag Condition="'$(NeoSymFailOnMaxSeverity)' != ''"> --fail-on-max-severity $(NeoSymFailOnMaxSeverity)</_NeoSymGateSeverityFlag>
       <_NeoSymGateBudgetFlag Condition="'$(NeoSymFailOnBudgetExceeded)' == 'true'"> --fail-on-budget-exceeded</_NeoSymGateBudgetFlag>
-      <_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)</_NeoSymGateFlag>
+      <_NeoSymGateCoverageFlag Condition="'$(NeoSymFailOnIncompleteCoverage)' == 'true'"> --fail-on-incomplete-coverage</_NeoSymGateCoverageFlag>
+      <_NeoSymGateCoverageFlag Condition="'$(NeoSymFailOnIncompleteCoverage)' == 'false'"> --allow-incomplete-coverage</_NeoSymGateCoverageFlag>
+      <_NeoSymGateFlag>$(_NeoSymGateSeverityFlag)$(_NeoSymGateBudgetFlag)$(_NeoSymGateCoverageFlag)</_NeoSymGateFlag>
+      <_NeoSymMaxEntrypointsFlag Condition="'$(NeoSymMaxEntrypoints)' != ''"> --max-entrypoints $(NeoSymMaxEntrypoints)</_NeoSymMaxEntrypointsFlag>
       <_NeoSymMaxPathsFlag Condition="'$(NeoSymMaxPaths)' != ''"> --max-paths $(NeoSymMaxPaths)</_NeoSymMaxPathsFlag>
       <_NeoSymMaxStepsFlag Condition="'$(NeoSymMaxSteps)' != ''"> --max-steps $(NeoSymMaxSteps)</_NeoSymMaxStepsFlag>
       <_NeoSymDeadlineFlag Condition="'$(NeoSymPerRunDeadlineMs)' != ''"> --per-run-deadline-ms $(NeoSymPerRunDeadlineMs)</_NeoSymDeadlineFlag>
-      <_NeoSymBudgetFlags>$(_NeoSymMaxPathsFlag)$(_NeoSymMaxStepsFlag)$(_NeoSymDeadlineFlag)</_NeoSymBudgetFlags>
+      <_NeoSymBudgetFlags>$(_NeoSymMaxEntrypointsFlag)$(_NeoSymMaxPathsFlag)$(_NeoSymMaxStepsFlag)$(_NeoSymDeadlineFlag)</_NeoSymBudgetFlags>
+      <_NeoSymVerifySpecFlag Condition="'$(NeoSymVerifySpec)' != ''"> --spec &quot;$(NeoSymVerifySpec)&quot;</_NeoSymVerifySpecFlag>
+      <_NeoSymVerifyProfileFlag Condition="'$(NeoSymVerifyProfile)' != ''"> --profile &quot;$(NeoSymVerifyProfile)&quot;</_NeoSymVerifyProfileFlag>
+      <_NeoSymVerifyDependencyProofSummaryFlags>@(_NeoSymDependencyProofSummary->' --dependency-proof-summary &quot;%(Identity)&quot;', '')</_NeoSymVerifyDependencyProofSummaryFlags>
+      <_NeoSymVerifyDependencyProofArtifactFlags>@(_NeoSymDependencyProofArtifact->' --dependency-proof-artifact &quot;%(Identity)&quot;', '')</_NeoSymVerifyDependencyProofArtifactFlags>
+      <_NeoSymVerifyTrustDependencyProofSummariesFlag Condition="'$(NeoSymVerifyTrustDependencyProofSummaries)' == 'true'"> --trust-dependency-proof-summaries</_NeoSymVerifyTrustDependencyProofSummariesFlag>
+      <_NeoSymVerifyAllowUnboundDependencyProofSummariesFlag Condition="'$(NeoSymVerifyAllowUnboundDependencyProofSummaries)' == 'true'"> --allow-unbound-dependency-proof-summaries</_NeoSymVerifyAllowUnboundDependencyProofSummariesFlag>
+      <_NeoSymVerifyEmitDependencyProofSummaryFlag Condition="'$(NeoSymVerifyEmitDependencyProofSummary)' != ''"> --emit-dependency-proof-summary &quot;$(NeoSymVerifyEmitDependencyProofSummary)&quot;</_NeoSymVerifyEmitDependencyProofSummaryFlag>
+      <_NeoSymVerifyAllowUnprovedFlag Condition="'$(NeoSymVerifyAllowUnproved)' == 'true'"> --allow-unproved</_NeoSymVerifyAllowUnprovedFlag>
+      <_NeoSymVerifyDeploySenderHashFlag Condition="'$(NeoSymDeploySenderHash)' != ''"> --deploy-sender-hash &quot;$(NeoSymDeploySenderHash)&quot;</_NeoSymVerifyDeploySenderHashFlag>
+      <_NeoSymVerifyRequireExternalSmtFlag Condition="'$(NeoSymVerifyRequireExternalSmt)' == 'true'"> --require-external-smt</_NeoSymVerifyRequireExternalSmtFlag>
+      <_NeoSymVerifyRequireUnqualifiedProofsFlag Condition="'$(NeoSymVerifyRequireUnqualifiedProofs)' == 'true'"> --require-unqualified-proofs</_NeoSymVerifyRequireUnqualifiedProofsFlag>
+      <_NeoSymVerifyAllowAssumptionBackedProofsFlag Condition="'$(NeoSymVerifyAllowAssumptionBackedProofs)' == 'true'"> --allow-assumption-backed-proofs</_NeoSymVerifyAllowAssumptionBackedProofsFlag>
+      <_NeoSymVerifyFlags>$(_NeoSymVerifySpecFlag)$(_NeoSymVerifyProfileFlag)$(_NeoSymVerifyDependencyProofSummaryFlags)$(_NeoSymVerifyDependencyProofArtifactFlags)$(_NeoSymVerifyTrustDependencyProofSummariesFlag)$(_NeoSymVerifyAllowUnboundDependencyProofSummariesFlag)$(_NeoSymVerifyEmitDependencyProofSummaryFlag)$(_NeoSymVerifyAllowUnprovedFlag)$(_NeoSymVerifyDeploySenderHashFlag)$(_NeoSymVerifyRequireExternalSmtFlag)$(_NeoSymVerifyRequireUnqualifiedProofsFlag)$(_NeoSymVerifyAllowAssumptionBackedProofsFlag)</_NeoSymVerifyFlags>
     </PropertyGroup>
 
     <MakeDir Directories="$(_NeoSymOutputDir)" Condition="'@(_NeoSymNefFile)' != ''" />
 
+    <Error Text="neo-sym: default NEF discovery found artifacts in both '$(OutputPath)sc' and '$(MSBuildProjectDirectory)/bin/sc'. Set NeoSymNefDir to the intended single artifact directory so stale fallback artifacts cannot overwrite or be mistaken for current proof reports."
+           Condition="'$(NeoSymNefDir)' == '' And '$(_NeoSymPrimaryNefFileCount)' != '0' And '$(_NeoSymFallbackNefFileCount)' != '0'" />
+
+    <Error Text="neo-sym: no .nef artifacts found. Set NeoSymNefDir if the Neo compiler writes contracts outside '$(OutputPath)sc' or '$(MSBuildProjectDirectory)/bin/sc', or set NeoSymRequireArtifacts=false for intentionally artifact-free builds."
+           Condition="'@(_NeoSymNefFile)' == '' And '$(NeoSymRequireArtifacts)' != 'false'" />
+
+    <Warning Text="neo-sym: no .nef artifacts found. Set NeoSymNefDir if the Neo compiler writes contracts outside '$(OutputPath)sc' or '$(MSBuildProjectDirectory)/bin/sc'."
+             Condition="'@(_NeoSymNefFile)' == '' And '$(NeoSymRequireArtifacts)' == 'false'" />
+
+    <Error Text="NeoSymVerifyEmitDependencyProofSummary can only be used when exactly one .nef artifact is discovered; otherwise batched verify invocations would overwrite the same dependency proof summary. Build dependency contracts separately or point NeoSymNefDir at a single-artifact directory."
+           Condition="'$(NeoSymVerifyEmitDependencyProofSummary)' != '' And '$(_NeoSymNefFileCount)' != '1'" />
+
     <Message Importance="High" Text="neo-sym: analyzing %(_NeoSymNefFile.Filename)%(_NeoSymNefFile.Extension)"
              Condition="'@(_NeoSymNefFile)' != ''" />
 
-    <Exec Command="$(NeoSymToolPath) analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymSmtDropUnsatFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)"
-          ContinueOnError="false"
+    <Exec Command="&quot;$(NeoSymToolPath)&quot; analyze &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename)$(_NeoSymExtension)&quot;$(_NeoSymSourceFlag)$(_NeoSymSmtFlag)$(_NeoSymSmtDropUnsatFlag)$(_NeoSymBudgetFlags)$(_NeoSymGateFlag)"
+          IgnoreExitCode="true"
           Condition="'@(_NeoSymNefFile)' != ''"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
+          WorkingDirectory="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="ExitCode" ItemName="_NeoSymAnalyzeExitCode" />
+    </Exec>
+
+    <Message Importance="High" Text="neo-sym: verifying %(_NeoSymNefFile.Filename)%(_NeoSymNefFile.Extension)"
+             Condition="'@(_NeoSymNefFile)' != '' And '$(NeoSymVerifyEnabled)' == 'true'" />
+
+    <Exec Command="&quot;$(NeoSymToolPath)&quot; verify &quot;%(_NeoSymNefFile.FullPath)&quot; --manifest &quot;%(_NeoSymNefFile.RootDir)%(_NeoSymNefFile.Directory)%(_NeoSymNefFile.Filename).manifest.json&quot; --format $(NeoSymFormat) --out &quot;$(_NeoSymOutputDir)%(_NeoSymNefFile.Filename).verify$(_NeoSymExtension)&quot;$(_NeoSymVerifyFlags)$(_NeoSymBudgetFlags)"
+          IgnoreExitCode="true"
+          Condition="'@(_NeoSymNefFile)' != '' And '$(NeoSymVerifyEnabled)' == 'true'"
+          WorkingDirectory="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="ExitCode" ItemName="_NeoSymVerifyExitCode" />
+    </Exec>
+
+    <PropertyGroup>
+      <_NeoSymAnalyzeExitCodes>@(_NeoSymAnalyzeExitCode)</_NeoSymAnalyzeExitCodes>
+      <_NeoSymVerifyExitCodes>@(_NeoSymVerifyExitCode)</_NeoSymVerifyExitCodes>
+      <_NeoSymAnalyzeFailureMessage Condition="'$(_NeoSymAnalyzeExitCodes)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(_NeoSymAnalyzeExitCodes)', '(^|;)(?!0($|;))[^;]+')) == 'True'">neo-sym analyze failed with exit code(s) $(_NeoSymAnalyzeExitCodes). </_NeoSymAnalyzeFailureMessage>
+      <_NeoSymVerifyFailureMessage Condition="'$(_NeoSymVerifyExitCodes)' != '' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(_NeoSymVerifyExitCodes)', '(^|;)(?!0($|;))[^;]+')) == 'True'">neo-sym verify failed with exit code(s) $(_NeoSymVerifyExitCodes). </_NeoSymVerifyFailureMessage>
+    </PropertyGroup>
+
+    <Error Text="$(_NeoSymAnalyzeFailureMessage)$(_NeoSymVerifyFailureMessage)Reports were written before failing the build."
+           Condition="'$(_NeoSymAnalyzeFailureMessage)$(_NeoSymVerifyFailureMessage)' != ''" />
   </Target>
 </Project>

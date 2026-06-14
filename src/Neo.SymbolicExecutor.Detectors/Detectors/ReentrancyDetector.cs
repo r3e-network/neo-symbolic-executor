@@ -40,9 +40,17 @@ public sealed class ReentrancyDetector : BaseDetector
             if (writes.Count == 0) continue;
 
             int lastWriteOffset = writes.Max(w => w.Offset);
+            // Review fix (#56): `c.Offset < lastWriteOffset` is only a sound "call precedes write"
+            // proxy on a path with no back-edges. On a state with a detected loop a higher-offset
+            // call can still execute before the write on a later iteration, so the offset filter
+            // would unsoundly clear a genuine reentrancy. When a loop is present we drop the offset
+            // filter and treat every non-benign external call as a pre-write candidate. Loop-free
+            // states keep the original behavior.
+            bool offsetOrderTrustworthy = state.Telemetry.LoopsDetected.Count == 0;
             var preWriteCalls = calls
+                .Where(c => !c.ModeledSelfCall)
                 .Where(c => !context.Natives.IsBenignReadOnlyCall(c))
-                .Where(c => c.Offset < lastWriteOffset)
+                .Where(c => !offsetOrderTrustworthy || c.Offset < lastWriteOffset)
                 .ToList();
             if (preWriteCalls.Count == 0) continue;
 

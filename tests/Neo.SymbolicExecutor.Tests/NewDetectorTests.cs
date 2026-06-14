@@ -43,6 +43,23 @@ public class NewDetectorTests
     }
 
     [Fact]
+    public void EntryScriptAuth_FlagsCurrentStableEntryScriptHashSymbol()
+    {
+        var s = NewState();
+        var entrySym = SymbolicValue.Symbol(Sort.Bytes, "entry_script_hash");
+        var owner = SymbolicValue.Bytes(new byte[20]);
+        s.PathConditions = s.PathConditions.Add(Expr.Eq(entrySym.Expression, owner.Expression));
+        s.Telemetry.StorageOps.Add(new StorageOp(0x20, StorageOpKind.Put,
+            SymbolicValue.Bytes(new byte[] { 1 }), SymbolicValue.Int(1), false, false));
+
+        var findings = new EntryScriptAuthDetector().Analyze(Ctx(s)).ToList();
+
+        findings.Should().ContainSingle();
+        findings[0].Detector.Should().Be("entry_script_auth");
+        findings[0].Tags.Should().Contain("tx-origin-equivalent");
+    }
+
+    [Fact]
     public void EntryScriptAuth_SilentWhenCallingScriptHashUsedInstead()
     {
         var s = NewState();
@@ -264,6 +281,41 @@ public class NewDetectorTests
     }
 
     [Fact]
+    public void Nep17AmountValidation_UsesStandardTransferWhenOverloadAppearsFirst()
+    {
+        var s = NewState();
+        s.Path.Add(0xD0);
+        s.Telemetry.StorageOps.Add(new StorageOp(0xD4, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("balance_from")),
+            SymbolicValue.Int(0), false, false));
+
+        var manifestJson = """
+        {
+          "name":"X","groups":[],"features":{},"supportedstandards":["NEP-17"],
+          "abi":{"methods":[
+            {"name":"transfer","parameters":[
+              {"name":"memo","type":"String"}
+            ],"returntype":"Void","offset":16,"safe":false},
+            {"name":"transfer","parameters":[
+              {"name":"from","type":"Hash160"},
+              {"name":"to","type":"Hash160"},
+              {"name":"amount","type":"Integer"},
+              {"name":"data","type":"Any"}
+            ],"returntype":"Boolean","offset":208,"safe":false}
+          ],"events":[]},
+          "permissions":[],"trusts":[]
+        }
+        """;
+        var manifest = Nef.ContractManifest.FromJson(manifestJson);
+
+        var findings = new Nep17AmountValidationDetector().Analyze(Ctx(s, manifest)).ToList();
+
+        findings.Should().ContainSingle("the detector must bind to the standard transfer overload, not the first same-name ABI method");
+        findings[0].Offset.Should().Be(0xD4);
+        findings[0].Description.Should().Contain("arg_amount");
+    }
+
+    [Fact]
     public void Nep17AmountValidation_SilentWhenAmountIsCheckedOnPath()
     {
         var s = NewState();
@@ -293,6 +345,39 @@ public class NewDetectorTests
         var manifest = Nef.ContractManifest.FromJson(manifestJson);
 
         new Nep17AmountValidationDetector().Analyze(Ctx(s, manifest)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Nep17AmountValidation_DoesNotTreatNeoVmIntegerDomainAsAmountCheck()
+    {
+        var s = NewState();
+        s.Path.Add(0xD0);
+        var amount = SymbolicValue.Symbol(Sort.Int, "arg_amount").Expression;
+        s.PathConditions = s.PathConditions
+            .Add(Expr.Ge(amount, Expr.Int(Expr.NeoVmIntegerMin)))
+            .Add(Expr.Le(amount, Expr.Int(Expr.NeoVmIntegerMax)));
+        s.Telemetry.StorageOps.Add(new StorageOp(0xD4, StorageOpKind.Put,
+            SymbolicValue.Bytes(System.Text.Encoding.UTF8.GetBytes("balance_from")),
+            SymbolicValue.Int(0), false, false));
+
+        var manifestJson = """
+        {
+          "name":"X","groups":[],"features":{},"supportedstandards":["NEP-17"],
+          "abi":{"methods":[
+            {"name":"transfer","parameters":[
+              {"name":"from","type":"Hash160"},
+              {"name":"to","type":"Hash160"},
+              {"name":"amount","type":"Integer"},
+              {"name":"data","type":"Any"}
+            ],"returntype":"Boolean","offset":208,"safe":false}
+          ],"events":[]},
+          "permissions":[],"trusts":[]
+        }
+        """;
+        var manifest = Nef.ContractManifest.FromJson(manifestJson);
+
+        new Nep17AmountValidationDetector().Analyze(Ctx(s, manifest))
+            .Should().ContainSingle();
     }
 
     [Fact]

@@ -54,9 +54,27 @@ public class AdditionalDetectorTests
     {
         var s = NewState();
         s.Telemetry.TimeAccesses.Add(0x10);
-        s.PathConditions = s.PathConditions.Add(Expr.Eq(Expr.Sym(Sort.Int, "timestamp"), Expr.Int(123)));
+        // Review fix (#17): HIGH weak-randomness requires the timestamp to feed an entropy-shaped op
+        // (modulo/bitwise-AND/shift) — the signature of "derive entropy from time" — e.g.
+        // `timestamp % N`. A bare timestamp comparison (deadline/time-lock) is only an Info advisory.
+        s.PathConditions = s.PathConditions.Add(Expr.Eq(
+            Expr.Mod(Expr.Sym(Sort.Int, "timestamp"), Expr.Int(100)),
+            Expr.Int(0)));
         var f = new RandomnessDetector().Analyze(Ctx(s)).ToList();
         f.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("weak-randomness"));
+    }
+
+    [Fact]
+    public void Randomness_BareTimestampBranchIsInfoNotHigh()
+    {
+        var s = NewState();
+        s.Telemetry.TimeAccesses.Add(0x10);
+        // Review fix (#17): a bare timestamp comparison (e.g. a deadline / time-lock check) is a
+        // benign use of block time, surfaced as an Info advisory rather than a HIGH false positive.
+        s.PathConditions = s.PathConditions.Add(Expr.Eq(Expr.Sym(Sort.Int, "timestamp"), Expr.Int(123)));
+        var f = new RandomnessDetector().Analyze(Ctx(s)).ToList();
+        f.Should().Contain(x => x.Severity == Severity.Info && x.Tags.Contains("timestamp-branch"));
+        f.Should().NotContain(x => x.Severity == Severity.High && x.Tags.Contains("weak-randomness"));
     }
 
     [Fact]
@@ -206,6 +224,21 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
+    public void Nep17_FiresWhenStandardDeclaredWithoutHyphen()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["Nep17"],
+             "abi":{"methods":[{"name":"transfer","parameters":[],"returntype":"Boolean","offset":0,"safe":false}],
+                    "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        new Nep17ComplianceDetector().Analyze(ctx).Should()
+            .Contain(x => x.Title.Contains("symbol"));
+    }
+
+    [Fact]
     public void Nep11_FiresOnlyWhenStandardDeclared()
     {
         var nep17Only = Nef.ContractManifest.FromJson("""
@@ -221,6 +254,473 @@ public class AdditionalDetectorTests
         """);
         var ctxYes = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = nep11 };
         new Nep11ComplianceDetector().Analyze(ctxYes).Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Nep11_FlagsMissingOwnerOfForDeclaredStandard()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{
+               "methods":[
+                 {"name":"symbol","parameters":[],"returntype":"String","offset":0,"safe":true},
+                 {"name":"decimals","parameters":[],"returntype":"Integer","offset":1,"safe":true},
+                 {"name":"totalSupply","parameters":[],"returntype":"Integer","offset":2,"safe":true},
+                 {"name":"balanceOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"Integer","offset":3,"safe":true},
+                 {"name":"tokensOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"InteropInterface","offset":4,"safe":true},
+                 {"name":"transfer","parameters":[
+                   {"name":"to","type":"Hash160"},
+                   {"name":"tokenId","type":"ByteString"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Boolean","offset":5,"safe":false}
+               ],
+               "events":[{"name":"Transfer","parameters":[
+                 {"name":"from","type":"Hash160"},
+                 {"name":"to","type":"Hash160"},
+                 {"name":"amount","type":"Integer"},
+                 {"name":"tokenId","type":"ByteString"}
+               ]}]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep11ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Title.Contains("ownerOf"));
+    }
+
+    [Fact]
+    public void Nep11_FlagsTransferEventWithExtraParameter()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{
+               "methods":[
+                 {"name":"symbol","parameters":[],"returntype":"String","offset":0,"safe":true},
+                 {"name":"decimals","parameters":[],"returntype":"Integer","offset":1,"safe":true},
+                 {"name":"totalSupply","parameters":[],"returntype":"Integer","offset":2,"safe":true},
+                 {"name":"balanceOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"Integer","offset":3,"safe":true},
+                 {"name":"ownerOf","parameters":[{"name":"tokenId","type":"ByteString"}],"returntype":"Hash160","offset":4,"safe":true},
+                 {"name":"tokensOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"InteropInterface","offset":5,"safe":true},
+                 {"name":"transfer","parameters":[
+                   {"name":"to","type":"Hash160"},
+                   {"name":"tokenId","type":"ByteString"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Boolean","offset":6,"safe":false}
+               ],
+               "events":[{"name":"Transfer","parameters":[
+                 {"name":"from","type":"Hash160"},
+                 {"name":"to","type":"Hash160"},
+                 {"name":"amount","type":"Integer"},
+                 {"name":"tokenId","type":"ByteString"},
+                 {"name":"memo","type":"String"}
+               ]}]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep11ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("event-shape"));
+    }
+
+    [Fact]
+    public void Nep11_UsesStandardOverloadsWhenNonstandardOverloadsAppearFirst()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"NFT","groups":[],"features":{},"supportedstandards":["NEP-11"],
+             "abi":{
+               "methods":[
+                 {"name":"symbol","parameters":[],"returntype":"String","offset":0,"safe":true},
+                 {"name":"decimals","parameters":[],"returntype":"Integer","offset":1,"safe":true},
+                 {"name":"totalSupply","parameters":[],"returntype":"Integer","offset":2,"safe":true},
+                 {"name":"balanceOf","parameters":[],"returntype":"Boolean","offset":3,"safe":false},
+                 {"name":"balanceOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"Integer","offset":4,"safe":true},
+                 {"name":"ownerOf","parameters":[],"returntype":"Boolean","offset":5,"safe":false},
+                 {"name":"ownerOf","parameters":[{"name":"tokenId","type":"ByteArray"}],"returntype":"Hash160","offset":6,"safe":true},
+                 {"name":"tokensOf","parameters":[{"name":"owner","type":"Hash160"}],"returntype":"InteropInterface","offset":7,"safe":true},
+                 {"name":"transfer","parameters":[],"returntype":"Boolean","offset":8,"safe":true},
+                 {"name":"transfer","parameters":[
+                   {"name":"to","type":"Hash160"},
+                   {"name":"tokenId","type":"ByteArray"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Boolean","offset":9,"safe":false}
+               ],
+               "events":[{"name":"Transfer","parameters":[
+                 {"name":"from","type":"Hash160"},
+                 {"name":"to","type":"Hash160"},
+                 {"name":"amount","type":"Integer"},
+                 {"name":"tokenId","type":"ByteArray"}
+               ]}]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep11ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Count.Should().Be(0, "detectors should select the standard NEP-11 overload, not the first same-name method");
+    }
+
+    [Fact]
+    public void Nep24_FiresWhenStandardDeclaredButMethodAndEventMissing()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-24"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep24ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Title.Contains("royaltyInfo"));
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Title.Contains("RoyaltiesTransferred"));
+    }
+
+    [Fact]
+    public void Nep24_FlagsWrongRoyaltyInfoAndRoyaltiesTransferredShapes()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-24"],
+             "abi":{
+               "methods":[
+                 {"name":"royaltyInfo","parameters":[
+                   {"name":"tokenId","type":"Hash160"},
+                   {"name":"royaltyToken","type":"Hash160"}
+                 ],"returntype":"Map","offset":0,"safe":false}
+               ],
+               "events":[
+                 {"name":"RoyaltiesTransferred","parameters":[
+                   {"name":"royaltyToken","type":"Hash160"},
+                   {"name":"royaltyRecipient","type":"Hash160"},
+                   {"name":"buyer","type":"Hash160"},
+                   {"name":"amount","type":"Integer"}
+                 ]}
+               ]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep24ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+        findings.Should().Contain(x => x.Severity == Severity.Medium && x.Tags.Contains("safe-flag"));
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("event-shape"));
+    }
+
+    [Fact]
+    public void Nep24_UsesValidRoyaltyInfoOverloadWhenBadOverloadAppearsFirst()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-24"],
+             "abi":{
+               "methods":[
+                 {"name":"royaltyInfo","parameters":[],"returntype":"Map","offset":0,"safe":false},
+                 {"name":"royaltyInfo","parameters":[
+                   {"name":"tokenId","type":"ByteArray"},
+                   {"name":"royaltyToken","type":"Hash160"},
+                   {"name":"salePrice","type":"Integer"}
+                 ],"returntype":"Array","offset":1,"safe":true}
+               ],
+               "events":[
+                 {"name":"RoyaltiesTransferred","parameters":[
+                   {"name":"royaltyToken","type":"Hash160"},
+                   {"name":"royaltyRecipient","type":"Hash160"},
+                   {"name":"buyer","type":"Hash160"},
+                   {"name":"tokenId","type":"ByteArray"},
+                   {"name":"amount","type":"Integer"}
+                 ]}
+               ]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep24ComplianceDetector().Analyze(ctx).ToList();
+
+        // The valid royaltyInfo overload satisfies the standard shape, so no royaltyInfo
+        // method-shape / safe-flag finding fires even though a malformed overload appears first.
+        findings.Should().NotContain(x => x.Tags.Contains("method-shape"));
+        findings.Should().NotContain(x => x.Tags.Contains("safe-flag"));
+        // Review fix (#58): this manifest declares NEP-24 but not the NEP-11 base standard that
+        // NEP-24 requires, so the detector now (correctly) emits base-standard/base-ABI findings.
+        findings.Should().Contain(x => x.Tags.Contains("missing-base-standard") || x.Tags.Contains("missing-base-abi"));
+    }
+
+    [Fact]
+    public void Nep24_FlagsSafeFalseAndRenamedStandardParameters()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-24"],
+             "abi":{
+               "methods":[
+                 {"name":"royaltyInfo","parameters":[
+                   {"name":"id","type":"ByteString"},
+                   {"name":"asset","type":"Hash160"},
+                   {"name":"price","type":"Integer"}
+                 ],"returntype":"Array","offset":0,"safe":false}
+               ],
+               "events":[
+                 {"name":"RoyaltiesTransferred","parameters":[
+                   {"name":"asset","type":"Hash160"},
+                   {"name":"recipient","type":"Hash160"},
+                   {"name":"purchaser","type":"Hash160"},
+                   {"name":"id","type":"ByteString"},
+                   {"name":"value","type":"Integer"}
+                 ]}
+               ]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep24ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().Contain(x => x.Severity == Severity.Medium && x.Tags.Contains("safe-flag"));
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+        findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("event-shape"));
+    }
+
+    [Fact]
+    public void Nep27_FiresWhenStandardDeclaredButPaymentCallbackMissing()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-27"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var finding = new Nep27ComplianceDetector().Analyze(ctx).Should().ContainSingle().Subject;
+
+        finding.Severity.Should().Be(Severity.High);
+        finding.Title.Should().Contain("onNEP17Payment");
+        finding.Tags.Should().Contain("nep27");
+    }
+
+    [Fact]
+    public void Nep27_FlagsWrongPaymentCallbackShape()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-27"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP17Payment","parameters":[
+                   {"name":"from","type":"ByteString"},
+                   {"name":"amount","type":"Integer"}
+                 ],"returntype":"Boolean","offset":0,"safe":true}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep27ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+    }
+
+    [Fact]
+    public void Nep27_UsesValidPaymentCallbackOverloadWhenBadOverloadAppearsFirst()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-27"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP17Payment","parameters":[],"returntype":"Boolean","offset":0,"safe":true},
+                 {"name":"onNEP17Payment","parameters":[
+                   {"name":"from","type":"Hash160"},
+                   {"name":"amount","type":"Integer"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Void","offset":1,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep27ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Count.Should().Be(0, "the valid NEP-27 callback overload should satisfy the standard shape");
+    }
+
+    [Fact]
+    public void Nep27_FlagsRenamedPaymentCallbackParameters()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-27"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP17Payment","parameters":[
+                   {"name":"sender","type":"Hash160"},
+                   {"name":"value","type":"Integer"},
+                   {"name":"payload","type":"Any"}
+                 ],"returntype":"Void","offset":0,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep27ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+    }
+
+    [Fact]
+    public void Nep26_FiresWhenStandardDeclaredButPaymentCallbackMissing()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var finding = new Nep26ComplianceDetector().Analyze(ctx).Should().ContainSingle().Subject;
+
+        finding.Severity.Should().Be(Severity.High);
+        finding.Title.Should().Contain("onNEP11Payment");
+        finding.Tags.Should().Contain("nep26");
+    }
+
+    [Fact]
+    public void Nep26_FlagsWrongPaymentCallbackShape()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP11Payment","parameters":[
+                   {"name":"from","type":"Hash160"},
+                   {"name":"tokenId","type":"ByteString"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Void","offset":0,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep26ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+    }
+
+    [Fact]
+    public void Nep26_UsesValidPaymentCallbackOverloadWhenBadOverloadAppearsFirst()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP11Payment","parameters":[],"returntype":"Boolean","offset":0,"safe":true},
+                 {"name":"onNEP11Payment","parameters":[
+                   {"name":"from","type":"Hash160"},
+                   {"name":"amount","type":"Integer"},
+                   {"name":"tokenId","type":"String"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Void","offset":1,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep26ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Count.Should().Be(0, "the valid NEP-26 callback overload should satisfy the standard shape");
+    }
+
+    [Fact]
+    public void Nep26_FlagsRenamedPaymentCallbackParametersEvenWithCSharpStringTokenId()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP11Payment","parameters":[
+                   {"name":"sender","type":"Hash160"},
+                   {"name":"value","type":"Integer"},
+                   {"name":"id","type":"String"},
+                   {"name":"payload","type":"Any"}
+                 ],"returntype":"Void","offset":0,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep26ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+    }
+
+    [Fact]
+    public void Nep26_AllowsReleasedCSharpStringTokenIdCallbackShape()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
+             "abi":{
+               "methods":[
+                 {"name":"onNEP11Payment","parameters":[
+                   {"name":"from","type":"Hash160"},
+                   {"name":"amount","type":"Integer"},
+                   {"name":"tokenId","type":"String"},
+                   {"name":"data","type":"Any"}
+                 ],"returntype":"Void","offset":0,"safe":false}
+               ],
+               "events":[]},
+             "permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new Nep26ComplianceDetector().Analyze(ctx).ToList();
+
+        findings.Count.Should().Be(0, "Neo.SmartContract.Framework 3.9.x declared INEP26 tokenId as C# string");
+    }
+
+    [Fact]
+    public void SupportedStandardsCoverage_FlagsStandardsWithoutDedicatedRules()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-99"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var finding = new SupportedStandardsCoverageDetector().Analyze(ctx).Should().ContainSingle().Subject;
+        finding.Severity.Should().Be(Severity.Info);
+        finding.Title.Should().Contain("NEP-99");
+        finding.Tags.Should().Contain("standard-coverage");
+    }
+
+    [Fact]
+    public void SupportedStandardsCoverage_DoesNotFlagProofGradeKnownNepVariants()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["Nep17","nep_11"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        new SupportedStandardsCoverageDetector().Analyze(ctx).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SupportedStandardsCoverage_FlagsAbiOnlyNepVariants()
+    {
+        var manifest = Nef.ContractManifest.FromJson("""
+            {"name":"T","groups":[],"features":{},"supportedstandards":["NEP-24","nep26","NEP_27"],
+             "abi":{"methods":[],"events":[]},"permissions":[],"trusts":[]}
+        """);
+        var ctx = new AnalysisContext { States = new System.Collections.Generic.List<ExecutionState>(), Manifest = manifest };
+
+        var findings = new SupportedStandardsCoverageDetector().Analyze(ctx).ToList();
+
+        findings.Should().HaveCount(3);
+        findings.Should().OnlyContain(f =>
+            f.Severity == Severity.Info
+            && f.Tags.Contains("standard-coverage")
+            && f.Tags.Contains("abi-only"));
+        findings.Should().Contain(f => f.Title.Contains("NEP-24"));
+        findings.Should().Contain(f => f.Title.Contains("nep26"));
+        findings.Should().Contain(f => f.Title.Contains("NEP_27"));
     }
 
     [Fact]
@@ -908,9 +1408,10 @@ public class AdditionalDetectorTests
             "reentrancy", "access_control", "overflow", "unchecked_return", "dynamic_call_target",
             "dangerous_call_flags", "dos", "gas_exhaustion", "randomness", "timestamp",
             "storage_collision", "upgradeability", "permissions", "admin_centralization",
-            "nep17_compliance", "unknown_instructions",
-            // 5 audit-derived new detectors
-            "nep11_compliance", "callback_reentry", "crypto_verification_bypass",
+            "nep17_compliance", "supported_standards_coverage", "unknown_instructions",
+            // audit-derived standard/runtime detectors
+            "nep11_compliance", "nep24_compliance", "nep27_compliance", "nep26_compliance",
+            "callback_reentry", "crypto_verification_bypass",
             "replay_attack", "taint_flow_upgrade",
             // Neo DApp / DeFi / NFT protocol-risk detectors
             "public_privileged_method", "defi_slippage_oracle", "nft_ownership_authorization",

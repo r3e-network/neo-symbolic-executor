@@ -18,4 +18,13 @@
     <ProjectReference Include="..\Neo.SymbolicExecutor.Smt\Neo.SymbolicExecutor.Smt.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\devpack-integration\Neo.SymbolicExecutor.props"
+          Pack="true"
+          PackagePath="buildTransitive\Neo.SymbolicExecutor.Cli.props" />
+    <None Include="..\..\devpack-integration\Neo.SymbolicExecutor.targets"
+          Pack="true"
+          PackagePath="buildTransitive\Neo.SymbolicExecutor.Cli.targets" />
+  </ItemGroup>
+
 </Project>

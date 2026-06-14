@@ -15,7 +15,8 @@ namespace Neo.SymbolicExecutor.Smt.Z3;
 /// then falls back to a conservative in-process solver for simple integer constraints.
 ///
 /// Sort mapping:
-///   Sort.Int   -> BitVec(256), signed comparisons via bvslt/bvsle/bvsgt/bvsge
+///   Sort.Int   -> Int, matching NeoVM BigInteger arithmetic before the VM enforces its 32-byte
+///                 signed integer result limit.
 ///   Sort.Bool  -> Bool
 /// Unsupported expressions are wrapped in fresh symbols of the right sort. That degrades query
 /// precision but keeps UNSAT answers sound; callers treat UNKNOWN as "could be SAT".
@@ -24,11 +25,10 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
 {
     public const int IntegerBits = 256;
     public const int BytesIndexBits = 32;
+    private const int MaxQueryCacheEntries = 4_096;
 
-    private static readonly BigInteger SignedHalfRange = BigInteger.One << (IntegerBits - 1);
-    private static readonly BigInteger UnsignedRange = BigInteger.One << IntegerBits;
     private static readonly Regex SmtValueRegex = new(
-        @"(?<value>#x[0-9A-Fa-f]+|#b[01]+|true|false|\(_\s+bv[0-9]+\s+[0-9]+\))",
+        @"(?<value>\(-\s+[0-9]+\)|-?[0-9]+|#x[0-9A-Fa-f]+|#b[01]+|true|false|\(_\s+bv[0-9]+\s+[0-9]+\))",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly string _z3Path;
@@ -44,6 +44,9 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
     public string Version { get; }
     public int TimeoutMs => _timeoutMs;
     public int BytesBound => _bytesBound;
+    private int MaxScriptChars => _bytesBound > int.MaxValue / 4_096
+        ? int.MaxValue
+        : Math.Max(4_096, _bytesBound * 4_096);
 
     public Z3Backend(int timeoutMs = 5000, int bytesBound = 64)
     {
@@ -81,7 +84,8 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         var outcome = _useExternalZ3
             ? RunExternalSatisfiabilityQuery(conditions)
             : RunPortableSatisfiabilityQuery(conditions);
-        _queryCache[key] = outcome;
+        if (_queryCache.Count < MaxQueryCacheEntries)
+            _queryCache[key] = outcome;
         return outcome;
     }
 
@@ -103,13 +107,13 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         var targetValue = translator.TranslateInt(target);
         var targetAtom = translator.NewAuxInt("__target", out var targetName);
         assertions.Add($"(= {targetAtom} {targetValue})");
-        if (lo.HasValue) assertions.Add($"(bvsge {targetAtom} {SmtLibTranslator.Bv(lo.Value)})");
-        if (hi.HasValue) assertions.Add($"(bvsle {targetAtom} {SmtLibTranslator.Bv(hi.Value)})");
+        if (lo.HasValue) assertions.Add($"(>= {targetAtom} {SmtLibTranslator.IntLiteral(lo.Value)})");
+        if (hi.HasValue) assertions.Add($"(<= {targetAtom} {SmtLibTranslator.IntLiteral(hi.Value)})");
 
         var run = RunQuery(BuildScript(translator, assertions, _timeoutMs, new[] { targetName }));
         _opaqueTranslations += translator.OpaqueTranslations;
         if (run.Outcome != SmtOutcome.Sat) return null;
-        return TryReadValueForName(run.Output, targetName, out var raw) && TryParseBitVec(raw, out var value)
+        return TryReadValueForName(run.Output, targetName, out var raw) && TryParseSolverInteger(raw, out var value)
             ? value
             : null;
     }
@@ -136,7 +140,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         foreach (var (name, sort) in translator.UserSymbols)
         {
             if (!TryReadValueForName(run.Output, name, out var raw)) continue;
-            if (sort == Sort.Int && TryParseBitVec(raw, out var integer))
+            if (sort == Sort.Int && TryParseSolverInteger(raw, out var integer))
                 witness[name] = integer;
             else if (sort == Sort.Bool && bool.TryParse(raw, out var boolean))
                 witness[name] = boolean;
@@ -165,6 +169,11 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
 
     private SolverRun RunQuery(string script)
     {
+        if (script.Length > MaxScriptChars)
+        {
+            RecordOutcome(SmtOutcome.Unknown, timedOut: false);
+            return new SolverRun(SmtOutcome.Unknown, "SMT script exceeded configured byte-bound-derived size limit", TimedOut: false);
+        }
         var run = RunSolver(script);
         RecordOutcome(run.Outcome, run.TimedOut);
         return run;
@@ -236,7 +245,7 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         IReadOnlyList<string>? getValueNames = null)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("(set-logic QF_BV)");
+        sb.AppendLine("(set-logic QF_NIA)");
         sb.AppendLine(CultureInfo.InvariantCulture, $"(set-option :timeout {timeoutMs})");
         foreach (var declaration in translator.Declarations())
             sb.AppendLine(declaration);
@@ -282,11 +291,29 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
         return match.Success;
     }
 
-    private static bool TryParseBitVec(string raw, out BigInteger value)
+    private static bool TryParseSolverInteger(string raw, out BigInteger value)
     {
         value = BigInteger.Zero;
         try
         {
+            var negative = Regex.Match(raw, @"^\(-\s+(?<value>[0-9]+)\)$", RegexOptions.CultureInvariant);
+            if (negative.Success)
+            {
+                value = -BigInteger.Parse(negative.Groups["value"].Value, CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            if (BigInteger.TryParse(raw, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value))
+                return true;
+
+            // Review note (#43): the production SMT-LIB translator emits only Int- and Bool-sorted
+            // terms, so a real z3's get-value for an Int symbol returns a decimal literal (handled
+            // above) and this bitvector branch is not exercised in production. It remains for SMT-LIB
+            // completeness and is covered by the fake-backend SmtTests. The fixed IntegerBits width
+            // (256) is the correct two's-complement width for NeoVM's 256-bit integers, so the
+            // sign-wrap below yields the right value for the NeoVM integer domain rather than an
+            // unsound one. If a future translator emits bitvectors of other widths, derive the wrap
+            // width from the queried symbol's declared sort instead of this constant.
             BigInteger unsigned;
             if (raw.StartsWith("#x", StringComparison.OrdinalIgnoreCase))
             {
@@ -303,7 +330,9 @@ public sealed class Z3Backend : ISmtBackend, IDisposable
                 unsigned = BigInteger.Parse(match.Groups["value"].Value, CultureInfo.InvariantCulture);
             }
 
-            value = unsigned >= SignedHalfRange ? unsigned - UnsignedRange : unsigned;
+            var signedHalfRange = BigInteger.One << (IntegerBits - 1);
+            var unsignedRange = BigInteger.One << IntegerBits;
+            value = unsigned >= signedHalfRange ? unsigned - unsignedRange : unsigned;
             return true;
         }
         catch

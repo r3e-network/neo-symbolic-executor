@@ -24,6 +24,14 @@ namespace Neo.SymbolicExecutor.Nef;
 public sealed class NefFile
 {
     public const uint MagicValue = 0x3346454E;
+
+    // Review note (#52/#76): the binary STRUCTURE/layout mirrors Neo.SmartContract.NefFile exactly,
+    // but these size limits are intentionally RELAXED analysis budgets, not Neo's deploy-time limits
+    // (Neo caps script at 131070 bytes). A relaxed cap only ever accepts a SUPERSET of Neo-deployable
+    // inputs, so it never narrows the analyzed surface and has no soundness impact; oversized inputs
+    // are bounded here so the analyzer cannot be DoS'd. The compiler/source fixed strings are decoded
+    // as ASCII with lenient NUL-trimming (vs Neo's strict UTF-8 / strict NUL-padding); MethodToken
+    // method names are already validated as strict UTF-8 (see MethodToken.Read).
     public const int MaxScriptSize = 512 * 1024;
 
     public required string Compiler { get; init; }
@@ -35,50 +43,68 @@ public sealed class NefFile
     public static NefFile Parse(byte[] data, bool verifyChecksum = true)
     {
         if (data is null) throw new ArgumentNullException(nameof(data));
-        using var ms = new MemoryStream(data);
-        using var br = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
-
-        uint magic = br.ReadUInt32();
-        if (magic != MagicValue)
-            throw new FormatException($"NEF magic mismatch: got 0x{magic:X8}, expected 0x{MagicValue:X8}");
-
-        byte[] compilerBytes = br.ReadBytes(64);
-        if (compilerBytes.Length != 64)
-            throw new FormatException("NEF compiler section truncated");
-        string compiler = TrimNul(Encoding.ASCII.GetString(compilerBytes));
-
-        string source = TrimNul(Encoding.ASCII.GetString(ReadVarBytes(br, maxLength: 256)));
-
-        byte reserve1 = br.ReadByte();
-        if (reserve1 != 0) throw new FormatException("NEF reserved byte 1 must be zero");
-
-        ushort tokenCount = (ushort)ReadVarInt(br, maxValue: 128);
-        var tokens = new MethodToken[tokenCount];
-        for (int i = 0; i < tokenCount; i++)
-            tokens[i] = MethodToken.Read(br);
-
-        ushort reserve2 = br.ReadUInt16();
-        if (reserve2 != 0) throw new FormatException("NEF reserved bytes 2 must be zero");
-
-        byte[] script = ReadVarBytes(br, maxLength: MaxScriptSize);
-        if (script.Length == 0) throw new FormatException("NEF script must be non-empty");
-
-        uint checksum = br.ReadUInt32();
-        if (verifyChecksum)
+        try
         {
-            uint expected = ComputeChecksum(data.AsSpan(0, data.Length - 4));
-            if (expected != checksum)
-                throw new FormatException($"NEF checksum mismatch: got 0x{checksum:X8}, expected 0x{expected:X8}");
+            using var ms = new MemoryStream(data);
+            using var br = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
+
+            uint magic = br.ReadUInt32();
+            if (magic != MagicValue)
+                throw new FormatException($"NEF magic mismatch: got 0x{magic:X8}, expected 0x{MagicValue:X8}");
+
+            byte[] compilerBytes = br.ReadBytes(64);
+            if (compilerBytes.Length != 64)
+                throw new FormatException("NEF compiler section truncated");
+            string compiler = TrimNul(Encoding.ASCII.GetString(compilerBytes));
+
+            string source = TrimNul(Encoding.ASCII.GetString(ReadVarBytes(br, maxLength: 256)));
+
+            byte reserve1 = br.ReadByte();
+            if (reserve1 != 0) throw new FormatException("NEF reserved byte 1 must be zero");
+
+            ushort tokenCount = (ushort)ReadVarInt(br, maxValue: 128);
+            var tokens = new MethodToken[tokenCount];
+            for (int i = 0; i < tokenCount; i++)
+                tokens[i] = MethodToken.Read(br);
+
+            ushort reserve2 = br.ReadUInt16();
+            if (reserve2 != 0) throw new FormatException("NEF reserved bytes 2 must be zero");
+
+            byte[] script = ReadVarBytes(br, maxLength: MaxScriptSize);
+            if (script.Length == 0) throw new FormatException("NEF script must be non-empty");
+
+            long checksumOffset = ms.Position;
+            uint checksum = br.ReadUInt32();
+            if (ms.Position != ms.Length)
+            {
+                throw new FormatException(
+                    $"NEF has {ms.Length - ms.Position} trailing byte(s) after checksum");
+            }
+
+            if (verifyChecksum)
+            {
+                uint expected = ComputeChecksum(data.AsSpan(0, (int)checksumOffset));
+                if (expected != checksum)
+                    throw new FormatException($"NEF checksum mismatch: got 0x{checksum:X8}, expected 0x{expected:X8}");
+            }
+
+            return new NefFile
+            {
+                Compiler = compiler,
+                Source = source,
+                Tokens = tokens,
+                Script = script,
+                Checksum = checksum,
+            };
         }
-
-        return new NefFile
+        catch (EndOfStreamException ex)
         {
-            Compiler = compiler,
-            Source = source,
-            Tokens = tokens,
-            Script = script,
-            Checksum = checksum,
-        };
+            throw new FormatException("NEF file truncated before all required fields were present", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new FormatException($"NEF file could not be parsed: {ex.Message}", ex);
+        }
     }
 
     public static uint ComputeChecksum(ReadOnlySpan<byte> bytes)
@@ -134,6 +160,11 @@ public sealed record MethodToken(
     bool HasReturnValue,
     byte CallFlags)
 {
+    private const byte ValidCallFlagsMask = 0x0F;
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
     public static MethodToken Read(BinaryReader br)
     {
         var hash = br.ReadBytes(20);
@@ -152,10 +183,23 @@ public sealed record MethodToken(
         var nameBytes = br.ReadBytes((int)len);
         if (nameBytes.Length != len)
             throw new FormatException($"MethodToken name truncated: wanted {len}, got {nameBytes.Length}");
-        var name = Encoding.UTF8.GetString(nameBytes);
+        string name;
+        try
+        {
+            name = StrictUtf8.GetString(nameBytes);
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new FormatException("MethodToken method name is not valid strict UTF-8", ex);
+        }
         ushort parametersCount = br.ReadUInt16();
-        bool hasRet = br.ReadByte() != 0;
+        byte hasReturnValueByte = br.ReadByte();
+        if (hasReturnValueByte is not 0 and not 1)
+            throw new FormatException("MethodToken hasReturnValue must be encoded as 0 or 1");
+        bool hasRet = hasReturnValueByte == 1;
         byte callFlags = br.ReadByte();
+        if ((callFlags & ~ValidCallFlagsMask) != 0)
+            throw new FormatException($"MethodToken callFlags contain unsupported bits: 0x{callFlags:X2}");
         return new MethodToken(hash, name, parametersCount, hasRet, callFlags);
     }
 }
