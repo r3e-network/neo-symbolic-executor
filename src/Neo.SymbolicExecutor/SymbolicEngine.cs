@@ -265,7 +265,7 @@ public sealed partial class SymbolicEngine
     {
         var state = new ExecutionState
         {
-            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize),
+            Heap = new Heap(_options.MaxHeapObjects, _options.MaxItemSize, _options.MaxCollectionSize, _options.MaxStackSize),
             CurrentCallFlags = _options.InitialCallFlags,
             RuntimeTrigger = _options.RuntimeTrigger,
         };

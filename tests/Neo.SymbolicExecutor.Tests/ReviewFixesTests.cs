@@ -1096,6 +1096,40 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Heap_StructCloneCopiesSharedSubStructIndependently()
+    {
+        // Round-3 audit fix: NeoVM's Struct.Clone copies each sub-struct independently (no
+        // memoization), so a sub-struct shared by two fields becomes two DISTINCT copies. The prior
+        // id-memoization aliased them, so a later mutation of one wrongly affected the other.
+        var heap = new Heap();
+        var t = heap.NewStruct(new[] { SymbolicValue.Int(42) });
+        var tRef = SymbolicValue.HeapRef(Sort.Struct, t.Id);
+        var s = heap.NewStruct(new[] { tRef, tRef });
+
+        var cloneRef = heap.CloneStructValueForCollection(SymbolicValue.HeapRef(Sort.Struct, s.Id));
+        var clone = heap.Get<StructObject>(cloneRef.Expression.Should().BeOfType<HeapRef>().Which.ObjectId);
+        int field0Id = clone.Fields[0].Expression.Should().BeOfType<HeapRef>().Which.ObjectId;
+        int field1Id = clone.Fields[1].Expression.Should().BeOfType<HeapRef>().Which.ObjectId;
+
+        field0Id.Should().NotBe(field1Id, "NeoVM copies each shared sub-struct into a distinct object");
+        heap.Get<StructObject>(field0Id).Fields[0] = SymbolicValue.Int(99);
+        heap.Get<StructObject>(field1Id).Fields[0].AsConcreteInt().Should().Be(new BigInteger(42));
+    }
+
+    [Fact]
+    public void Heap_StructCloneFaultsOnCircularStruct()
+    {
+        // Round-3 audit fix: without memoization a circular struct would loop forever; NeoVM bounds the
+        // clone by MaxStackSize-1 subitems and faults ("Beyond struct subitem clone limits").
+        var heap = new Heap();
+        var s = heap.NewStruct();
+        heap.Get<StructObject>(s.Id).Fields.Add(SymbolicValue.HeapRef(Sort.Struct, s.Id));
+
+        var act = () => heap.CloneStructValueForCollection(SymbolicValue.HeapRef(Sort.Struct, s.Id));
+        act.Should().Throw<VmFaultException>().WithMessage("*subitem clone limits*");
+    }
+
+    [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
         // Review fix (#2): APPEND on an open array increments OpenSizeOffset, so SIZE after APPEND is

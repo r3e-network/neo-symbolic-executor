@@ -7584,8 +7584,9 @@ public sealed partial class SymbolicEngine
             return false;
         }
 
+        // Round-3 audit fix: Neo's StringSplit applies [MaxLength(1024)] only to `str`, not to
+        // `separator`, so the engine must not fault on a long separator (it would prune a feasible path).
         EnforceStdLibMaxLength("StdLib.stringSplit", "value", strBytes);
-        EnforceStdLibMaxLength("StdLib.stringSplit", "separator", separatorBytes);
         string text = DecodeStrictUtf8OrThrow(strBytes, "StdLib.stringSplit", "value");
         string separator = DecodeStrictUtf8OrThrow(separatorBytes, "StdLib.stringSplit", "separator");
         if (separator.Length == 0)
@@ -7641,7 +7642,7 @@ public sealed partial class SymbolicEngine
         result = SymbolicValue.Null();
         if (args.Count is < 2 or > 4
             || !TryGetStdLibConcreteBytes(args[0], "StdLib.memorySearch", "memory", out var memory)
-            || !TryGetStdLibConcreteBytes(args[1], "StdLib.memorySearch", "value", out var value))
+            || !TryGetStdLibConcreteBytes(args[1], "StdLib.memorySearch", "value", out var value, enforceMaxLength: false))
         {
             return false;
         }
@@ -7693,13 +7694,19 @@ public sealed partial class SymbolicEngine
         SymbolicValue value,
         string operation,
         string argumentName,
-        out byte[] bytes)
+        out byte[] bytes,
+        bool enforceMaxLength = true)
     {
         bytes = System.Array.Empty<byte>();
         if (value.AsConcreteBytes() is not { } concrete)
             return false;
 
-        EnforceStdLibMaxLength(operation, argumentName, concrete);
+        // Round-3 audit fix: the StdLib [MaxLength(1024)] cap is per-parameter — e.g. memorySearch
+        // limits `mem` but NOT `value`, and stringSplit limits `str` but NOT `separator`. Callers pass
+        // enforceMaxLength: false for the unconstrained parameter so the engine does not fault (prune a
+        // feasible path) on input lengths Neo accepts.
+        if (enforceMaxLength)
+            EnforceStdLibMaxLength(operation, argumentName, concrete);
         bytes = concrete;
         return true;
     }

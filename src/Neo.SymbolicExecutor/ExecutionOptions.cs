@@ -11,7 +11,6 @@ public sealed record ExecutionOptions
 {
     public int MaxSteps { get; init; } = 200_000;
     public int MaxPaths { get; init; } = 512;
-    public int MaxDepth { get; init; } = 256;
     public int MaxVisitsPerOffset { get; init; } = 16;
     public int MaxStackSize { get; init; } = 2_048;
     public int MaxInvocationStackDepth { get; init; } = 1_024;

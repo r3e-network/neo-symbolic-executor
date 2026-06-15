@@ -14,6 +14,8 @@ public sealed class Heap
     public int MaxObjects { get; init; } = 4096;
     public int MaxItemSize { get; init; } = 1024 * 1024; // 1 MiB
     public int MaxCollectionSize { get; init; } = 2048;
+    // NeoVM's reference-counted evaluation-stack limit; also bounds Struct.Clone subitems.
+    public int MaxStackSize { get; init; } = 2048;
 
     public Heap()
     {
@@ -28,22 +30,24 @@ public sealed class Heap
     /// the default-constructed Heap silently overrode the engine's options and allowed up to
     /// 1 MiB × 4096 = 4 GiB peaks per state — the iter-2 wakeup-2 memory bomb.
     /// </summary>
-    public Heap(int maxObjects, int maxItemSize, int maxCollectionSize)
+    public Heap(int maxObjects, int maxItemSize, int maxCollectionSize, int maxStackSize = 2048)
     {
         _objects = new Dictionary<int, HeapObject>();
         _nextId = 1;
         MaxObjects = maxObjects;
         MaxItemSize = maxItemSize;
         MaxCollectionSize = maxCollectionSize;
+        MaxStackSize = maxStackSize;
     }
 
-    private Heap(Dictionary<int, HeapObject> objects, int nextId, int maxObjects, int maxItemSize, int maxCollectionSize)
+    private Heap(Dictionary<int, HeapObject> objects, int nextId, int maxObjects, int maxItemSize, int maxCollectionSize, int maxStackSize)
     {
         _objects = objects;
         _nextId = nextId;
         MaxObjects = maxObjects;
         MaxItemSize = maxItemSize;
         MaxCollectionSize = maxCollectionSize;
+        MaxStackSize = maxStackSize;
     }
 
     public IReadOnlyDictionary<int, HeapObject> Objects => _objects;
@@ -154,41 +158,61 @@ public sealed class Heap
             : throw new VmFaultException($"Heap object {id} is {obj.Sort}, not {typeof(T).Name}");
     }
 
-    public SymbolicValue CloneStructValueForCollection(SymbolicValue value) =>
-        CloneStructValueForCollection(value, new Dictionary<int, int>());
-
-    private SymbolicValue CloneStructValueForCollection(
-        SymbolicValue value,
-        Dictionary<int, int> clonedStructs)
+    /// <summary>
+    /// Clone a Struct value by value, mirroring NeoVM's Neo.VM.Types.Struct.Clone exactly: a BFS that
+    /// copies every Struct subitem INDEPENDENTLY (no memoization — a sub-struct referenced by two
+    /// fields becomes two distinct copies, as on the real VM), shares non-struct items by reference,
+    /// and faults (uncatchable) once the cumulative subitem count exceeds MaxStackSize - 1 (which also
+    /// bounds circular structs, matching NeoVM's "Beyond struct subitem clone limits"). Round-3 audit
+    /// fix: the prior id-memoization aliased shared sub-structs, producing wrong values after a later
+    /// SETITEM into one of them.
+    /// </summary>
+    public SymbolicValue CloneStructValueForCollection(SymbolicValue value)
     {
         if (value.Expression is not HeapRef { RefSort: Sort.Struct } href)
             return value;
 
-        return SymbolicValue
-            .HeapRef(Sort.Struct, CloneStructObjectForCollection(href.ObjectId, clonedStructs))
-            .WithTaints(value.Taints);
+        int budget = MaxStackSize - 1;
+        var rootClone = AllocateStructShell(Get<StructObject>(href.ObjectId));
+        var queue = new Queue<(StructObject Source, StructObject Clone)>();
+        queue.Enqueue((Get<StructObject>(href.ObjectId), rootClone));
+        while (queue.Count > 0)
+        {
+            var (source, clone) = queue.Dequeue();
+            foreach (var field in source.Fields)
+                clone.Fields.Add(CloneStructSubitem(field, queue, ref budget));
+            foreach (var write in source.OpenWrites)
+                clone.OpenWrites.Add((write.Key, CloneStructSubitem(write.Value, queue, ref budget)));
+        }
+
+        return SymbolicValue.HeapRef(Sort.Struct, rootClone.Id).WithTaints(value.Taints);
     }
 
-    private int CloneStructObjectForCollection(int sourceId, Dictionary<int, int> clonedStructs)
-    {
-        if (clonedStructs.TryGetValue(sourceId, out int existingClone))
-            return existingClone;
-
-        var source = Get<StructObject>(sourceId);
-        EnforceCollectionGrowth(source.Fields.Count);
-        var clone = Allocate(id => new StructObject(
+    private StructObject AllocateStructShell(StructObject source) =>
+        Allocate(id => new StructObject(
             id,
             isSymbolicOpen: source.IsSymbolicOpen,
             minCount: source.MinCount,
             openSizeOffset: source.OpenSizeOffset));
-        clonedStructs[sourceId] = clone.Id;
 
-        foreach (var field in source.Fields)
-            clone.Fields.Add(CloneStructValueForCollection(field, clonedStructs));
-        foreach (var write in source.OpenWrites)
-            clone.OpenWrites.Add((write.Key, CloneStructValueForCollection(write.Value, clonedStructs)));
+    private SymbolicValue CloneStructSubitem(
+        SymbolicValue item,
+        Queue<(StructObject Source, StructObject Clone)> queue,
+        ref int budget)
+    {
+        if (--budget < 0)
+            throw new VmFaultException("Beyond struct subitem clone limits");
 
-        return clone.Id;
+        if (item.Expression is HeapRef { RefSort: Sort.Struct } childRef
+            && _objects.TryGetValue(childRef.ObjectId, out var obj)
+            && obj is StructObject childSource)
+        {
+            var childClone = AllocateStructShell(childSource);
+            queue.Enqueue((childSource, childClone));
+            return SymbolicValue.HeapRef(Sort.Struct, childClone.Id).WithTaints(item.Taints);
+        }
+
+        return item;
     }
 
     /// <summary>
@@ -203,7 +227,7 @@ public sealed class Heap
         foreach (var obj in _objects.Values)
             obj.IsShared = true;
         var copy = new Dictionary<int, HeapObject>(_objects);
-        return new Heap(copy, _nextId, MaxObjects, MaxItemSize, MaxCollectionSize);
+        return new Heap(copy, _nextId, MaxObjects, MaxItemSize, MaxCollectionSize, MaxStackSize);
     }
 
     public void EnforceCollectionGrowth(int newSize)
