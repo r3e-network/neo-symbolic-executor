@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
-    <PackageReference Include="Neo.Cryptography.BLS12_381" Version="$(NeoCorePackageVersion)" />
+    <PackageReference Include="Neo.Cryptography.BLS12_381" Version="$(NeoBls12381PackageVersion)" />
     <PackageReference Include="Neo.VM" Version="$(NeoCorePackageVersion)" />
     <PackageReference Include="System.IO.Hashing" Version="10.0.8" />
   </ItemGroup>

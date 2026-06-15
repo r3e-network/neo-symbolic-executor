@@ -13,7 +13,13 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <NeoSymExecVersion>0.8.0</NeoSymExecVersion>
-    <NeoCorePackageVersion>3.9.0</NeoCorePackageVersion>
+    <!-- Neo N3 3.10.0: VM semantics (OpCode set, ExecutionEngineLimits, JumpTable, StackItem
+         conversion/clone) and the modeled native/interop surface are byte-for-byte identical to
+         3.9.0 (verified by decompilation diff); the 3.9->3.10 delta is an internal ReferenceCounter
+         refactor the engine does not depend on. Neo.Cryptography.BLS12_381 has no 3.10.0 release, so
+         it stays pinned to its latest 3.9.0 (its bls12381 surface is unchanged across the bump). -->
+    <NeoCorePackageVersion>3.10.0</NeoCorePackageVersion>
+    <NeoBls12381PackageVersion>3.9.0</NeoBls12381PackageVersion>
     <Authors>Neo Symbolic Executor Contributors</Authors>
     <Company>Neo Symbolic Executor</Company>
     <Copyright>Copyright 2026</Copyright>

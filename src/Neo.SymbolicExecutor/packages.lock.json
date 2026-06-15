@@ -16,11 +16,11 @@
       },
       "Neo.VM": {
         "type": "Direct",
-        "requested": "[3.9.0, )",
-        "resolved": "3.9.0",
-        "contentHash": "5QxkGWadGcN0aXcrcJ3MRVIl9PmRnMipsKY22bD+2AA2K/nHEhm91guQTsERIKClNvbdrLyY+6VwnakicZQb0A==",
+        "requested": "[3.10.0, )",
+        "resolved": "3.10.0",
+        "contentHash": "MAxiOhkOkFzfjjYgHmsx4HkY2lQl+nl9ca/lF5vWlcd2DqqTXo16o3RP4AS/6IxHSEceMzgZDDQgFwNcyUSkEA==",
         "dependencies": {
-          "System.IO.Hashing": "9.0.10"
+          "System.IO.Hashing": "10.0.2"
         }
       },
       "System.IO.Hashing": {
