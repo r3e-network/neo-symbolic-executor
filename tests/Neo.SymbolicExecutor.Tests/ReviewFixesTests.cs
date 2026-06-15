@@ -1419,6 +1419,56 @@ public class ReviewFixesTests
         faulted.Telemetry.UnknownSyscalls.Should().BeEmpty();
     }
 
+    private static ExecutionResult RunStdLibBase64UrlDecode(string base64UrlText)
+    {
+        byte[] script = Concat(
+            Pushdata1(StdLibHashBytes()),
+            Pushdata1("base64UrlDecode"u8.ToArray()),
+            new[] { (byte)NeoVm.OpCode.PUSH1 },
+            Pushdata1(System.Text.Encoding.ASCII.GetBytes(base64UrlText)),
+            new[] { (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.PACK },
+            Syscall("System.Contract.Call"),
+            new[] { (byte)NeoVm.OpCode.RET });
+        return new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+    }
+
+    [Fact]
+    public void Engine_Base64UrlDecodeValidUtf8RoundTrips()
+    {
+        // "aGVsbG8" (unpadded base64url) decodes to "hello"; valid UTF-8 so the round-trip is identity.
+        var halted = RunStdLibBase64UrlDecode("aGVsbG8").Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteBytes().Should().Equal("hello"u8.ToArray());
+    }
+
+    [Fact]
+    public void Engine_Base64UrlDecodeNonUtf8DecodedBytesAreUtf8Replaced()
+    {
+        // Neo's base64UrlDecode returns UTF8.GetString(DecodeBytes(s)) re-marshalled: "_w" decodes to the
+        // raw byte 0xFF (invalid UTF-8) which collapses to U+FFFD (EF BF BD), NOT the raw [0xFF].
+        var halted = RunStdLibBase64UrlDecode("_w").Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteBytes().Should().Equal(new byte[] { 0xEF, 0xBF, 0xBD });
+
+        // "__8" decodes to [0xFF, 0xFF] -> two replacement chars.
+        var halted2 = RunStdLibBase64UrlDecode("__8").Halted.Should().ContainSingle().Which;
+        halted2.EvaluationStack.Single().AsConcreteBytes()
+            .Should().Equal(new byte[] { 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD });
+    }
+
+    [Fact]
+    public void Engine_Base64UrlDecodeNonCanonicalInputFaults()
+    {
+        // "ab" has non-zero unused trailing bits; Neo's strict decoder (Microsoft.IdentityModel
+        // Base64UrlEncoder.DecodeBytes) faults on it even though lenient Convert.FromBase64String would
+        // accept "ab==" and decode to [0x69]. The engine must fault, not silently produce a value.
+        foreach (var nonCanonical in new[] { "ab", "ab==", "-_" })
+        {
+            var faulted = RunStdLibBase64UrlDecode(nonCanonical).Faulted.Should().ContainSingle().Which;
+            faulted.TerminationReason.Should().Contain("StdLib.base64UrlDecode");
+            faulted.TerminationReason.Should().Contain("valid base64url");
+            faulted.Telemetry.UnknownSyscalls.Should().BeEmpty();
+        }
+    }
+
     [Theory]
     [InlineData("base58Encode", "6E656F", "65356838")]
     [InlineData("base58Decode", "65356838", "6E656F")]

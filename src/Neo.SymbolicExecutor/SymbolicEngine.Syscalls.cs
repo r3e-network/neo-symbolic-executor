@@ -7998,7 +7998,14 @@ public sealed partial class SymbolicEngine
     private static string Base64UrlEncode(byte[] bytes) =>
         System.Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    private static bool TryDecodeBase64Url(string text, out byte[] bytes)
+    // Faithful port of Microsoft.IdentityModel.Tokens.Base64UrlEncoder.DecodeBytes — the decoder Neo's
+    // StdLib.base64UrlDecode delegates to (verified by decompiling Neo 3.10.0 and probing the real
+    // library). It performs STRICT base64url decoding: it rejects len % 4 == 1, characters outside the
+    // base64url alphabet, and non-canonical inputs whose unused trailing bits are non-zero (e.g. "ab",
+    // "-_", "ab==") — cases .NET's lenient Convert.FromBase64String would silently accept and decode to
+    // the wrong value. We detect those by decoding then re-encoding and requiring the canonical
+    // base64url form to match the input (padding aside).
+    private static bool TryDecodeBase64UrlBytes(string text, out byte[] bytes)
     {
         bytes = System.Array.Empty<byte>();
         string normalized = text.Replace('-', '+').Replace('_', '/');
@@ -8007,7 +8014,28 @@ public sealed partial class SymbolicEngine
             return false;
         if (padding > 0)
             normalized = normalized.PadRight(normalized.Length + 4 - padding, '=');
-        return TryDecodeBase64(normalized, out bytes);
+        if (!TryDecodeBase64(normalized, out var raw))
+            return false;
+        string canonical = System.Convert.ToBase64String(raw).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        if (!string.Equals(canonical, text.TrimEnd('='), System.StringComparison.Ordinal))
+            return false;
+        bytes = raw;
+        return true;
+    }
+
+    // StdLib.base64UrlDecode returns Base64UrlEncoder.Decode(s) == UTF8.GetString(DecodeBytes(s)), a
+    // STRING the VM re-marshals back to a ByteString. The observable result is therefore the UTF-8
+    // *replacement* round-trip of the decoded bytes (invalid sequences collapse to U+FFFD), NOT the raw
+    // decoded bytes. The inner GetString uses the default replacement fallback (never throws); its
+    // output is always a valid string, so the strict re-encode the VM performs never faults. (base64Decode
+    // returns a raw byte[] via TryDecodeBase64 and is deliberately unaffected.)
+    private static bool TryDecodeBase64Url(string text, out byte[] bytes)
+    {
+        bytes = System.Array.Empty<byte>();
+        if (!TryDecodeBase64UrlBytes(text, out var raw))
+            return false;
+        bytes = StrictUtf8.GetBytes(System.Text.Encoding.UTF8.GetString(raw));
+        return true;
     }
 
     private static string Base58Encode(byte[] bytes)
