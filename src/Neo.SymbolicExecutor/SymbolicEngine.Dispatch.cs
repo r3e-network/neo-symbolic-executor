@@ -693,8 +693,16 @@ public sealed partial class SymbolicEngine
         {
             if (ah.ObjectId == bh.ObjectId) return BoolConst.True;
             if (ah.RefSort != bh.RefSort) return BoolConst.False;
-            if (ah.RefSort == Sort.Struct && depth < MaxDepth)
+            if (ah.RefSort == Sort.Struct)
             {
+                // Round-3 audit fix: the analyzer's recursion-depth budget is NOT a NeoVM limit (NeoVM
+                // bounds struct comparison by MaxComparableSize, far deeper). Bottoming out at it and
+                // returning False would unsoundly assert the structs DIFFER, pruning the case where they
+                // are equal in the deep tail. Terminate as a modeling limit (CoverageIncomplete) instead.
+                if (depth >= MaxDepth)
+                    throw new ModelingLimitException(
+                        $"EQUAL deep struct equality exceeds the analyzer depth budget {MaxDepth}");
+
                 var s1 = state.Heap.Objects.TryGetValue(ah.ObjectId, out var o1) ? o1 as StructObject : null;
                 var s2 = state.Heap.Objects.TryGetValue(bh.ObjectId, out var o2) ? o2 as StructObject : null;
                 if (s1 is null || s2 is null) return BoolConst.False;

@@ -218,9 +218,16 @@ public sealed partial class SymbolicEngine
             case "System.Runtime.BurnGas":
                 {
                     var gas = state.Pop();
-                    if (Expr.ConcreteInt(gas.Expression) is { Sign: <= 0 } amount)
-                        throw new VmFaultException($"BurnGas with non-positive amount {amount}");
-                    if (Expr.ConcreteInt(gas.Expression) is null)
+                    if (Expr.ConcreteInt(gas.Expression) is { } amount)
+                    {
+                        if (amount.Sign <= 0)
+                            throw new VmFaultException($"BurnGas with non-positive amount {amount}");
+                        // Round-3 audit fix: Runtime.BurnGas takes a `long` datoshi parameter, so an
+                        // amount above long.MaxValue faults at argument binding on the real VM.
+                        if (amount > long.MaxValue)
+                            throw new VmFaultException($"BurnGas amount {amount} exceeds the long datoshi range");
+                    }
+                    else
                     {
                         state.Telemetry.FaultConditions.Add(new FaultConditionOp(
                             inst.Offset,
