@@ -56,13 +56,17 @@ public sealed class Nep27ComplianceDetector : BaseDetector
             && IsType(method.ReturnType, "Void");
     }
 
+    // Round-2 fix (#20): validate parameter TYPE and arity only — NOT the author's parameter
+    // identifier. NEP-27 fixes the method name, parameter types, arity, and return type, but not the
+    // spelling of parameter names; comparing parameters[index].Name produced false positives on
+    // spec-compliant contracts that renamed a parameter. The `name` argument is retained for
+    // call-site documentation of the canonical NEP name.
     private static bool HasParameter(
         IReadOnlyList<Nef.ContractParameterDefinition> parameters,
         int index,
         string name,
         System.Func<string, bool> typeMatches) =>
         parameters.Count > index
-        && string.Equals(parameters[index].Name, name, System.StringComparison.Ordinal)
         && typeMatches(parameters[index].Type);
 
     // Review fix (#74): shared Nef.AbiTypeMatching source of truth (was a per-detector copy).

@@ -473,9 +473,14 @@ public class AdditionalDetectorTests
 
         var findings = new Nep24ComplianceDetector().Analyze(ctx).ToList();
 
+        // safe=false fails the royaltyInfo shape (which requires safe=true), so both the safe-flag and
+        // method-shape findings still fire.
         findings.Should().Contain(x => x.Severity == Severity.Medium && x.Tags.Contains("safe-flag"));
         findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
-        findings.Should().Contain(x => x.Severity == Severity.High && x.Tags.Contains("event-shape"));
+        // Round-2 fix (#20): the RoyaltiesTransferred event has renamed but correctly-typed parameters,
+        // which is now compliant (NEP standards fix parameter types/arity, not the author's parameter
+        // names), so there is no event-shape finding.
+        findings.Should().NotContain(x => x.Tags.Contains("event-shape"));
     }
 
     [Fact]
@@ -541,7 +546,7 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
-    public void Nep27_FlagsRenamedPaymentCallbackParameters()
+    public void Nep27_AcceptsRenamedPaymentCallbackParametersWithCorrectTypes()
     {
         var manifest = Nef.ContractManifest.FromJson("""
             {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-27"],
@@ -560,7 +565,11 @@ public class AdditionalDetectorTests
 
         var findings = new Nep27ComplianceDetector().Analyze(ctx).ToList();
 
-        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+        // Round-2 fix (#20): NEP standards fix the method name, parameter TYPES, arity, return type,
+        // and Safe flag — NOT the author's parameter identifiers (dispatch is by name+arity). A
+        // spec-compliant onNEP17Payment that renames its parameters (sender/value/payload instead of
+        // from/amount/data) with correct types must NOT be flagged as a shape violation.
+        findings.Should().NotContain(x => x.Tags.Contains("method-shape"));
     }
 
     [Fact]
@@ -628,7 +637,7 @@ public class AdditionalDetectorTests
     }
 
     [Fact]
-    public void Nep26_FlagsRenamedPaymentCallbackParametersEvenWithCSharpStringTokenId()
+    public void Nep26_AcceptsRenamedPaymentCallbackParametersWithCorrectTypes()
     {
         var manifest = Nef.ContractManifest.FromJson("""
             {"name":"Receiver","groups":[],"features":{},"supportedstandards":["NEP-26"],
@@ -648,7 +657,10 @@ public class AdditionalDetectorTests
 
         var findings = new Nep26ComplianceDetector().Analyze(ctx).ToList();
 
-        findings.Should().ContainSingle(x => x.Severity == Severity.High && x.Tags.Contains("method-shape"));
+        // Round-2 fix (#20): a spec-compliant onNEP11Payment with correct parameter TYPES (Hash160,
+        // Integer, String-as-tokenId, Any), arity, return type, and safe flag must NOT be flagged just
+        // because the author renamed the parameters (sender/value/id/payload).
+        findings.Should().NotContain(x => x.Tags.Contains("method-shape"));
     }
 
     [Fact]

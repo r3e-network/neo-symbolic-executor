@@ -148,13 +148,17 @@ public sealed class Nep24ComplianceDetector : BaseDetector
     private static bool IsByteString(string type) =>
         IsType(type, "ByteString") || IsType(type, "ByteArray");
 
+    // Round-2 fix (#20): validate parameter TYPE and arity only — NOT the author's parameter
+    // identifier. NEP-24 fixes the method name, parameter types, arity, return type, and the Safe
+    // flag, but not the spelling of parameter names; comparing parameters[index].Name produced false
+    // positives on spec-compliant contracts that renamed a parameter. The `name` argument is retained
+    // for call-site documentation of the canonical NEP name.
     private static bool HasParameter(
         IReadOnlyList<Nef.ContractParameterDefinition> parameters,
         int index,
         string name,
         System.Func<string, bool> typeMatches) =>
         parameters.Count > index
-        && string.Equals(parameters[index].Name, name, System.StringComparison.Ordinal)
         && typeMatches(parameters[index].Type);
 
     // Review fix (#74): shared Nef.AbiTypeMatching source of truth (was a per-detector copy).

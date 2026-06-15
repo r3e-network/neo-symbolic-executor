@@ -36,10 +36,19 @@ public sealed class CallbackReentryDetector : BaseDetector
                 .ToList();
             if (transfers.Count == 0) continue;
 
+            // Round-2 fix (#56 parity): the `o.Offset > t.Offset` post-transfer filter is only a
+            // sound proxy for execution order on a path with NO back-edges. Under a loop, a write at
+            // a lower offset than the transfer can still execute AFTER it (or on a later iteration),
+            // so when loops are present we drop the offset filter and treat every state write —
+            // pre- or post-transfer — as a callback-reentry candidate. Loop-free behavior is
+            // unchanged: the offset filter still applies. Mirrors the ReentrancyDetector /
+            // AccessControlDetector / HasAuthBefore round-1 ordering fix.
+            bool hasLoops = state.Telemetry.LoopsDetected.Count > 0;
+
             foreach (var t in transfers)
             {
                 bool postWriteExists = state.Telemetry.StorageOps.Any(o =>
-                    ProtocolRiskHelpers.IsStateWrite(o) && o.Offset > t.Offset);
+                    ProtocolRiskHelpers.IsStateWrite(o) && (hasLoops || o.Offset > t.Offset));
                 if (!postWriteExists) continue;
 
                 yield return MakeFinding(

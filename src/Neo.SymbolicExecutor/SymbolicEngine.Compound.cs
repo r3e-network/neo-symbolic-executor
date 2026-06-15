@@ -265,6 +265,16 @@ public sealed partial class SymbolicEngine
             BytesConst by => by.Value.Length,
             HeapRef href => state.Heap.Get(href.ObjectId) switch
             {
+                // Round-2 fix: an open (symbolic-length) collection has no concrete size — returning
+                // the seeded materialized count would let `coll.Count == N` fold to a concrete value
+                // and prune feasible paths (false negative). SIZE of an open Array/Struct/Buffer is
+                // already intercepted by TryOpenSequenceSize before this method; open Maps were NOT
+                // (TryOpenSequenceSize has no Map case), so an open Map's SIZE reached here and
+                // returned the seeded Entries.Count. Return null for every open kind so SIZE falls
+                // through to a symbolic size node (Buffer already did this).
+                ArrayObject { IsSymbolicOpen: true } => null,
+                StructObject { IsSymbolicOpen: true } => null,
+                MapObject { IsSymbolicOpen: true } => null,
                 ArrayObject a => a.Items.Count,
                 StructObject s => s.Fields.Count,
                 MapObject m => m.Entries.Count,
@@ -1453,7 +1463,7 @@ public sealed partial class SymbolicEngine
                         break;
                     }
                     var index = idx.Value;
-                    if (index < 0 || index >= a.Items.Count) throw new CatchableVmException("REMOVE out of range");
+                    if (index < 0 || index >= a.Items.Count) throw new VmFaultException("REMOVE out of range");
                     int i = (int)index;
                     a.Items.RemoveAt(i);
                     break;
@@ -1474,7 +1484,7 @@ public sealed partial class SymbolicEngine
                         break;
                     }
                     var index = idx.Value;
-                    if (index < 0 || index >= s.Fields.Count) throw new CatchableVmException("REMOVE out of range");
+                    if (index < 0 || index >= s.Fields.Count) throw new VmFaultException("REMOVE out of range");
                     int i = (int)index;
                     s.Fields.RemoveAt(i);
                     break;
@@ -1572,7 +1582,7 @@ public sealed partial class SymbolicEngine
         SymbolicValue key)
     {
         if (key.AsConcreteInt() is { } concreteIndex && concreteIndex < 0)
-            throw new CatchableVmException("REMOVE out of range");
+            throw new VmFaultException("REMOVE out of range");
         if (openWrites.Count > 0)
             throw new ModelingLimitException($"REMOVE open {kindLabel} after symbolic SETITEM writes not yet supported");
         if (items.Select(item => item.Sort).Distinct().Count() > 1)
@@ -1613,7 +1623,7 @@ public sealed partial class SymbolicEngine
         SymbolicValue key)
     {
         if (items.Count == 0)
-            throw new CatchableVmException("REMOVE out of range");
+            throw new VmFaultException("REMOVE out of range");
         if (items.Select(item => item.Sort).Distinct().Count() != 1)
             throw new ModelingLimitException($"REMOVE {kindLabel} with symbolic index over heterogeneous values not yet supported");
 
@@ -1699,21 +1709,21 @@ public sealed partial class SymbolicEngine
             throw new ModelingLimitException("POPITEM over open symbolic collection of unknown length not modeled");
         if (obj is ArrayObject a)
         {
-            if (a.Items.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
+            if (a.Items.Count == 0) throw new VmFaultException("POPITEM on empty collection");
             var v = a.Items[^1];
             a.Items.RemoveAt(a.Items.Count - 1);
             state.Push(v);
         }
         else if (obj is StructObject st)
         {
-            if (st.Fields.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
+            if (st.Fields.Count == 0) throw new VmFaultException("POPITEM on empty collection");
             var v = st.Fields[^1];
             st.Fields.RemoveAt(st.Fields.Count - 1);
             state.Push(v);
         }
         else if (obj is MapObject m)
         {
-            if (m.Entries.Count == 0) throw new CatchableVmException("POPITEM on empty collection");
+            if (m.Entries.Count == 0) throw new VmFaultException("POPITEM on empty collection");
             var (_, v) = m.Entries[^1];
             m.Entries.RemoveAt(m.Entries.Count - 1);
             state.Push(v);

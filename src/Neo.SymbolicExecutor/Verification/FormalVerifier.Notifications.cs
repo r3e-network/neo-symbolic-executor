@@ -476,8 +476,13 @@ public static partial class FormalVerifier
         RuntimeNotification notification,
         out IReadOnlyList<SymbolicValue> args)
     {
+        // Round-2 fix: an OPEN (symbolic-length) notification payload array has an unknown arg count,
+        // so returning array.Items (the seeded prefix) under-counts the arguments and yields a
+        // spurious arg-count/arg-type Violated. Treat an open array as "arguments not statically
+        // known" (return false) so callers add an Incomplete "symbolic notification state; arity
+        // cannot be proven" reason — consistent with the round-1 open-collection downgrade policy.
         if (notification.State.Expression is HeapRef href
-            && state.Heap.Get(href.ObjectId) is ArrayObject array)
+            && state.Heap.Get(href.ObjectId) is ArrayObject { IsSymbolicOpen: false } array)
         {
             args = array.Items;
             return true;

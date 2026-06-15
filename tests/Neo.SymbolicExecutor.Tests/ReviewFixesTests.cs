@@ -958,6 +958,72 @@ public class ReviewFixesTests
         result.FinalStates.Should().OnlyContain(s => s.Status == TerminalStatus.Stopped);
     }
 
+    [Theory]
+    [InlineData(NeoVm.OpCode.LT)]
+    [InlineData(NeoVm.OpCode.LE)]
+    [InlineData(NeoVm.OpCode.GT)]
+    [InlineData(NeoVm.OpCode.GE)]
+    public void Engine_RelationalOperatorWithNullOperandPushesFalseAndDoesNotFault(NeoVm.OpCode op)
+    {
+        // Round-2 fix: real NeoVM HALTs and pushes False for LT/LE/GT/GE when either operand is Null
+        // (verified by executing Neo.VM 3.9 `PUSHNULL PUSH1 <op>` -> HALT, result False). The engine
+        // previously faulted on a Null relational operand, which unsoundly pruned the feasible
+        // false-return path (a verifier proof that ignored it could be unsound).
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSHNULL,
+            (byte)NeoVm.OpCode.PUSH1,
+            (byte)op,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var result = engine.Run(engine.CreateMethodEntryState(0, parameters: null));
+        result.Faulted.Should().BeEmpty("a Null relational operand pushes False in NeoVM rather than faulting");
+        var halted = result.Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteBool().Should().BeFalse();
+    }
+
+    [Fact]
+    public void Engine_ConvertOpenArrayToStructMarksCoverageIncomplete()
+    {
+        // Round-2 fix: CONVERT Array<->Struct over an open (symbolic-length) source would drop
+        // IsSymbolicOpen and let a later SIZE/PICKITEM fold the seeded prefix to a concrete length
+        // (false negative / unsound Proved), so the engine terminates as a modeling limit instead.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.INITSLOT, 0x00, 0x01,
+            (byte)NeoVm.OpCode.LDARG0,
+            (byte)NeoVm.OpCode.CONVERT, SymbolicEngine.StackItemTypeCodes.Struct,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[] { new ContractParameterDefinition("c", "Array") });
+        var result = engine.Run(entry);
+        result.CoverageIncomplete.Should().BeTrue();
+        result.CoverageReason.Should().Contain("CONVERT over open symbolic Array of unknown length not modeled");
+        result.FinalStates.Should().OnlyContain(s => s.Status == TerminalStatus.Stopped);
+    }
+
+    [Fact]
+    public void Engine_CreateMultisigAccountOverOpenPublicKeyArrayMarksCoverageIncomplete()
+    {
+        // Round-2 fix: the seeded-prefix Items.Count of an open public-key array would drive the
+        // MaxMultisigPublicKeys bound and the threshold-vs-count fault condition with a wrong length,
+        // so the syscall terminates as a modeling limit when the key array is open.
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.INITSLOT, (byte)0x00, (byte)0x01 },
+            new[] { (byte)NeoVm.OpCode.PUSH1 },
+            new[] { (byte)NeoVm.OpCode.LDARG0 },
+            Syscall("System.Contract.CreateMultisigAccount"),
+            new[] { (byte)NeoVm.OpCode.RET });
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[] { new ContractParameterDefinition("keys", "Array") });
+        var result = engine.Run(entry);
+        result.CoverageIncomplete.Should().BeTrue();
+        result.CoverageReason.Should().Contain("CreateMultisigAccount over open symbolic public-key array");
+        result.FinalStates.Should().OnlyContain(s => s.Status == TerminalStatus.Stopped);
+    }
+
     [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
@@ -979,6 +1045,28 @@ public class ReviewFixesTests
         var halted = engine.Run(entry).Halted.Should().ContainSingle().Which;
         halted.EvaluationStack.Single().Expression.Should().BeOfType<BinaryExpr>()
             .Which.Op.Should().Be("+");
+    }
+
+    [Fact]
+    public void Engine_SizeOfOpenMapParameterIsSymbolicNotSeededCount()
+    {
+        // Round-2 fix: SIZE of an open (unknown-size) Map parameter must NOT return the seeded
+        // materialized entry count (which would let `map.Count == N` fold to a concrete value and
+        // prune feasible paths). TryOpenSequenceSize had no Map case, so SIZE fell through to
+        // ConcreteSize and returned the seeded Entries.Count; ConcreteSize now returns null for all
+        // open kinds, so SIZE yields a symbolic node instead.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.INITSLOT, 0x00, 0x01,
+            (byte)NeoVm.OpCode.LDARG0,
+            (byte)NeoVm.OpCode.SIZE,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[] { new ContractParameterDefinition("m", "Map") });
+        var size = engine.Run(entry).Halted.Should().ContainSingle().Which.EvaluationStack.Single();
+        size.AsConcreteInt().Should().BeNull("an open map has no concrete size");
+        size.Expression.Should().BeOfType<UnaryExpr>().Which.Op.Should().Be("size");
     }
 
     [Fact]
@@ -1203,7 +1291,10 @@ public class ReviewFixesTests
         var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
 
         var halted = result.Halted.Should().ContainSingle().Which;
-        halted.EvaluationStack.Single().AsConcreteInt().Should().Be(new BigInteger(3));
+        // Round-2 fix: Neo's backward memorySearch is memory.AsSpan(0, start).LastIndexOf(value), so a
+        // match must lie entirely within [0, start). In "banana" with start=5, "ana" fits only at
+        // index 1 (1+3=4 <= 5); index 3 would extend to 6 > 5 and is excluded. Neo returns 1, not 3.
+        halted.EvaluationStack.Single().AsConcreteInt().Should().Be(new BigInteger(1));
         var call = halted.Telemetry.ExternalCalls.Should().ContainSingle().Which;
         call.Method.Should().Be("memorySearch");
         call.HasReturnValue.Should().BeTrue("modeled pure StdLib calls still return stack values");

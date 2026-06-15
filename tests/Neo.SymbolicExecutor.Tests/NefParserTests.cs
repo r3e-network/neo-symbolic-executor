@@ -186,6 +186,30 @@ public class NefParserTests
         hash.Should().Be(NeoNativeContractHashes.StdLib);
     }
 
+    [Fact]
+    public void ContractIdentity_MatchesNeoVerifiedGoldenVectorForNonPalindromicSender()
+    {
+        // Golden vector verified against real Neo 3.9 Helper.GetContractHash. Unlike the native-StdLib
+        // case (zero sender + zero checksum), this exercises the round-1 fixes: the deploy sender is
+        // non-palindromic (so big-endian vs little-endian emission differ) and the checksum's low byte
+        // is 0x78 (so PUSHINT vs PUSH-short-form differ). sender 00112233..eeff00112233 (little-endian
+        // UInt160), checksum 0x12345678, name "MyContract" => 0x02e14ed6f01f22151aa90334f7651fd3b262b322.
+        var nef = new NefFile
+        {
+            Compiler = "",
+            Source = "",
+            Tokens = System.Array.Empty<MethodToken>(),
+            Script = new byte[] { 0x40 },
+            Checksum = 0x12345678u,
+        };
+        var manifest = new ContractManifest { Name = "MyContract" };
+        byte[] sender = Convert.FromHexString("00112233445566778899aabbccddeeff00112233");
+
+        string hash = ContractIdentity.ComputeContractHashHex(nef, manifest, sender);
+
+        hash.Should().Be("02e14ed6f01f22151aa90334f7651fd3b262b322");
+    }
+
     private static byte[] BuildNef(string compiler, string source, MethodToken[] tokens, byte[] script)
     {
         using var ms = new MemoryStream();

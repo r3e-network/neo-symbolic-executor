@@ -25687,8 +25687,16 @@ public class FormalVerificationTests
 
             var insufficientBalanceResult = root["results"]!.AsArray()
                 .Single(r => r!["id"]!.GetValue<string>() == "security.nep17.insufficient_balance_false.transfer")!;
-            insufficientBalanceResult["status"]!.GetValue<string>().Should().Be("proved");
-            insufficientBalanceResult["obligations_checked"]!.GetValue<int>().Should().BeGreaterThanOrEqualTo(1);
+            // This fixture reads the from balance with a raw `CONVERT Integer`, so a missing balance
+            // (Storage.Get => Null) stays Null and the `balance >= amount` guard returns false for ANY
+            // amount (NeoVM pushes false for a relational operator with a Null operand). That false-return
+            // path is therefore not provably `balance < amount` (it also fires at amount == 0), so the
+            // obligation is soundly Incomplete. The engine previously faulted Null relational operands,
+            // which unsoundly hid this path and let the obligation report "proved"; modelling NeoVM's
+            // actual false-push semantics exposes it. Every other transfer obligation still proves.
+            insufficientBalanceResult["status"]!.GetValue<string>().Should().Be("incomplete");
+            insufficientBalanceResult["reason"]!.GetValue<string>().Should()
+                .Contain("does not prove from balance < amount");
 
             var totalSupplyResult = root["results"]!.AsArray()
                 .Single(r => r!["id"]!.GetValue<string>() == "security.nep17.total_supply_unchanged.transfer")!;
@@ -28999,9 +29007,15 @@ public class FormalVerificationTests
             root["results"]!.AsArray()
                 .Single(r => r!["id"]!.GetValue<string>() == "security.nep11.balance_delta.transfer")!["status"]!.GetValue<string>()
                 .Should().Be("proved");
+            // The fixture reads the from balance with a raw `CONVERT Integer`, so a missing balance
+            // (Storage.Get => Null) stays Null and `balance >= amount` returns false for any amount
+            // (NeoVM pushes false for relational operators with a Null operand, including amount == 0).
+            // That false-return path is not provably `balance < amount`, so the obligation is soundly
+            // Incomplete. The engine previously faulted Null relational operands, which unsoundly hid the
+            // path; modelling NeoVM's actual false-push semantics exposes it.
             root["results"]!.AsArray()
                 .Single(r => r!["id"]!.GetValue<string>() == "security.nep11.insufficient_balance_false.transfer")!["status"]!.GetValue<string>()
-                .Should().Be("proved");
+                .Should().Be("incomplete");
             root["results"]!.AsArray()
                 .Single(r => r!["id"]!.GetValue<string>() == "security.nep11.ownerof_index.transfer")!["status"]!.GetValue<string>()
                 .Should().Be("proved");

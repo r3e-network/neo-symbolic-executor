@@ -264,13 +264,17 @@ public sealed class Nep11ComplianceDetector : BaseDetector
         && IsType(method.ReturnType, "InteropInterface")
         && method.Safe;
 
+    // Round-2 fix (#20): validate parameter TYPE and arity only — NOT the author's parameter
+    // identifier. NEP standards fix method names, parameter types, arity, return type, and the Safe
+    // flag, but NOT the spelling of parameter names; comparing parameters[index].Name produced false
+    // positives on spec-compliant contracts that merely renamed a parameter (e.g. `owner` -> `account`).
+    // The `name` argument is retained for call-site documentation of the canonical NEP name.
     private static bool HasStandardParameter(
         IReadOnlyList<Nef.ContractParameterDefinition> parameters,
         int index,
         string name,
         System.Func<string, bool> typeMatches) =>
         parameters.Count > index
-        && string.Equals(parameters[index].Name, name, System.StringComparison.Ordinal)
         && typeMatches(parameters[index].Type);
 
     private static bool IsStrictHash160(string type) =>

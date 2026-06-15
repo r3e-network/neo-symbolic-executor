@@ -180,13 +180,23 @@ public sealed partial class SymbolicEngine
 
             // Struct ↔ Array — sort change with content preserved per NeoVM rules. We allocate
             // a fresh heap object of the target sort containing the same items list.
+            // Round-2 fix: NeoVM's Struct.ConvertTo(Array)/Array.ConvertTo(Struct) preserve the full
+            // runtime contents and length. For an OPEN (symbolic-length) source, allocating a closed
+            // target from only the seeded prefix would drop IsSymbolicOpen/MinCount/OpenSizeOffset/
+            // OpenWrites and let a later SIZE/PICKITEM fold the seeded prefix length to a concrete
+            // value (false negative / unsound Proved). Terminate as a modeling limit instead, as the
+            // round-1 open-collection opcodes do.
             (StackItemTypeCodes.Array, Sort.Struct) =>
                 v.Expression is HeapRef hsa && state.Heap.Objects.TryGetValue(hsa.ObjectId, out var sa) && sa is StructObject so1
-                    ? SymbolicValue.HeapRef(Sort.Array, state.Heap.NewArray(so1.Fields).Id)
+                    ? (so1.IsSymbolicOpen
+                        ? throw new ModelingLimitException("CONVERT over open symbolic Struct of unknown length not modeled")
+                        : SymbolicValue.HeapRef(Sort.Array, state.Heap.NewArray(so1.Fields).Id))
                     : v,
             (StackItemTypeCodes.Struct, Sort.Array) =>
                 v.Expression is HeapRef has && state.Heap.Objects.TryGetValue(has.ObjectId, out var aa) && aa is ArrayObject ao1
-                    ? SymbolicValue.HeapRef(Sort.Struct, state.Heap.NewStruct(ao1.Items).Id)
+                    ? (ao1.IsSymbolicOpen
+                        ? throw new ModelingLimitException("CONVERT over open symbolic Array of unknown length not modeled")
+                        : SymbolicValue.HeapRef(Sort.Struct, state.Heap.NewStruct(ao1.Items).Id))
                     : v,
 
             // Audit fix: every other pair is invalid per NeoVM. Fault rather than silently

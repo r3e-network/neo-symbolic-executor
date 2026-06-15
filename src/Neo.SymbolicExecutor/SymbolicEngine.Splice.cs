@@ -33,6 +33,15 @@ public sealed partial class SymbolicEngine
         if (state.Heap.GetForWrite(dstRef.ObjectId) is not BufferObject dstBuf)
             throw new VmFaultException("MEMCPY destination is not a Buffer");
 
+        // Round-2 fix: MEMCPY into an OPEN (symbolic-length) destination buffer cannot be modeled —
+        // the destination range checks and the per-cell writes are evaluated against the seeded
+        // prefix length, so writes past the prefix are silently dropped (no OpenWrites record) and a
+        // concrete over-prefix write spuriously faults. Both directions are unsound (false negative /
+        // unflagged incompleteness). Terminate as a modeling limit so the verifier downgrades, as the
+        // round-1 open-collection opcodes do.
+        if (dstBuf.IsSymbolicOpen)
+            throw new ModelingLimitException("MEMCPY into open symbolic Buffer of unknown length not modeled");
+
         var srcBytes = ResolveSpliceSourceBytes(state, src);
         if (srcBytes is null || count.AsConcreteInt() is not { } cn || srcIdx.AsConcreteInt() is not { } si || dstIdx.AsConcreteInt() is not { } di)
         {

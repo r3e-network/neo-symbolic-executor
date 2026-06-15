@@ -70,6 +70,8 @@ public sealed partial class SymbolicEngine
     private const int SignatureLength = 64;
     private const int RecoverSecp256K1SignatureLength = 65;
     private const int StdLibMaxInputLength = 1024;
+    // JavaScript Number.MAX_SAFE_INTEGER (2^53 - 1) — the bound Neo's StdLib.jsonSerialize enforces.
+    private static readonly BigInteger JsonMaxSafeInteger = 9007199254740991L;
     private const int MaxRuntimeLoadScriptDepth = 4;
     private const int MaxContractSelfCallDepth = 8;
     private const string Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -600,6 +602,13 @@ public sealed partial class SymbolicEngine
                         state.Pc = inst.EndOffset;
                         return Single(state);
                     }
+                    // Round-2 fix: an open (symbolic-length) public-key array has an unknown true count,
+                    // so the seeded-prefix Items.Count would drive the MaxMultisigPublicKeys bound and the
+                    // threshold-vs-count fault condition with a wrong length (false negative / unsound
+                    // Proved). Terminate as a modeling limit, as the open-collection opcodes do.
+                    if (pubKeysArray.IsSymbolicOpen)
+                        throw new ModelingLimitException(
+                            "CreateMultisigAccount over open symbolic public-key array of unknown length not modeled");
                     int publicKeyCount = pubKeysArray.Items.Count;
                     if (publicKeyCount > MaxMultisigPublicKeys)
                         throw new VmFaultException(
@@ -1611,7 +1620,11 @@ public sealed partial class SymbolicEngine
 
             case HeapRef { RefSort: Sort.Buffer } href:
                 {
-                    if (state.Heap.Get(href.ObjectId) is not BufferObject buffer)
+                    // Round-2 fix: an OPEN (symbolic-length) buffer has no concrete serialized length —
+                    // using buffer.Length (the seeded prefix) under-approximates the serialized size.
+                    // Route to the fail-closed UnknownSyscall path (return false), matching the
+                    // open-Array/Map guards below.
+                    if (state.Heap.Get(href.ObjectId) is not BufferObject { IsSymbolicOpen: false } buffer)
                     {
                         size = Expr.Int(0);
                         return false;
@@ -1629,7 +1642,9 @@ public sealed partial class SymbolicEngine
                     var heapObject = state.Heap.Get(href.ObjectId);
                     if (heapObject is ArrayObject { IsSymbolicOpen: false } array)
                         return TrySerializedSequenceSizeExpression(state, array.Items, serializedCompounds, operation, valueName, out size);
-                    if (heapObject is StructObject structure)
+                    // Round-2 fix: guard open Structs too (was unguarded, asymmetric with the open-Array
+                    // branch above) so an open Struct routes to the fail-closed UnknownSyscall path.
+                    if (heapObject is StructObject { IsSymbolicOpen: false } structure)
                         return TrySerializedSequenceSizeExpression(state, structure.Fields, serializedCompounds, operation, valueName, out size);
 
                     size = Expr.Int(0);
@@ -2631,7 +2646,11 @@ public sealed partial class SymbolicEngine
                 bytes,
                 new System.Text.Json.JsonDocumentOptions
                 {
-                    MaxDepth = 64,
+                    // Round-2 fix: Neo's StdLib.jsonDeserialize uses max_nest = 10; a deeper input
+                    // faults on-chain. Parse with MaxDepth=10 so over-nested JSON is rejected (the
+                    // exception is caught below and returns false → UnknownSyscall/fault) rather than
+                    // accepted up to depth 64.
+                    MaxDepth = 10,
                     AllowTrailingCommas = false,
                     CommentHandling = System.Text.Json.JsonCommentHandling.Disallow,
                 });
@@ -2912,6 +2931,12 @@ public sealed partial class SymbolicEngine
                 return true;
 
             case IntConst integer:
+                // Round-2 fix: Neo's StdLib.jsonSerialize faults (InvalidOperationException) on an
+                // integer outside JavaScript's safe range [-(2^53-1), 2^53-1] (MAX_SAFE_INTEGER), so
+                // the serialized JSON round-trips losslessly. Mirror that fault rather than emitting an
+                // out-of-range number a real node would reject.
+                if (integer.Value > JsonMaxSafeInteger || integer.Value < -JsonMaxSafeInteger)
+                    throw new VmFaultException("StdLib.jsonSerialize integer exceeds the JSON safe-integer range");
                 writer.WriteRawValue(
                     integer.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     skipInputValidation: true);
@@ -3205,6 +3230,11 @@ public sealed partial class SymbolicEngine
             case HeapRef { RefSort: Sort.Buffer } href:
                 {
                     var buffer = state.Heap.Get<BufferObject>(href.ObjectId);
+                    // Round-2 fix: an OPEN buffer's true length is unknown; serializing only the seeded
+                    // prefix cells (which can be empty) emits a wrong-length serialization. Fail closed
+                    // (UnknownSyscall) for open buffers.
+                    if (buffer.IsSymbolicOpen)
+                        return false;
                     var bufferBytes = new byte[buffer.Cells.Count];
                     for (int i = 0; i < buffer.Cells.Count; i++)
                     {
@@ -7534,7 +7564,10 @@ public sealed partial class SymbolicEngine
 
         EnforceStdLibMaxLength("StdLib.strLen", "value", bytes);
         string text = DecodeStrictUtf8OrThrow(bytes, "StdLib.strLen", "value");
-        result = SymbolicValue.Int(text.EnumerateRunes().Count());
+        // Round-2 fix: Neo's StdLib.strLen counts grapheme/text-elements (StringInfo), not Unicode
+        // runes. They differ for combining marks and ZWJ emoji sequences (e.g. a base char + combining
+        // mark is 2 runes but 1 text element). Mirror Neo exactly.
+        result = SymbolicValue.Int(new System.Globalization.StringInfo(text).LengthInTextElements);
         return true;
     }
 
@@ -7698,7 +7731,12 @@ public sealed partial class SymbolicEngine
         if (value.Length == 0)
             return start;
 
-        int lastStart = System.Math.Min(start, memory.Length - value.Length);
+        // Round-2 fix: Neo's backward memorySearch is memory.AsSpan(0, start).LastIndexOf(value),
+        // so a match must lie ENTIRELY within [0, start): i + value.Length <= start. The previous
+        // Math.Min(start, memory.Length - value.Length) allowed a match to extend past the start
+        // window, returning a wrong (too-large) index. When start < value.Length this yields a
+        // negative bound and the loop correctly returns -1.
+        int lastStart = start - value.Length;
         for (int i = lastStart; i >= 0; i--)
         {
             if (memory.AsSpan(i, value.Length).SequenceEqual(value))

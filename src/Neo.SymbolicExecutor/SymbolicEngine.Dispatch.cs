@@ -461,6 +461,17 @@ public sealed partial class SymbolicEngine
     {
         var b = state.Pop();
         var a = state.Pop();
+        // Round-2 fix: NeoVM's relational LT/LE/GT/GE push FALSE (they do not fault) when either
+        // operand is Null. Only these four ops have this behavior — MIN/MAX/NUMEQUAL/NUMNOTEQUAL,
+        // bitwise AND/OR/XOR, and the JMP-comparison branches still fault on Null. Bypass BOTH the
+        // null-operand guard and the integer-input guard (which also throws on Sort.Null) for the Null
+        // case and push the false result via the comparison factory.
+        if ((opName is "LT" or "LE" or "GT" or "GE") && (a.IsConcreteNull || b.IsConcreteNull))
+        {
+            state.Push(SymbolicValue.Of(f(a.Expression, b.Expression), a.Taints.Union(b.Taints)));
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
         EnsureArithmeticOperandNotNull(opName, a);
         EnsureArithmeticOperandNotNull(opName, b);
         EnforceNeoVmIntegerInput(state, inst, opName, a, "left operand");
@@ -691,6 +702,14 @@ public sealed partial class SymbolicEngine
                 var s1 = state.Heap.Objects.TryGetValue(ah.ObjectId, out var o1) ? o1 as StructObject : null;
                 var s2 = state.Heap.Objects.TryGetValue(bh.ObjectId, out var o2) ? o2 as StructObject : null;
                 if (s1 is null || s2 is null) return BoolConst.False;
+                // Round-2 fix: deep equality over an OPEN (unknown-length) struct can only compare the
+                // seeded prefix; the unknown tail/length is ignored. Reporting prefix-equality as the
+                // result is unsound — the NOTEQUAL/not-equal branch silently prunes "structs differ
+                // only in the unknown tail" states. Terminate as a modeling limit so the verdict
+                // downgrades, consistent with the round-1 open-collection opcode treatment. The check
+                // is per struct-pair inside the recursion, so it also covers nested open structs.
+                if (s1.IsSymbolicOpen || s2.IsSymbolicOpen)
+                    throw new ModelingLimitException("EQUAL deep struct equality over open symbolic Struct of unknown length not modeled");
                 if (s1.Fields.Count != s2.Fields.Count) return BoolConst.False;
                 Expression acc = BoolConst.True;
                 for (int i = 0; i < s1.Fields.Count; i++)

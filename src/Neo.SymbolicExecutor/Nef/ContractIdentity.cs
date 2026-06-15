@@ -76,9 +76,13 @@ public static class ContractIdentity
         var script = new List<byte>(64 + Encoding.UTF8.GetByteCount(manifestName));
         script.Add((byte)NeoVm.OpCode.ABORT);
 
-        byte[] senderBigEndian = deploySenderLittleEndian.ToArray();
-        Array.Reverse(senderBigEndian);
-        EmitPushBytes(script, senderBigEndian);
+        // Round-2 fix: Neo's Helper.GetContractHash emits the deploy sender via EmitPush(sender),
+        // which pushes sender.ToArray() — the UInt160 little-endian wire bytes — AS-IS. The previous
+        // Array.Reverse(...) pushed big-endian bytes, producing a different (wrong) contract hash for
+        // any non-palindromic sender. Push the little-endian bytes unchanged. (Verified against real
+        // Neo 3.9.0: sender 0011..2233, checksum 0x12345678, name "MyContract" =>
+        // 0x02e14ed6f01f22151aa90334f7651fd3b262b322.)
+        EmitPushBytes(script, deploySenderLittleEndian);
         EmitPushInteger(script, new BigInteger(nefChecksum));
         EmitPushBytes(script, Encoding.UTF8.GetBytes(manifestName));
         return script.ToArray();

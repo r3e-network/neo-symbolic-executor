@@ -48,8 +48,19 @@ public sealed class OracleResponseValidationDetector : BaseDetector
             .ToList();
         if (callbacks.Count == 0) yield break;
 
+        // Round-2 fix (#21): a manifest-level reference to the Oracle native (a permission or trust
+        // entry naming the Oracle native hash) is corroborating evidence that a structurally-shaped
+        // method really is an oracle callback. Computed once per manifest.
+        bool manifestReferencesOracle = ManifestReferencesOracle(context.Manifest);
+
         foreach (var method in callbacks)
         {
+            // Round-2 fix (#21): a NAME match (canonical/permissive) is a strong oracle signal on
+            // its own. A method matched only by the bare parameter shape (String, Any, Integer, *) is
+            // a weak signal — that shape is common to many non-oracle methods — so the HIGH
+            // forged-caller assertion must NOT fire on shape alone.
+            bool strongNameSignal = HasStrongOracleNameSignal(method);
+
             string codeSym = ProtocolRiskHelpers.MethodArgSymbolName(method, index: 2, defaultIfMissing: "arg2");
             foreach (var state in context.States)
             {
@@ -84,19 +95,119 @@ public sealed class OracleResponseValidationDetector : BaseDetector
                 // Oracle native hash on this path.
                 if (!VerifiesOracleCaller(state))
                 {
-                    yield return MakeFinding(
-                        title: $"Oracle callback `{method.Name}` consumes response without verifying the Oracle caller",
-                        description: $"`{method.Name}` reaches a storage write at 0x{firstWrite:X4} without checking "
-                                   + "that Runtime.CallingScriptHash equals the Oracle native contract. Any contract "
-                                   + "can invoke this method directly and supply attacker-chosen result/code values. "
-                                   + "Require `Runtime.CallingScriptHash == Oracle.Hash` before consuming `result`.",
-                        offset: firstWrite,
-                        severity: Severity.High,
-                        state: state,
-                        tags: new[] { "oracle", "forged-caller", "missing-auth" });
+                    // Round-2 fix (#21): only assert the HIGH forged-caller finding when there is a
+                    // STRONGER oracle signal than the bare type-shape: a canonical/permissive NAME
+                    // match, OR (shape-match AND additional evidence — the manifest references the
+                    // Oracle native, or this path calls the Oracle native). A bare-shape-only match
+                    // with no corroborating evidence is downgraded to a Low advisory with its own tag
+                    // so genuine oracle callbacks are still caught while common non-oracle methods
+                    // sharing the (String, Any, Integer, *) shape no longer trigger a HIGH false
+                    // positive.
+                    bool strongOracleSignal =
+                        strongNameSignal
+                        || manifestReferencesOracle
+                        || StateCallsOracleNative(state);
+
+                    if (strongOracleSignal)
+                    {
+                        yield return MakeFinding(
+                            title: $"Oracle callback `{method.Name}` consumes response without verifying the Oracle caller",
+                            description: $"`{method.Name}` reaches a storage write at 0x{firstWrite:X4} without checking "
+                                       + "that Runtime.CallingScriptHash equals the Oracle native contract. Any contract "
+                                       + "can invoke this method directly and supply attacker-chosen result/code values. "
+                                       + "Require `Runtime.CallingScriptHash == Oracle.Hash` before consuming `result`.",
+                            offset: firstWrite,
+                            severity: Severity.High,
+                            state: state,
+                            tags: new[] { "oracle", "forged-caller", "missing-auth" });
+                    }
+                    else
+                    {
+                        yield return MakeFinding(
+                            title: $"Method `{method.Name}` matches the Oracle callback shape but lacks an Oracle-caller check",
+                            description: $"`{method.Name}` matches the Oracle callback parameter shape "
+                                       + "(String, Any, Integer, *) and reaches a storage write at "
+                                       + $"0x{firstWrite:X4} without verifying Runtime.CallingScriptHash == Oracle. "
+                                       + "No stronger oracle signal (canonical name, Oracle permission/trust, or a "
+                                       + "call to the Oracle native) is present, so this is reported as a "
+                                       + "low-confidence advisory: IF this is an oracle callback, add the caller check; "
+                                       + "otherwise it is likely a false positive from the shared parameter shape.",
+                            offset: firstWrite,
+                            severity: Severity.Low,
+                            state: state,
+                            tags: new[] { "oracle", "forged-caller-advisory", "shape-only" });
+                    }
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Round-2 fix (#21): true iff the method name itself is a strong oracle-callback signal —
+    /// the canonical <c>onOracleResponse</c> (case-insensitive) or a permissive name containing
+    /// both an "oracle" token and a "response"/"callback" token. Distinct from the bare structural
+    /// shape, which is a weak signal common to non-oracle methods.
+    /// </summary>
+    private static bool HasStrongOracleNameSignal(Nef.ContractMethodDescriptor m)
+    {
+        string n = m.Name.ToLowerInvariant();
+        return n == "onoracleresponse"
+            || (n.Contains("oracle") && (n.Contains("response") || n.Contains("callback")));
+    }
+
+    /// <summary>
+    /// Round-2 fix (#21): true iff the manifest declares a permission or trust entry naming the
+    /// Oracle native contract (or a wildcard that subsumes it). Corroborating evidence that a
+    /// structurally-shaped handler is a genuine oracle callback rather than a shape coincidence.
+    /// </summary>
+    private static bool ManifestReferencesOracle(Nef.ContractManifest? manifest)
+    {
+        if (manifest is null) return false;
+        if (manifest.Permissions.Any(p => p.Contract == "*" || IsOracleHashString(p.Contract)))
+            return true;
+        if (manifest.Trusts.IsWildcard)
+            return true;
+        return manifest.Trusts.Items.Any(IsOracleHashString);
+    }
+
+    /// <summary>
+    /// Round-2 fix (#21): true iff this path makes an external call whose concrete target hash is the
+    /// Oracle native contract — i.e. the contract actually talks to the Oracle native, strong
+    /// evidence that a shaped handler participates in the oracle flow.
+    /// </summary>
+    private static bool StateCallsOracleNative(ExecutionState state) =>
+        state.Telemetry.ExternalCalls.Any(call =>
+            call.TargetHash?.AsConcreteBytes() is { Length: NeoNativeContractHashes.HashLength } bytes
+            && bytes.AsSpan().SequenceEqual(OracleContractHash));
+
+    /// <summary>
+    /// Round-2 fix (#21): true iff a manifest permission/trust string denotes the Oracle native
+    /// hash. Manifest hash strings are conventionally <c>0x</c>-prefixed big-endian; the native hash
+    /// constant is stored little-endian, so we normalize (strip <c>0x</c>, lowercase) and compare
+    /// against both the little-endian and reversed (big-endian) hex forms.
+    /// </summary>
+    private static bool IsOracleHashString(string contract)
+    {
+        if (string.IsNullOrEmpty(contract)) return false;
+        string normalized = contract.StartsWith("0x", System.StringComparison.OrdinalIgnoreCase)
+            ? contract[2..]
+            : contract;
+        normalized = normalized.ToLowerInvariant();
+        return string.Equals(normalized, OracleHashLittleEndianHex, System.StringComparison.Ordinal)
+            || string.Equals(normalized, OracleHashBigEndianHex, System.StringComparison.Ordinal);
+    }
+
+    private static readonly string OracleHashLittleEndianHex =
+        System.Convert.ToHexString(OracleContractHash).ToLowerInvariant();
+
+    private static readonly string OracleHashBigEndianHex =
+        System.Convert.ToHexString(ReverseBytes(OracleContractHash)).ToLowerInvariant();
+
+    private static byte[] ReverseBytes(byte[] input)
+    {
+        var copy = (byte[])input.Clone();
+        System.Array.Reverse(copy);
+        return copy;
     }
 
     private static bool IsOracleCallback(Nef.ContractMethodDescriptor m)
