@@ -107,13 +107,11 @@ public sealed partial class SymbolicEngine
         if (!IsValidArrayCellType(typeByte))
             throw new VmFaultException($"NEWARRAY_T with invalid cell type 0x{typeByte:X2}");
         var n = state.Pop();
-        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "NEWARRAY_T requires concrete size (no SMT model)"); return Single(state); }
-        if (sz < 0 || sz > _options.MaxCollectionSize)
-            throw new VmFaultException($"NEWARRAY_T size {sz} out of range");
-        var fill = new List<SymbolicValue>((int)sz.Value);
+        var size = ResolveConcreteCollectionSize(state, n, "NEWARRAY_T");
+        if (size is null) { state.Terminate(TerminalStatus.Stopped, "NEWARRAY_T requires concrete size (no SMT model)"); return Single(state); }
+        var fill = new List<SymbolicValue>(size.Value);
         var defaultValue = DefaultForType(typeByte);
-        for (int i = 0; i < sz.Value; i++) fill.Add(defaultValue);
+        for (int i = 0; i < size.Value; i++) fill.Add(defaultValue);
         var arr = state.Heap.NewArray(fill);
         state.Push(SymbolicValue.HeapRef(Sort.Array, arr.Id));
         state.Pc = inst.EndOffset;
@@ -144,15 +142,34 @@ public sealed partial class SymbolicEngine
 
     private enum CompoundKind { Array, Struct }
 
+    /// <summary>
+    /// Resolve a concrete collection size for NEWARRAY/NEWSTRUCT/NEWARRAY_T/PACK, distinguishing
+    /// NeoVM's real limit from the analyzer's materialization budget. NeoVM faults only when the size
+    /// is negative or exceeds the reference-counted stack limit (MaxStackSize); a size within that
+    /// limit but above the analyzer's MaxCollectionSize budget would SUCCEED on the real VM, so it is a
+    /// modeling limit (CoverageIncomplete), NOT a fault. Returns null when the size cannot be
+    /// concretized (caller terminates Stopped). Round-3 audit fix: the prior `> MaxCollectionSize`
+    /// fault pruned feasible paths for sizes 513..2048 that NeoVM accepts.
+    /// </summary>
+    private int? ResolveConcreteCollectionSize(ExecutionState state, SymbolicValue n, string opName)
+    {
+        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
+        if (sz is null) return null;
+        if (sz < 0 || sz > _options.MaxStackSize)
+            throw new VmFaultException($"{opName} size {sz} is outside NeoVM's [0, {_options.MaxStackSize}] range");
+        if (sz > _options.MaxCollectionSize)
+            throw new ModelingLimitException(
+                $"{opName} size {sz} exceeds the analyzer materialization budget {_options.MaxCollectionSize} (NeoVM allows up to {_options.MaxStackSize})");
+        return (int)sz.Value;
+    }
+
     private IEnumerable<ExecutionState> NewSized(ExecutionState state, Instruction inst, CompoundKind kind)
     {
         var n = state.Pop();
-        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
         string opName = inst.OpCode.ToString();
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, $"{opName} requires concrete size (no SMT model)"); return Single(state); }
-        if (sz < 0 || sz > _options.MaxCollectionSize)
-            throw new VmFaultException($"{opName} size {sz} out of range");
-        var fill = Enumerable.Repeat(SymbolicValue.Null(), (int)sz.Value);
+        var size = ResolveConcreteCollectionSize(state, n, opName);
+        if (size is null) { state.Terminate(TerminalStatus.Stopped, $"{opName} requires concrete size (no SMT model)"); return Single(state); }
+        var fill = Enumerable.Repeat(SymbolicValue.Null(), size.Value);
         switch (kind)
         {
             case CompoundKind.Array:
@@ -173,11 +190,9 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> PackArrayOrStructOrMap(ExecutionState state, Instruction inst, PackMode mode)
     {
         var n = state.Pop();
-        var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxCollectionSize);
-        if (sz is null) { state.Terminate(TerminalStatus.Stopped, "PACK requires concrete size (no SMT model)"); return Single(state); }
-        if (sz < 0 || sz > _options.MaxCollectionSize)
-            throw new VmFaultException($"PACK size {sz} out of range");
-        int count = (int)sz.Value;
+        var size = ResolveConcreteCollectionSize(state, n, "PACK");
+        if (size is null) { state.Terminate(TerminalStatus.Stopped, "PACK requires concrete size (no SMT model)"); return Single(state); }
+        int count = size.Value;
         state.Heap.EnforceCollectionGrowth(count);
         switch (mode)
         {
