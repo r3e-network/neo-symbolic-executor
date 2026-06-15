@@ -9,52 +9,55 @@ namespace Neo.SymbolicExecutor;
 /// <summary>
 /// Telemetry collected per-state during symbolic exploration. Detectors consume these fields.
 ///
-/// All collections are mutable lists/dicts owned by the state. <see cref="Clone"/> performs a
-/// deep copy so cloned states do not alias each other (audit C1, C6 lessons).
+/// Collections holding IMMUTABLE elements (records, ints, strings) are <see cref="CowList{T}"/> /
+/// <see cref="CowSet{T}"/>: <see cref="Clone"/> forks them in O(1) and the backing storage is copied
+/// only on the first write after a fork (audit C1, C6: cloned states must never alias each other's
+/// writes — the copy-before-write discipline guarantees this). <see cref="ExternalCalls"/> holds MUTABLE
+/// <see cref="ExternalCall"/> objects (their fields are set in place), so it is still eagerly deep-copied.
 /// </summary>
 public sealed class Telemetry
 {
-    public List<StorageOp> StorageOps { get; } = new();
+    public CowList<StorageOp> StorageOps { get; private set; } = new();
     public List<ExternalCall> ExternalCalls { get; } = new();
-    public ArithmeticOpCollection ArithmeticOps { get; } = new();
-    public FaultConditionCollection FaultConditions { get; } = new();
-    public List<int> WitnessChecks { get; } = new();
-    public List<WitnessCheckOp> WitnessCheckOps { get; } = new();
-    public HashSet<int> WitnessChecksEnforced { get; } = new();
-    public HashSet<string> WitnessCheckResultsEnforced { get; } = new();
-    public List<int> CallerHashChecks { get; } = new();
-    public List<CallerHashCheckOp> CallerHashCheckOps { get; } = new();
-    public List<int> SignatureChecks { get; } = new();
-    public List<SignatureCheckOp> SignatureCheckOps { get; } = new();
-    public HashSet<int> SignatureChecksEnforced { get; } = new();
-    public HashSet<string> SignatureCheckResultsEnforced { get; } = new();
-    public List<int> TimeAccesses { get; } = new();
-    public List<int> RandomnessAccesses { get; } = new();
-    public List<int> EventsEmitted { get; } = new();
-    public List<RuntimeNotification> Notifications { get; } = new();
-    public List<ContractExistenceQuery> ContractExistenceQueries { get; } = new();
+    public ArithmeticOpCollection ArithmeticOps { get; private set; } = new();
+    public FaultConditionCollection FaultConditions { get; private set; } = new();
+    public CowList<int> WitnessChecks { get; private set; } = new();
+    public CowList<WitnessCheckOp> WitnessCheckOps { get; private set; } = new();
+    public CowSet<int> WitnessChecksEnforced { get; private set; } = new();
+    public CowSet<string> WitnessCheckResultsEnforced { get; private set; } = new();
+    public CowList<int> CallerHashChecks { get; private set; } = new();
+    public CowList<CallerHashCheckOp> CallerHashCheckOps { get; private set; } = new();
+    public CowList<int> SignatureChecks { get; private set; } = new();
+    public CowList<SignatureCheckOp> SignatureCheckOps { get; private set; } = new();
+    public CowSet<int> SignatureChecksEnforced { get; private set; } = new();
+    public CowSet<string> SignatureCheckResultsEnforced { get; private set; } = new();
+    public CowList<int> TimeAccesses { get; private set; } = new();
+    public CowList<int> RandomnessAccesses { get; private set; } = new();
+    public CowList<int> EventsEmitted { get; private set; } = new();
+    public CowList<RuntimeNotification> Notifications { get; private set; } = new();
+    public CowList<ContractExistenceQuery> ContractExistenceQueries { get; private set; } = new();
     /// <summary>
     /// Set of back-edge target offsets — populated at JMP*/branch sites when the resolved target
     /// is a lower offset than the current PC. Each entry is a *loop-header offset*, not the
     /// jumping instruction.
     /// </summary>
-    public HashSet<int> LoopsDetected { get; } = new();
+    public CowSet<int> LoopsDetected { get; private set; } = new();
     /// <summary>
     /// Set of PCs where the per-offset visit cap fired. Distinct from <see cref="LoopsDetected"/>
     /// because a cap-hit PC is not necessarily a back-edge target — any opcode revisited beyond
     /// the cap (e.g. an unrolled tight switch tail) ends up here. The DOS detector consumes both
     /// as evidence of a loop-shaped truncation.
     /// </summary>
-    public HashSet<int> VisitCapsHit { get; } = new();
-    public HashSet<int> IteratorLoops { get; } = new();
-    public List<int> ExceptionsThrown { get; } = new();
-    public List<int> UnknownSyscalls { get; } = new();
-    public List<int> UnknownOpcodes { get; } = new();
+    public CowSet<int> VisitCapsHit { get; private set; } = new();
+    public CowSet<int> IteratorLoops { get; private set; } = new();
+    public CowList<int> ExceptionsThrown { get; private set; } = new();
+    public CowList<int> UnknownSyscalls { get; private set; } = new();
+    public CowList<int> UnknownOpcodes { get; private set; } = new();
     public int MaxCallStackDepth { get; set; }
     public long GasCost { get; set; }
     public bool Truncated { get; set; }
     public bool ReentrancyGuard { get; set; }
-    public HashSet<int> SmtUnknownOffsets { get; } = new();
+    public CowSet<int> SmtUnknownOffsets { get; private set; } = new();
     public int SmtPrunedBranches { get; set; }
     public int SmtConcretizations { get; set; }
 
@@ -66,39 +69,45 @@ public sealed class Telemetry
 
     public Telemetry Clone()
     {
-        var copy = new Telemetry();
-        copy.StorageOps.AddRange(StorageOps);
+        var copy = new Telemetry
+        {
+            // Copy-on-write fork: O(1), the backing storage is copied only on the first write in either
+            // state. Sound because every element here is immutable.
+            StorageOps = StorageOps.Fork(),
+            ArithmeticOps = ArithmeticOps.Fork(),
+            FaultConditions = FaultConditions.Fork(),
+            WitnessChecks = WitnessChecks.Fork(),
+            WitnessCheckOps = WitnessCheckOps.Fork(),
+            WitnessChecksEnforced = WitnessChecksEnforced.Fork(),
+            WitnessCheckResultsEnforced = WitnessCheckResultsEnforced.Fork(),
+            CallerHashChecks = CallerHashChecks.Fork(),
+            CallerHashCheckOps = CallerHashCheckOps.Fork(),
+            SignatureChecks = SignatureChecks.Fork(),
+            SignatureCheckOps = SignatureCheckOps.Fork(),
+            SignatureChecksEnforced = SignatureChecksEnforced.Fork(),
+            SignatureCheckResultsEnforced = SignatureCheckResultsEnforced.Fork(),
+            TimeAccesses = TimeAccesses.Fork(),
+            RandomnessAccesses = RandomnessAccesses.Fork(),
+            EventsEmitted = EventsEmitted.Fork(),
+            Notifications = Notifications.Fork(),
+            ContractExistenceQueries = ContractExistenceQueries.Fork(),
+            LoopsDetected = LoopsDetected.Fork(),
+            VisitCapsHit = VisitCapsHit.Fork(),
+            IteratorLoops = IteratorLoops.Fork(),
+            ExceptionsThrown = ExceptionsThrown.Fork(),
+            UnknownSyscalls = UnknownSyscalls.Fork(),
+            UnknownOpcodes = UnknownOpcodes.Fork(),
+            SmtUnknownOffsets = SmtUnknownOffsets.Fork(),
+            MaxCallStackDepth = MaxCallStackDepth,
+            GasCost = GasCost,
+            Truncated = Truncated,
+            ReentrancyGuard = ReentrancyGuard,
+            SmtPrunedBranches = SmtPrunedBranches,
+            SmtConcretizations = SmtConcretizations,
+        };
+        // ExternalCall objects are mutated in place (ReturnChecked, Method, …) after recording, so the
+        // list cannot be COW-shared — deep-copy each entry as before.
         copy.ExternalCalls.AddRange(ExternalCalls.Select(c => c.Clone()));
-        copy.ArithmeticOps.AddRange(ArithmeticOps);
-        copy.FaultConditions.AddRange(FaultConditions);
-        copy.WitnessChecks.AddRange(WitnessChecks);
-        copy.WitnessCheckOps.AddRange(WitnessCheckOps);
-        foreach (var w in WitnessChecksEnforced) copy.WitnessChecksEnforced.Add(w);
-        foreach (var w in WitnessCheckResultsEnforced) copy.WitnessCheckResultsEnforced.Add(w);
-        copy.CallerHashChecks.AddRange(CallerHashChecks);
-        copy.CallerHashCheckOps.AddRange(CallerHashCheckOps);
-        copy.SignatureChecks.AddRange(SignatureChecks);
-        copy.SignatureCheckOps.AddRange(SignatureCheckOps);
-        foreach (var s in SignatureChecksEnforced) copy.SignatureChecksEnforced.Add(s);
-        foreach (var s in SignatureCheckResultsEnforced) copy.SignatureCheckResultsEnforced.Add(s);
-        copy.TimeAccesses.AddRange(TimeAccesses);
-        copy.RandomnessAccesses.AddRange(RandomnessAccesses);
-        copy.EventsEmitted.AddRange(EventsEmitted);
-        copy.Notifications.AddRange(Notifications);
-        copy.ContractExistenceQueries.AddRange(ContractExistenceQueries);
-        foreach (var l in LoopsDetected) copy.LoopsDetected.Add(l);
-        foreach (var v in VisitCapsHit) copy.VisitCapsHit.Add(v);
-        foreach (var l in IteratorLoops) copy.IteratorLoops.Add(l);
-        copy.ExceptionsThrown.AddRange(ExceptionsThrown);
-        copy.UnknownSyscalls.AddRange(UnknownSyscalls);
-        copy.UnknownOpcodes.AddRange(UnknownOpcodes);
-        copy.MaxCallStackDepth = MaxCallStackDepth;
-        copy.GasCost = GasCost;
-        copy.Truncated = Truncated;
-        copy.ReentrancyGuard = ReentrancyGuard;
-        foreach (var off in SmtUnknownOffsets) copy.SmtUnknownOffsets.Add(off);
-        copy.SmtPrunedBranches = SmtPrunedBranches;
-        copy.SmtConcretizations = SmtConcretizations;
         return copy;
     }
 
@@ -111,10 +120,24 @@ public sealed class Telemetry
         || (SignatureCheckResultsEnforced.Count == 0 && SignatureChecksEnforced.Contains(op.Offset));
 }
 
+/// <summary>
+/// Fault-condition list with two extra responsibilities over a plain <see cref="CowList{T}"/>: it stamps
+/// each added op with the current path-condition snapshot, and it is copy-on-write so a state fork shares
+/// the backing storage until the first subsequent write (see <see cref="Telemetry"/>).
+/// </summary>
 public sealed class FaultConditionCollection : IReadOnlyList<FaultConditionOp>
 {
-    private readonly List<FaultConditionOp> items = new();
+    private List<FaultConditionOp> items;
+    private bool shared;
     private Func<ImmutableArray<Expression>> currentPathSnapshot = static () => ImmutableArray<Expression>.Empty;
+
+    public FaultConditionCollection() => items = new List<FaultConditionOp>();
+
+    private FaultConditionCollection(List<FaultConditionOp> items)
+    {
+        this.items = items;
+        shared = true;
+    }
 
     public int Count => items.Count;
 
@@ -123,10 +146,27 @@ public sealed class FaultConditionCollection : IReadOnlyList<FaultConditionOp>
     internal void BindPathConditions(Func<ImmutableArray<Expression>> snapshot) =>
         currentPathSnapshot = snapshot;
 
+    /// <summary>Fork sharing the backing list; both sides copy before their next write.</summary>
+    public FaultConditionCollection Fork()
+    {
+        shared = true;
+        return new FaultConditionCollection(items);
+    }
+
+    private void EnsureWritable()
+    {
+        if (shared)
+        {
+            items = new List<FaultConditionOp>(items);
+            shared = false;
+        }
+    }
+
     public void Add(FaultConditionOp item)
     {
         if (item.PathConditions.IsDefault)
             item = item with { PathConditions = currentPathSnapshot() };
+        EnsureWritable();
         items.Add(item);
     }
 
@@ -141,10 +181,23 @@ public sealed class FaultConditionCollection : IReadOnlyList<FaultConditionOp>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
+/// <summary>
+/// Arithmetic-op list, the path-condition-stamping copy-on-write sibling of
+/// <see cref="FaultConditionCollection"/>.
+/// </summary>
 public sealed class ArithmeticOpCollection : IReadOnlyList<ArithmeticOp>
 {
-    private readonly List<ArithmeticOp> items = new();
+    private List<ArithmeticOp> items;
+    private bool shared;
     private Func<ImmutableArray<Expression>> currentPathSnapshot = static () => ImmutableArray<Expression>.Empty;
+
+    public ArithmeticOpCollection() => items = new List<ArithmeticOp>();
+
+    private ArithmeticOpCollection(List<ArithmeticOp> items)
+    {
+        this.items = items;
+        shared = true;
+    }
 
     public int Count => items.Count;
 
@@ -153,10 +206,26 @@ public sealed class ArithmeticOpCollection : IReadOnlyList<ArithmeticOp>
     internal void BindPathConditions(Func<ImmutableArray<Expression>> snapshot) =>
         currentPathSnapshot = snapshot;
 
+    public ArithmeticOpCollection Fork()
+    {
+        shared = true;
+        return new ArithmeticOpCollection(items);
+    }
+
+    private void EnsureWritable()
+    {
+        if (shared)
+        {
+            items = new List<ArithmeticOp>(items);
+            shared = false;
+        }
+    }
+
     public void Add(ArithmeticOp item)
     {
         if (item.PathConditions.IsDefault)
             item = item with { PathConditions = currentPathSnapshot() };
+        EnsureWritable();
         items.Add(item);
     }
 

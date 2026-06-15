@@ -246,4 +246,75 @@ public class HeapCloneIsolationTests
         // Calling GetForWrite again returns the already-materialized private copy, not a new one.
         ReferenceEquals(clone.GetForWrite<ArrayObject>(arr.Id), cloneArr).Should().BeTrue();
     }
+
+    // ---- Telemetry copy-on-write isolation (#31). Telemetry.Clone() forks its CowList/CowSet
+    // collections in O(1); the backing storage must be copied on the first write so a parent and clone
+    // never observe each other's appends.
+
+    [Fact]
+    public void TelemetryCowList_AddOnClone_DoesNotAffectParent()
+    {
+        var parent = new Telemetry();
+        parent.StorageOps.Add(new StorageOp(0, StorageOpKind.Get, SymbolicValue.Int(1), null, false, false));
+        var clone = parent.Clone();
+
+        clone.StorageOps.Add(new StorageOp(1, StorageOpKind.Put, SymbolicValue.Int(2), SymbolicValue.Int(3), false, false));
+
+        parent.StorageOps.Count.Should().Be(1);
+        clone.StorageOps.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void TelemetryCowList_AddOnParentAfterClone_DoesNotAffectClone()
+    {
+        var parent = new Telemetry();
+        var clone = parent.Clone();
+
+        parent.UnknownSyscalls.Add(42);
+
+        parent.UnknownSyscalls.Count.Should().Be(1);
+        clone.UnknownSyscalls.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void TelemetryCowSet_AddOnClone_DoesNotAffectParent()
+    {
+        var parent = new Telemetry();
+        parent.LoopsDetected.Add(10);
+        var clone = parent.Clone();
+
+        clone.LoopsDetected.Add(20);
+
+        parent.LoopsDetected.Count.Should().Be(1);
+        parent.LoopsDetected.Contains(20).Should().BeFalse();
+        clone.LoopsDetected.Count.Should().Be(2);
+        clone.LoopsDetected.Contains(20).Should().BeTrue();
+    }
+
+    [Fact]
+    public void TelemetryFaultConditions_AddOnClone_DoesNotAffectParent()
+    {
+        var parent = new Telemetry();
+        parent.FaultConditions.Add(new FaultConditionOp(0, "OP", BoolConst.True, "r", "f"));
+        var clone = parent.Clone();
+
+        clone.FaultConditions.Add(new FaultConditionOp(1, "OP2", BoolConst.True, "r2", "f2"));
+
+        parent.FaultConditions.Count.Should().Be(1);
+        clone.FaultConditions.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void TelemetryExternalCalls_MutateCloneElement_DoesNotAffectParent()
+    {
+        // ExternalCall objects are mutated in place, so the list stays eagerly deep-copied (not COW).
+        var parent = new Telemetry();
+        parent.ExternalCalls.Add(new ExternalCall { Offset = 0, Method = "transfer" });
+        var clone = parent.Clone();
+
+        clone.ExternalCalls[0].ReturnChecked = true;
+
+        parent.ExternalCalls[0].ReturnChecked.Should().BeFalse();
+        clone.ExternalCalls[0].ReturnChecked.Should().BeTrue();
+    }
 }
