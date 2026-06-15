@@ -539,16 +539,10 @@ public sealed partial class SymbolicEngine
         System.Math.Max(0, System.Math.Min(MethodEntryCollectionSeedSize, state.Heap.MaxCollectionSize));
 
     /// <summary>
-    /// Lower bound on NeoVM's <c>ReferenceCounter.Count</c> — the quantity its
-    /// <c>ExecutionEngineLimits.MaxStackSize</c> (2048) actually bounds, asserted in
-    /// <c>PostExecuteInstruction</c>. NeoVM counts the evaluation stack PLUS every static/local/argument
-    /// slot PLUS the compound-type subitems reachable from them (Array/Struct/Map elements). We sum the
-    /// stack and all slots across the call stack; we deliberately omit the compound subitems, which makes
-    /// this a guaranteed lower bound — so a fault here implies NeoVM also faults (never the reverse). The
-    /// residual (an overflow driven purely by nested-collection subitems with no single collection
-    /// exceeding MaxCollectionSize) is bounded by the heap-object (MaxObjects) and collection
-    /// (MaxCollectionSize) budgets, which flag CoverageIncomplete when hit. Counting the slots closes the
-    /// previous gap where slot-driven overflows (the eval stack alone is well under 2048) went unflagged.
+    /// The top-level reference contribution: the evaluation stack plus every static/local/argument slot.
+    /// The full NeoVM reference count (the quantity <c>ExecutionEngineLimits.MaxStackSize</c> = 2048 bounds,
+    /// asserted in <c>PostExecuteInstruction</c>) also includes the subitems of every reachable compound,
+    /// added on top of this base by <see cref="EnforceReferenceCount"/>.
     /// </summary>
     private static int ReferenceLoad(ExecutionState state)
     {
@@ -556,6 +550,99 @@ public sealed partial class SymbolicEngine
         foreach (var frame in state.CallStack)
             load += frame.Locals.Count + frame.Args.Count;
         return load;
+    }
+
+    /// <summary>
+    /// NeoVM's <c>ReferenceCounter.Count</c> (bounded by MaxStackSize = 2048) is the evaluation stack and
+    /// slots PLUS the subitems of every reachable compound, counted once per distinct object via
+    /// <c>AddStackReference</c>: Array/Struct items and Map keys+values (Buffer is not a CompoundType, so its
+    /// cells do not count). <see cref="ReferenceLoad"/> alone misses a subitem-driven overflow (e.g. several
+    /// 512-cell arrays held live, where no single collection exceeds MaxCollectionSize), which NeoVM faults
+    /// on but the engine used to prove fault-free. A cheap all-heap upper bound short-circuits the common
+    /// safe case; only when it exceeds the limit do we walk the reachable object graph to count precisely.
+    /// A concrete over-limit count faults; a reachable OPEN (unknown-length) collection that could push the
+    /// total past the limit routes to a modeling limit (CoverageIncomplete) — never a false fault.
+    /// </summary>
+    private void EnforceReferenceCount(ExecutionState state)
+    {
+        int baseLoad = ReferenceLoad(state);
+        if (baseLoad > _options.MaxStackSize)
+            throw new VmFaultException("evaluation stack overflow");
+
+        long upper = baseLoad;
+        foreach (var obj in state.Heap.Objects.Values)
+            upper += CompoundSubitemCount(obj);
+        if (upper <= _options.MaxStackSize)
+            return;
+
+        var (count, sawOpen) = ReachableReferenceCount(state, _options.MaxStackSize);
+        if (count > _options.MaxStackSize)
+            throw new VmFaultException(
+                $"reference count {count} exceeds NeoVM MaxStackSize {_options.MaxStackSize}");
+        if (sawOpen)
+            throw new ModelingLimitException(
+                "a reachable open symbolic collection may push the reference count past NeoVM MaxStackSize");
+    }
+
+    private static int CompoundSubitemCount(HeapObject obj) => obj switch
+    {
+        StructObject s => s.Fields.Count,    // Struct : Array, subitems are its fields
+        ArrayObject a => a.Items.Count,
+        MapObject m => m.Entries.Count * 2,  // NeoVM Map.SubItems = Keys.Concat(Values)
+        _ => 0,                              // Buffer is not a CompoundType
+    };
+
+    /// <summary>
+    /// Precise NeoVM reference count: the top-level <see cref="ReferenceLoad"/> plus the subitems of every
+    /// compound reachable from the stack/slot roots, each distinct object counted once (matching
+    /// AddStackReference's tracked-set dedup). Stops early once <paramref name="cap"/> is exceeded.
+    /// <c>SawOpen</c> is set when a reachable collection has unknown (symbolic-open) length, so its true
+    /// subitem count may exceed the seeded prefix counted here.
+    /// </summary>
+    private static (int Count, bool SawOpen) ReachableReferenceCount(ExecutionState state, int cap)
+    {
+        int count = ReferenceLoad(state);
+        bool sawOpen = false;
+        var visited = new HashSet<int>();
+        var queue = new Queue<int>();
+        void Enqueue(IEnumerable<SymbolicValue?> items)
+        {
+            foreach (var v in items)
+                if (v?.Expression is HeapRef href)
+                    queue.Enqueue(href.ObjectId);
+        }
+        Enqueue(state.EvaluationStack);
+        Enqueue(state.StaticFields);
+        foreach (var frame in state.CallStack)
+        {
+            Enqueue(frame.Locals);
+            Enqueue(frame.Args);
+        }
+        while (queue.Count > 0 && count <= cap)
+        {
+            int id = queue.Dequeue();
+            if (!visited.Add(id)) continue;
+            if (!state.Heap.Objects.TryGetValue(id, out var obj)) continue;
+            switch (obj)
+            {
+                case StructObject s:
+                    count += s.Fields.Count;
+                    if (s.IsSymbolicOpen) sawOpen = true;
+                    Enqueue(s.Fields);
+                    break;
+                case ArrayObject a:
+                    count += a.Items.Count;
+                    if (a.IsSymbolicOpen) sawOpen = true;
+                    Enqueue(a.Items);
+                    break;
+                case MapObject m:
+                    count += m.Entries.Count * 2;
+                    if (m.IsSymbolicOpen) sawOpen = true;
+                    Enqueue(m.Entries.Select(e => e.Value));
+                    break;
+            }
+        }
+        return (count, sawOpen);
     }
 
     private IEnumerable<ExecutionState> StepBounded(ExecutionState state)
@@ -571,8 +658,7 @@ public sealed partial class SymbolicEngine
         state.Steps++;
         _stepsExecuted++;
 
-        if (ReferenceLoad(state) > _options.MaxStackSize)
-            throw new VmFaultException("evaluation stack overflow");
+        EnforceReferenceCount(state);
 
         if (!state.VisitCounts.TryGetValue(state.Pc, out int visits)) visits = 0;
         if (visits >= _options.MaxVisitsPerOffset)

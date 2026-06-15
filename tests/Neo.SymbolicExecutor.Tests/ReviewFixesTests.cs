@@ -1557,6 +1557,42 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_ReferenceCountIncludesReachableSubitems()
+    {
+        // NeoVM counts compound subitems toward MaxStackSize. Two 3-element arrays held on the stack =
+        // 2 array refs + 6 cells = 8 references; a limit of 7 overflows, even though the eval stack (2) and
+        // each array (3) are individually under the limit. The prior stack+slots-only count missed this.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH3, (byte)NeoVm.OpCode.NEWARRAY,
+            (byte)NeoVm.OpCode.PUSH3, (byte)NeoVm.OpCode.NEWARRAY,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(
+            ScriptDecoder.Decode(script),
+            new ExecutionOptions { MaxStackSize = 7 }).Run();
+        result.Faulted.Should().ContainSingle()
+            .Which.TerminationReason.Should().Contain("reference count");
+    }
+
+    [Fact]
+    public void Engine_ReferenceCountWithinLimitIncludingSubitemsDoesNotFault()
+    {
+        // Same shape, limit 8 = exactly the reference count: NeoVM faults only when Count > limit, so no fault.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH3, (byte)NeoVm.OpCode.NEWARRAY,
+            (byte)NeoVm.OpCode.PUSH3, (byte)NeoVm.OpCode.NEWARRAY,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(
+            ScriptDecoder.Decode(script),
+            new ExecutionOptions { MaxStackSize = 8 }).Run();
+        result.Faulted.Should().BeEmpty();
+        result.Halted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Engine_StackWithinLimitIncludingSlotsDoesNotFault()
     {
         // 3 stack items + 3 static slots (=6) is within a limit of 8 — no overflow.
