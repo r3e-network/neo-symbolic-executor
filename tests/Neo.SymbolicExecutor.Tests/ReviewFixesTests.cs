@@ -1180,6 +1180,37 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_StoragePutAliasesPossiblyEqualCachedKey()
+    {
+        // Round-3 audit fix (#16): caching a Get of k1, then Put-ing a structurally-different but
+        // possibly-runtime-equal key k2, must make a later Get(k1) conditional on k1 == k2 instead of
+        // returning the stale cached value. The re-read therefore yields an ite(k1==k2, putValue, old).
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.INITSLOT, (byte)0x00, (byte)0x02 },
+            Syscall("System.Storage.GetContext"), new[] { (byte)NeoVm.OpCode.LDARG0 },
+            Syscall("System.Storage.Get"), new[] { (byte)NeoVm.OpCode.DROP },
+            Syscall("System.Storage.GetContext"),
+            new[] { (byte)NeoVm.OpCode.LDARG1, (byte)NeoVm.OpCode.PUSHDATA1, (byte)0x01, (byte)0x2A },
+            Syscall("System.Storage.Put"),
+            Syscall("System.Storage.GetContext"), new[] { (byte)NeoVm.OpCode.LDARG0 },
+            Syscall("System.Storage.Get"),
+            new[] { (byte)NeoVm.OpCode.RET });
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[]
+        {
+            new ContractParameterDefinition("k1", "ByteArray"),
+            new ContractParameterDefinition("k2", "ByteArray"),
+        });
+        var result = engine.Run(entry);
+        result.Halted.Should().NotBeEmpty();
+        // The storage-exists state rewrites the cached k1 entry to ite(k1 == k2, putValue, oldValue);
+        // the not-exists state (cached Null) takes the sound invalidation fallback. So at least one
+        // halted state reflects the write conditionally instead of returning the stale cached value.
+        result.Halted.Any(s => s.EvaluationStack.Single().Expression is TernaryExpr { Op: "ite" })
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void Engine_ByteString32BytesAsBooleanIsOk()
     {
         // 32 bytes is within the GetBoolean limit, so no fault.

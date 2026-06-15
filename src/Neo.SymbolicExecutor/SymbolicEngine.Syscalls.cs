@@ -439,7 +439,7 @@ public sealed partial class SymbolicEngine
                     state.Telemetry.StorageOps.Add(new StorageOp(inst.Offset, StorageOpKind.Put, normalizedKey, value,
                         ContextDynamic: contextDynamic, ContextReadOnly: false));
                     if (!contextDynamic)
-                        state.StorageValues[normalizedKey.Expression] = storedValue;
+                        WriteStorageValueAliasing(state, normalizedKey.Expression, storedValue);
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
@@ -453,7 +453,7 @@ public sealed partial class SymbolicEngine
                     var storedValue = NormalizeStorageBytes(state, value);
                     state.Telemetry.StorageOps.Add(new StorageOp(inst.Offset, StorageOpKind.Put, normalizedKey, value,
                         ContextDynamic: false, ContextReadOnly: false));
-                    state.StorageValues[normalizedKey.Expression] = storedValue;
+                    WriteStorageValueAliasing(state, normalizedKey.Expression, storedValue);
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
@@ -468,7 +468,7 @@ public sealed partial class SymbolicEngine
                     state.Telemetry.StorageOps.Add(new StorageOp(inst.Offset, StorageOpKind.Delete, normalizedKey, null,
                         ContextDynamic: contextDynamic, ContextReadOnly: false));
                     if (!contextDynamic)
-                        state.StorageValues[normalizedKey.Expression] = SymbolicValue.Null();
+                        WriteStorageValueAliasing(state, normalizedKey.Expression, SymbolicValue.Null());
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
@@ -479,7 +479,7 @@ public sealed partial class SymbolicEngine
                     EnforceStorageByteLikeOperand(state, inst, "Storage.Local.Delete", normalizedKey, "key");
                     state.Telemetry.StorageOps.Add(new StorageOp(inst.Offset, StorageOpKind.Delete, normalizedKey, null,
                         ContextDynamic: false, ContextReadOnly: false));
-                    state.StorageValues[normalizedKey.Expression] = SymbolicValue.Null();
+                    WriteStorageValueAliasing(state, normalizedKey.Expression, SymbolicValue.Null());
                     state.Pc = inst.EndOffset;
                     return Single(state);
                 }
@@ -1250,6 +1250,56 @@ public sealed partial class SymbolicEngine
         ResolveSpliceSourceBytes(state, key) is { } bytes
             ? SymbolicValue.Of(Expr.Bytes(bytes), key.Taints)
             : key;
+
+    // Round-3 audit fix (#16): a write to a storage key may alias other cached entries whose keys are
+    // not provably distinct (e.g. balance[from] vs balance[to] when from == to). The path-local cache is
+    // keyed by structural Expression identity, so the fast-path Get of a structurally-different but
+    // runtime-equal key would return a STALE value. After writing, make every other cached entry
+    // conditional on key equality: StorageValues[k1] = ite(k1 == writtenKey, writtenValue, old). Expr.Eq
+    // folds to false for provably-distinct keys, so the ite collapses to the old value (no cost). To
+    // bound SMT-expression growth on storage-heavy contracts, when the cache exceeds a cap we instead
+    // INVALIDATE entries not provably distinct (a later Get re-derives them symbolically) — both
+    // branches are sound; only the stale-read is not.
+    private const int StorageAliasingRewriteCap = 32;
+
+    private static void WriteStorageValueAliasing(
+        ExecutionState state,
+        Expression keyExpr,
+        SymbolicValue newValue)
+    {
+        if (state.StorageValues.Count > 0)
+        {
+            var otherKeys = state.StorageValues.Keys.Where(k => !k.Equals(keyExpr)).ToList();
+            bool precise = otherKeys.Count <= StorageAliasingRewriteCap;
+            foreach (var k1 in otherKeys)
+            {
+                var eq = Expr.Eq(k1, keyExpr);
+                if (eq is BoolConst bc)
+                {
+                    if (bc.Value) state.StorageValues[k1] = newValue; // provably equal -> takes the new value
+                    continue;                                         // provably distinct -> unchanged
+                }
+
+                // Build the conditional value only when both sides share a sort (storage values are not
+                // sort-normalized — a Get yields a Bytes symbol while an Integer Put keeps Sort.Int). On
+                // a mismatch (or when the cache is over the cap) drop the entry so a later Get re-derives
+                // it symbolically. Both branches are sound; only returning the stale value is not.
+                var oldValue = state.StorageValues[k1];
+                if (precise && oldValue.Expression.Sort == newValue.Expression.Sort)
+                {
+                    state.StorageValues[k1] = SymbolicValue.Of(
+                        Expr.Ite(eq, newValue.Expression, oldValue.Expression),
+                        newValue.Taints.Union(oldValue.Taints));
+                }
+                else
+                {
+                    state.StorageValues.Remove(k1);
+                }
+            }
+        }
+
+        state.StorageValues[keyExpr] = newValue;
+    }
 
     private static bool TryGetPathLocalStorageValue(
         ExecutionState state,
