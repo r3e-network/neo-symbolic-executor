@@ -1419,6 +1419,35 @@ public class ReviewFixesTests
         faulted.Telemetry.UnknownSyscalls.Should().BeEmpty();
     }
 
+    [Fact]
+    public void Engine_SymbolicCatProducesMutableBufferWithCatSourceBytes()
+    {
+        // #13/#14: NeoVM's CAT yields a mutable Buffer (the concrete arm already does). A symbolic CAT
+        // must also produce a Buffer so a later MEMCPY/SETITEM does not spuriously fault on an immutable
+        // ByteString, while carrying the structural `cat` byte-source so storage-key length stays precise.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.CAT,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var program = ScriptDecoder.Decode(script);
+        var state = new ExecutionState();
+        state.CallStack.Add(new CallFrame(returnPc: -1));
+        var a = SymbolicValue.Symbol(Sort.Bytes, "left");
+        var b = SymbolicValue.Symbol(Sort.Bytes, "right");
+        state.Push(a);
+        state.Push(b);
+
+        var result = new SymbolicEngine(program).Run(state);
+
+        var halted = result.FinalStates.Should().ContainSingle().Subject;
+        halted.Status.Should().Be(TerminalStatus.Halted);
+        var bufferRef = halted.EvaluationStack.Single().Expression.Should().BeOfType<HeapRef>().Subject;
+        bufferRef.RefSort.Should().Be(Sort.Buffer);
+        var buffer = halted.Heap.Get<BufferObject>(bufferRef.ObjectId);
+        buffer.SourceBytes.Should().Be(new BinaryExpr(Sort.Bytes, "cat", a.Expression, b.Expression));
+    }
+
     private static ExecutionResult RunStdLibBase64UrlDecode(string base64UrlText)
     {
         byte[] script = Concat(

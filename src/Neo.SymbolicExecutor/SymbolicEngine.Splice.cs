@@ -165,14 +165,19 @@ public sealed partial class SymbolicEngine
                 return Single(state);
             }
 
-            // NOTE (#13/#14, deferred): NeoVM's CAT yields a mutable Buffer; a later MEMCPY/SETITEM into
-            // a symbolic CAT result therefore spuriously faults here on an immutable ByteString. Modeling
-            // it as an open (symbolic-length) Buffer loses the length precision that storage-key and
-            // comparison paths rely on (it makes every CAT-built Storage.Put key length unknown, so
-            // EnforceStorageKeyLength flags a false >64-byte fault). The ByteString `cat` expression is
-            // the better representation for the common case; the mutable-Buffer modeling needs a
-            // length-preserving symbolic Buffer, left as a deliberate follow-up.
-            state.Push(SymbolicValue.Of(new BinaryExpr(Sort.Bytes, "cat", ae, be), a.Taints.Union(b.Taints)));
+            // #13/#14: NeoVM's CAT yields a mutable Buffer (the concrete arm above already does), so the
+            // symbolic result must also be a Buffer — otherwise a later MEMCPY/SETITEM into it spuriously
+            // faults on an immutable ByteString, and EQUAL uses content equality where NeoVM uses Buffer
+            // reference identity. Model it as a symbolic Buffer whose byte-source is the `cat` expression
+            // and whose length is size(a)+size(b). Carrying the structural `cat` expression (resolved back
+            // by NormalizeStorageKey/Bytes -> StorageByteLengthExpression) preserves the precise key/value
+            // length, avoiding the false ">64 byte" storage-key fault that reverted the earlier attempt.
+            var catExpr = new BinaryExpr(Sort.Bytes, "cat", ae, be);
+            var catLength = Expr.Add(
+                new UnaryExpr(Sort.Int, "size", ae),
+                new UnaryExpr(Sort.Int, "size", be));
+            var catBuffer = state.Heap.NewSymbolicBuffer(catExpr, catLength);
+            state.Push(SymbolicValue.HeapRef(Sort.Buffer, catBuffer.Id).WithTaints(a.Taints.Union(b.Taints)));
             state.Pc = inst.EndOffset;
             return Single(state);
         }

@@ -1246,10 +1246,25 @@ public sealed partial class SymbolicEngine
         }
     }
 
-    private static SymbolicValue NormalizeStorageKey(ExecutionState state, SymbolicValue key) =>
-        ResolveSpliceSourceBytes(state, key) is { } bytes
-            ? SymbolicValue.Of(Expr.Bytes(bytes), key.Taints)
-            : key;
+    private static SymbolicValue NormalizeStorageKey(ExecutionState state, SymbolicValue key)
+    {
+        if (ResolveSpliceSourceBytes(state, key) is { } bytes)
+            return SymbolicValue.Of(Expr.Bytes(bytes), key.Taints);
+        // A symbolic Buffer (a CAT/SUBSTR/LEFT/RIGHT result) carries a structural byte-source expression.
+        // Resolve to it so the key-length and aliasing machinery see the precise length tree (e.g. a CAT
+        // key resolves to size(a)+size(b)) instead of an opaque Buffer HeapRef, which
+        // StorageByteLengthExpression would treat as unbounded and raise a false ">64 byte" fault.
+        if (TryResolveBufferSourceBytes(state, key) is { } sourceKey)
+            return sourceKey;
+        return key;
+    }
+
+    private static SymbolicValue? TryResolveBufferSourceBytes(ExecutionState state, SymbolicValue value) =>
+        value.Expression is HeapRef href
+        && state.Heap.Objects.TryGetValue(href.ObjectId, out var obj)
+        && obj is BufferObject { SourceBytes: { } sourceBytes }
+            ? SymbolicValue.Of(sourceBytes, value.Taints)
+            : null;
 
     // Round-3 audit fix (#16): a write to a storage key may alias other cached entries whose keys are
     // not provably distinct (e.g. balance[from] vs balance[to] when from == to). The path-local cache is
@@ -1488,6 +1503,10 @@ public sealed partial class SymbolicEngine
     {
         if (ResolveSpliceSourceBytes(state, value) is { } bytes)
             return SymbolicValue.Of(Expr.Bytes(bytes), value.Taints);
+        // Same as NormalizeStorageKey: resolve a symbolic Buffer (e.g. a CAT result stored as a value) to
+        // its structural byte-source so the value-length machinery stays precise.
+        if (TryResolveBufferSourceBytes(state, value) is { } sourceValue)
+            return sourceValue;
         return value.Sort switch
         {
             Sort.Int => SymbolicValue.Of(new UnaryExpr(Sort.Bytes, "i2b", value.Expression), value.Taints),
