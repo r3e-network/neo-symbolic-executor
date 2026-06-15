@@ -1146,9 +1146,10 @@ public class ReviewFixesTests
     [Fact]
     public void Engine_NewBufferAboveNeoVmItemLimitFaults()
     {
-        // A size above NeoVM's 1 MiB MaxItemSize faults on the real VM.
+        // A size above NeoVM's real MaxItemSize (131070, verified against Neo.VM 3.10.0) faults. 200_000
+        // is above 131070 but below the wrong 1 MiB the engine briefly used, so this pins the constant.
         byte[] script = Concat(
-            new[] { (byte)NeoVm.OpCode.PUSHINT32 }, BitConverter.GetBytes(2_000_000),
+            new[] { (byte)NeoVm.OpCode.PUSHINT32 }, BitConverter.GetBytes(200_000),
             new[] { (byte)NeoVm.OpCode.NEWBUFFER, (byte)NeoVm.OpCode.RET });
         RunNoArgScript(script).Faulted.Should().ContainSingle();
     }

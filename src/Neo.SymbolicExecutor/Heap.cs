@@ -233,15 +233,18 @@ public sealed class Heap
             throw new AnalysisBudgetException($"Collection grew to {newSize}, exceeds limit {MaxCollectionSize}");
     }
 
-    // NeoVM's real StackItem byte-size limit (ExecutionEngineLimits.MaxItemSize).
-    public const int NeoVmMaxItemSize = 1024 * 1024; // 1 MiB
+    // NeoVM's real StackItem byte-size limit (Neo.VM.ExecutionEngineLimits.MaxItemSize, verified by
+    // decompiling Neo.VM 3.10.0 — it is 131070, NOT 1 MiB). NEWBUFFER/CAT call AssertMaxItemSize and
+    // fault above this. (The check below faults BEFORE the materialization-budget check, so an item
+    // larger than this faults even when the analyzer's MaxItemSize budget is raised past it.)
+    public const int NeoVmMaxItemSize = 131070;
 
     /// <summary>
-    /// Round-3 audit fix: NeoVM faults only when a Buffer/ByteString exceeds NeoVmMaxItemSize (1 MiB).
+    /// Round-3 audit fix: NeoVM faults only when a Buffer/ByteString exceeds NeoVmMaxItemSize (131070).
     /// A size within that limit but above the analyzer's materialization budget (<see cref="MaxItemSize"/>,
     /// default 64 KiB) would SUCCEED on the real VM, so it is a modeling limit (CoverageIncomplete), not
     /// a fault — the prior `> MaxItemSize` fault pruned feasible paths for items between the budget and
-    /// NeoVM's 1 MiB limit.
+    /// NeoVM's real limit.
     /// </summary>
     public void EnforceItemSize(int newSize)
     {
