@@ -11,8 +11,11 @@ public sealed partial class SymbolicEngine
         var n = state.Pop();
         var sz = TryConcretizeIndex(state, n, lo: 0, hi: _options.MaxItemSize);
         if (sz is null) { state.Terminate(TerminalStatus.Stopped, "NEWBUFFER requires concrete size (no SMT model)"); return Single(state); }
-        if (sz < 0 || sz > _options.MaxItemSize)
-            throw new VmFaultException($"NEWBUFFER size {sz} out of range");
+        // Round-3 audit fix: fault only above NeoVM's real 1 MiB item limit (also guards the int cast);
+        // Heap.NewBuffer -> EnforceItemSize turns a size between the 64 KiB materialization budget and
+        // 1 MiB into a modeling limit (CoverageIncomplete), not a false fault.
+        if (sz < 0 || sz > Heap.NeoVmMaxItemSize)
+            throw new VmFaultException($"NEWBUFFER size {sz} exceeds NeoVM MaxItemSize {Heap.NeoVmMaxItemSize}");
         var buf = state.Heap.NewBuffer((int)sz.Value);
         state.Push(SymbolicValue.HeapRef(Sort.Buffer, buf.Id));
         state.Pc = inst.EndOffset;

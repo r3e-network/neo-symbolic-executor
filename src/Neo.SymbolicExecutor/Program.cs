@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using NeoVm = Neo.VM;
@@ -13,7 +14,9 @@ public sealed class NeoProgram
 {
     public ReadOnlyMemory<byte> Bytes { get; }
     public ImmutableArray<Instruction> Instructions { get; }
-    public ImmutableDictionary<int, int> OffsetToIndex { get; }
+    // Round-3 audit fix (#30): built once at decode, read on every instruction fetch — a
+    // FrozenDictionary gives O(1) lookups instead of ImmutableDictionary's O(log n) AVL traversal.
+    public FrozenDictionary<int, int> OffsetToIndex { get; }
 
     /// <summary>
     /// Method tokens declared in the source NEF for CALLT dispatch. May be null when the
@@ -25,7 +28,7 @@ public sealed class NeoProgram
     public NeoProgram(
         ReadOnlyMemory<byte> bytes,
         ImmutableArray<Instruction> instructions,
-        ImmutableDictionary<int, int> offsetToIndex,
+        FrozenDictionary<int, int> offsetToIndex,
         ImmutableArray<Nef.MethodToken> tokens = default)
     {
         Bytes = bytes;
@@ -76,7 +79,7 @@ public static class ScriptDecoder
             throw new VmFaultException($"Raw script size {script.Length} exceeds max {MaxRawScriptSize}");
 
         var instructions = ImmutableArray.CreateBuilder<Instruction>();
-        var offsetIndex = ImmutableDictionary.CreateBuilder<int, int>();
+        var offsetIndex = new Dictionary<int, int>();
 
         int pos = 0;
         while (pos < script.Length)
@@ -121,7 +124,7 @@ public static class ScriptDecoder
             instructions.Add(new Instruction(offset, op, operandBytes, totalSize, target));
         }
 
-        return new NeoProgram(script, instructions.ToImmutable(), offsetIndex.ToImmutable());
+        return new NeoProgram(script, instructions.ToImmutable(), offsetIndex.ToFrozenDictionary());
     }
 
     private static long ReadUnsigned(ReadOnlySpan<byte> bytes) => bytes.Length switch

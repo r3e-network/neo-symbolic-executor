@@ -84,22 +84,19 @@ public sealed class Heap
 
     public BufferObject NewBuffer(int length)
     {
-        if (length < 0 || length > MaxItemSize)
-            throw new VmFaultException($"NEWBUFFER size {length} out of range");
+        EnforceItemSize(length);
         return Allocate(id => new BufferObject(id, length));
     }
 
     public BufferObject NewBuffer(byte[] bytes)
     {
-        if (bytes.Length > MaxItemSize)
-            throw new VmFaultException($"Buffer size {bytes.Length} exceeds item size limit");
+        EnforceItemSize(bytes.Length);
         return Allocate(id => new BufferObject(id, bytes));
     }
 
     public BufferObject NewSymbolicBuffer(Expression sourceBytes, Expression symbolicLength, int minLength = 0)
     {
-        if (minLength < 0 || minLength > MaxItemSize)
-            throw new VmFaultException($"Buffer minimum size {minLength} exceeds item size limit");
+        EnforceItemSize(minLength);
         return Allocate(id => new BufferObject(
             id,
             System.Array.Empty<Expression>(),
@@ -236,9 +233,22 @@ public sealed class Heap
             throw new AnalysisBudgetException($"Collection grew to {newSize}, exceeds limit {MaxCollectionSize}");
     }
 
+    // NeoVM's real StackItem byte-size limit (ExecutionEngineLimits.MaxItemSize).
+    public const int NeoVmMaxItemSize = 1024 * 1024; // 1 MiB
+
+    /// <summary>
+    /// Round-3 audit fix: NeoVM faults only when a Buffer/ByteString exceeds NeoVmMaxItemSize (1 MiB).
+    /// A size within that limit but above the analyzer's materialization budget (<see cref="MaxItemSize"/>,
+    /// default 64 KiB) would SUCCEED on the real VM, so it is a modeling limit (CoverageIncomplete), not
+    /// a fault — the prior `> MaxItemSize` fault pruned feasible paths for items between the budget and
+    /// NeoVM's 1 MiB limit.
+    /// </summary>
     public void EnforceItemSize(int newSize)
     {
+        if (newSize < 0 || newSize > NeoVmMaxItemSize)
+            throw new VmFaultException($"item size {newSize} exceeds NeoVM MaxItemSize {NeoVmMaxItemSize}");
         if (newSize > MaxItemSize)
-            throw new VmFaultException($"Item size {newSize} exceeds NeoVM limit {MaxItemSize}");
+            throw new ModelingLimitException(
+                $"item size {newSize} exceeds the analyzer materialization budget {MaxItemSize} (NeoVM allows up to {NeoVmMaxItemSize})");
     }
 }

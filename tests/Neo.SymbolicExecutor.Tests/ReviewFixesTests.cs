@@ -1130,6 +1130,30 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_NewBufferAboveBudgetBelowNeoVmLimitIsModelingLimit()
+    {
+        // Round-3 audit fix: a NEWBUFFER size between the 64 KiB materialization budget and NeoVM's
+        // 1 MiB item limit succeeds on the real VM, so the engine flags coverage-incomplete (a modeling
+        // limit), not a fault.
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHINT32 }, BitConverter.GetBytes(100_000),
+            new[] { (byte)NeoVm.OpCode.NEWBUFFER, (byte)NeoVm.OpCode.RET });
+        var result = RunNoArgScript(script);
+        result.CoverageIncomplete.Should().BeTrue();
+        result.Faulted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Engine_NewBufferAboveNeoVmItemLimitFaults()
+    {
+        // A size above NeoVM's 1 MiB MaxItemSize faults on the real VM.
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHINT32 }, BitConverter.GetBytes(2_000_000),
+            new[] { (byte)NeoVm.OpCode.NEWBUFFER, (byte)NeoVm.OpCode.RET });
+        RunNoArgScript(script).Faulted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
         // Review fix (#2): APPEND on an open array increments OpenSizeOffset, so SIZE after APPEND is
