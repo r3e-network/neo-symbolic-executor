@@ -670,12 +670,69 @@ public sealed partial class SymbolicEngine
     {
         var b = state.Pop();
         var a = state.Pop();
-        Expression eq = StackItemEquals(state, a.Expression, b.Expression, depth: 0);
+        Expression eq = StackItemEquals(state, inst, a.Expression, b.Expression, depth: 0);
         var result = negate ? Expr.Not(eq) : eq;
         state.Push(SymbolicValue.Of(result, a.Taints.Union(b.Taints)));
         state.Pc = inst.EndOffset;
         return Single(state);
     }
+
+    /// <summary>
+    /// Model NeoVM's MaxComparableSize fault on EQUAL/NOTEQUAL/Struct.Equals. NeoVM's
+    /// ByteString.Equals(other, ref limits) throws an UNCATCHABLE InvalidOperationException (→ VMState.FAULT)
+    /// when the operand's Size exceeds ExecutionEngineLimits.MaxComparableSize (65536). A concrete oversize
+    /// operand definitely faults (throw VmFaultException); a symbolic ByteString whose size may exceed the
+    /// limit records a FaultConditionOp so the vm-fault-freedom obligation downgrades from Proved. This is
+    /// applied to the deeper operand unconditionally and to the other operand only when both are ByteStrings
+    /// (matching ByteString.Equals' asymmetric checks); for Struct comparison it fires per matched
+    /// ByteString field as the walk recurses through StackItemEquals.
+    /// </summary>
+    private static void EnforceComparableByteSize(ExecutionState state, Instruction inst, Expression operand)
+    {
+        if (Expr.CanonicalBytes(operand) is { } bytes)
+        {
+            if (bytes.Length > Expr.NeoVmMaxComparableSize)
+                throw new VmFaultException(
+                    $"EQUAL operand size {bytes.Length} exceeds NeoVM MaxComparableSize {Expr.NeoVmMaxComparableSize}");
+            return;
+        }
+        // Skip operands whose size is STRUCTURALLY bounded within the comparable limit (account hashes,
+        // integer-to-bytes, bounded concatenations) — no fault is possible, so emitting an obligation would
+        // be a spurious false fault that downgrades vm-fault-freedom (e.g. comparing two 20-byte
+        // CreateStandardAccount results). Only an operand that could actually exceed the limit needs it.
+        if (StructuralByteSizeUpperBound(operand) is { } bound && bound <= Expr.NeoVmMaxComparableSize)
+            return;
+        state.Telemetry.FaultConditions.Add(new FaultConditionOp(
+            inst.Offset,
+            "EQUAL",
+            Expr.Gt(new UnaryExpr(Sort.Int, "size", operand), Expr.Int(Expr.NeoVmMaxComparableSize)),
+            $"EQUAL operand size may exceed NeoVM MaxComparableSize {Expr.NeoVmMaxComparableSize}",
+            "comparable operand size within limit"));
+    }
+
+    /// <summary>
+    /// A structural upper bound on a Sort.Bytes expression's byte length, or null when unbounded/unknown.
+    /// Mirrors the verifier's StorageByteLengthExpression so an operand whose length is provably within
+    /// NeoVM's MaxComparableSize is not given a (spurious) comparable-size fault obligation. Symbols bounded
+    /// only by a path condition return null and keep their obligation, which the solver then discharges.
+    /// </summary>
+    private static int? StructuralByteSizeUpperBound(Expression e) => e switch
+    {
+        BytesConst b => b.Value.Length,
+        BoolConst => 1,
+        UnaryExpr { Sort: Sort.Bytes, Op: "i2b" } => MaxNeoVmIntegerBytes,
+        UnaryExpr { Sort: Sort.Bytes, Op: "standard_account" } => Hash160Length,
+        BinaryExpr { Sort: Sort.Bytes, Op: "multisig_account" } => Hash160Length,
+        BinaryExpr { Sort: Sort.Bytes, Op: "cat" } cat =>
+            StructuralByteSizeUpperBound(cat.Left) is { } l && StructuralByteSizeUpperBound(cat.Right) is { } r
+                ? (int)System.Math.Min((long)l + r, int.MaxValue)
+                : null,
+        TernaryExpr { Sort: Sort.Bytes, Op: "ite" } ite =>
+            StructuralByteSizeUpperBound(ite.B) is { } b && StructuralByteSizeUpperBound(ite.C) is { } c
+                ? System.Math.Max(b, c)
+                : null,
+        _ => null,
+    };
 
     /// <summary>
     /// Mirrors NeoVM's StackItem.Equals(other, limits) for the EQUAL/NOTEQUAL opcodes.
@@ -686,9 +743,19 @@ public sealed partial class SymbolicEngine
     ///  - Map / Array / Buffer → reference identity (different ids ⇒ false)
     /// Anything symbolic returns a BinaryExpr that downstream branching can resolve.
     /// </summary>
-    private Expression StackItemEquals(ExecutionState state, Expression a, Expression b, int depth)
+    private Expression StackItemEquals(ExecutionState state, Instruction inst, Expression a, Expression b, int depth)
     {
         const int MaxDepth = 64;
+        // NeoVM EQUAL/NOTEQUAL/Struct.Equals fault when a ByteString operand exceeds MaxComparableSize. The
+        // deeper operand 'a' is checked unconditionally; 'b' only when both are ByteStrings (ByteString.Equals'
+        // asymmetric size checks). This runs at the top level and, via the struct field recursion below, for
+        // each matched ByteString field inside a Struct comparison.
+        if (a.Sort == Sort.Bytes)
+        {
+            EnforceComparableByteSize(state, inst, a);
+            if (b.Sort == Sort.Bytes)
+                EnforceComparableByteSize(state, inst, b);
+        }
         if (a is HeapRef ah && b is HeapRef bh)
         {
             if (ah.ObjectId == bh.ObjectId) return BoolConst.True;
@@ -718,7 +785,7 @@ public sealed partial class SymbolicEngine
                 Expression acc = BoolConst.True;
                 for (int i = 0; i < s1.Fields.Count; i++)
                 {
-                    var fEq = StackItemEquals(state, s1.Fields[i].Expression, s2.Fields[i].Expression, depth + 1);
+                    var fEq = StackItemEquals(state, inst, s1.Fields[i].Expression, s2.Fields[i].Expression, depth + 1);
                     if (fEq is BoolConst bc && !bc.Value) return BoolConst.False;
                     acc = Expr.BoolAnd(acc, fEq);
                 }

@@ -245,6 +245,11 @@ public static class Expr
     // NeoVM's ByteString.GetBoolean / Integer.MaxSize limit.
     public const int NeoVmIntegerMaxBytes = 32;
 
+    // NeoVM's ExecutionEngineLimits.MaxComparableSize (decompiled Neo.VM 3.10.0). EQUAL/NOTEQUAL on a
+    // ByteString whose Size exceeds this faults (uncatchable InvalidOperationException -> VMState.FAULT);
+    // Struct deep comparison faults when the cumulative compared-operand size exceeds it.
+    public const int NeoVmMaxComparableSize = 65536;
+
     public static bool? Truthy(Expression e) => e switch
     {
         IntConst i => !i.Value.IsZero,

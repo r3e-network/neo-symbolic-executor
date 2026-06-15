@@ -1448,6 +1448,60 @@ public class ReviewFixesTests
         buffer.SourceBytes.Should().Be(new BinaryExpr(Sort.Bytes, "cat", a.Expression, b.Expression));
     }
 
+    [Fact]
+    public void Engine_EqualOnOversizedByteStringFaults()
+    {
+        // NeoVM EQUAL faults (uncatchable) when a ByteString operand exceeds MaxComparableSize (65536).
+        // A 70000-byte literal compared with itself faulted on the real VM but the engine used to HALT clean.
+        const int n = 70000;
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHDATA4 },
+            BitConverter.GetBytes(n),
+            new byte[n],
+            new[] { (byte)NeoVm.OpCode.DUP, (byte)NeoVm.OpCode.EQUAL, (byte)NeoVm.OpCode.RET });
+
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+
+        result.Faulted.Should().ContainSingle()
+            .Which.TerminationReason.Should().Contain("MaxComparableSize");
+    }
+
+    [Fact]
+    public void Engine_EqualOnWithinLimitByteStringDoesNotFault()
+    {
+        // A 100-byte ByteString EQUAL is well within MaxComparableSize -> no fault.
+        const int n = 100;
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHDATA2 },
+            BitConverter.GetBytes((ushort)n),
+            new byte[n],
+            new[] { (byte)NeoVm.OpCode.DUP, (byte)NeoVm.OpCode.EQUAL, (byte)NeoVm.OpCode.RET });
+
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+
+        result.Faulted.Should().BeEmpty();
+        result.Halted.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Engine_EqualOnSymbolicByteStringRecordsComparableSizeFaultCondition()
+    {
+        // A symbolic ByteString whose size may exceed MaxComparableSize records an EQUAL fault condition so
+        // the vm-fault-freedom obligation downgrades from Proved instead of silently asserting no fault.
+        byte[] script = { (byte)NeoVm.OpCode.EQUAL, (byte)NeoVm.OpCode.RET };
+        var program = ScriptDecoder.Decode(script);
+        var state = new ExecutionState();
+        state.CallStack.Add(new CallFrame(returnPc: -1));
+        state.Push(SymbolicValue.Symbol(Sort.Bytes, "x"));
+        state.Push(SymbolicValue.Symbol(Sort.Bytes, "y"));
+
+        var result = new SymbolicEngine(program).Run(state);
+
+        var halted = result.FinalStates.Should().ContainSingle().Subject;
+        halted.Telemetry.FaultConditions.Should().Contain(f =>
+            f.Operation == "EQUAL" && f.FailedCondition.Contains("comparable operand size"));
+    }
+
     private static ExecutionResult RunStdLibBase64UrlDecode(string base64UrlText)
     {
         byte[] script = Concat(
