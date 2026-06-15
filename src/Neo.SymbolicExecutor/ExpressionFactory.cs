@@ -439,22 +439,28 @@ public static class Expr
 
     public static Expression Shl(Expression a, Expression b, int maxShift = 256)
     {
-        if (ConcreteInt(a) is { } shl_a && ConcreteInt(b) is { } shl_b)
+        // Round-3 audit fix: NeoVM validates the shift count before the value, so a concrete
+        // out-of-range shift faults even when the value operand is symbolic. The prior `&&` guard
+        // checked the bound only when BOTH operands were concrete, letting a symbolic-value shift by a
+        // concrete >maxShift count slip past the fault.
+        if (ConcreteInt(b) is { } shl_b)
         {
             if (shl_b < 0) throw new VmFaultException("SHL by negative count");
             if (shl_b > maxShift) throw new VmFaultException("SHL count too large");
-            return Int(shl_a << (int)shl_b);
+            if (ConcreteInt(a) is { } shl_a) return Int(shl_a << (int)shl_b);
         }
         return new BinaryExpr(Sort.Int, "<<", a, b);
     }
 
     public static Expression Shr(Expression a, Expression b, int maxShift = 256)
     {
-        if (ConcreteInt(a) is { } shr_a && ConcreteInt(b) is { } shr_b)
+        // Round-3 audit fix: validate the concrete shift count regardless of whether the value is
+        // concrete (see Shl).
+        if (ConcreteInt(b) is { } shr_b)
         {
             if (shr_b < 0) throw new VmFaultException("SHR by negative count");
             if (shr_b > maxShift) throw new VmFaultException("SHR count too large");
-            return Int(shr_a >> (int)shr_b);
+            if (ConcreteInt(a) is { } shr_a) return Int(shr_a >> (int)shr_b);
         }
         return new BinaryExpr(Sort.Int, ">>", a, b);
     }

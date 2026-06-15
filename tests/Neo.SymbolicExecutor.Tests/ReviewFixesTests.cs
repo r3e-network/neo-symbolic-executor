@@ -1154,6 +1154,20 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_ShiftByOversizedCountFaultsEvenWithSymbolicValue()
+    {
+        // Round-3 audit fix: NeoVM validates the shift count before the value, so a concrete shift
+        // greater than the 256 limit faults even when the value operand is symbolic.
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.INITSLOT, (byte)0x00, (byte)0x01, (byte)NeoVm.OpCode.LDARG0 },
+            new[] { (byte)NeoVm.OpCode.PUSHINT16, (byte)0x2C, (byte)0x01 }, // shift = 300
+            new[] { (byte)NeoVm.OpCode.SHL, (byte)NeoVm.OpCode.RET });
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        var entry = engine.CreateMethodEntryState(0, new[] { new ContractParameterDefinition("v", "Integer") });
+        engine.Run(entry).Faulted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
         // Review fix (#2): APPEND on an open array increments OpenSizeOffset, so SIZE after APPEND is
