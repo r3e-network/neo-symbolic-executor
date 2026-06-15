@@ -538,6 +538,26 @@ public sealed partial class SymbolicEngine
     private static int MethodEntryCollectionSeedCount(ExecutionState state) =>
         System.Math.Max(0, System.Math.Min(MethodEntryCollectionSeedSize, state.Heap.MaxCollectionSize));
 
+    /// <summary>
+    /// Lower bound on NeoVM's <c>ReferenceCounter.Count</c> — the quantity its
+    /// <c>ExecutionEngineLimits.MaxStackSize</c> (2048) actually bounds, asserted in
+    /// <c>PostExecuteInstruction</c>. NeoVM counts the evaluation stack PLUS every static/local/argument
+    /// slot PLUS the compound-type subitems reachable from them (Array/Struct/Map elements). We sum the
+    /// stack and all slots across the call stack; we deliberately omit the compound subitems, which makes
+    /// this a guaranteed lower bound — so a fault here implies NeoVM also faults (never the reverse). The
+    /// residual (an overflow driven purely by nested-collection subitems with no single collection
+    /// exceeding MaxCollectionSize) is bounded by the heap-object (MaxObjects) and collection
+    /// (MaxCollectionSize) budgets, which flag CoverageIncomplete when hit. Counting the slots closes the
+    /// previous gap where slot-driven overflows (the eval stack alone is well under 2048) went unflagged.
+    /// </summary>
+    private static int ReferenceLoad(ExecutionState state)
+    {
+        int load = state.EvaluationStack.Count + state.StaticFields.Count;
+        foreach (var frame in state.CallStack)
+            load += frame.Locals.Count + frame.Args.Count;
+        return load;
+    }
+
     private IEnumerable<ExecutionState> StepBounded(ExecutionState state)
     {
         if (state.Steps >= _options.MaxSteps)
@@ -551,7 +571,7 @@ public sealed partial class SymbolicEngine
         state.Steps++;
         _stepsExecuted++;
 
-        if (state.EvaluationStack.Count > _options.MaxStackSize)
+        if (ReferenceLoad(state) > _options.MaxStackSize)
             throw new VmFaultException("evaluation stack overflow");
 
         if (!state.VisitCounts.TryGetValue(state.Pc, out int visits)) visits = 0;

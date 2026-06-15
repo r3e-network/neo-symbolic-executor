@@ -1455,6 +1455,42 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_StackOverflowCountsSlotsNotJustEvaluationStack()
+    {
+        // NeoVM's MaxStackSize bounds the reference counter: eval stack + slots (+ subitems). With a
+        // tiny limit, 3 stack items plus 3 static slots (=6) overflow even though the eval stack alone
+        // (3) is under the limit. The prior eval-stack-only check missed this slot-driven overflow.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.PUSH1,
+            (byte)NeoVm.OpCode.INITSSLOT, 0x03,
+            (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(
+            ScriptDecoder.Decode(script),
+            new ExecutionOptions { MaxStackSize = 4 }).Run();
+        result.Faulted.Should().ContainSingle()
+            .Which.TerminationReason.Should().Contain("evaluation stack overflow");
+    }
+
+    [Fact]
+    public void Engine_StackWithinLimitIncludingSlotsDoesNotFault()
+    {
+        // 3 stack items + 3 static slots (=6) is within a limit of 8 — no overflow.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.PUSH1,
+            (byte)NeoVm.OpCode.INITSSLOT, 0x03,
+            (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(
+            ScriptDecoder.Decode(script),
+            new ExecutionOptions { MaxStackSize = 8 }).Run();
+        result.Faulted.Should().BeEmpty();
+        result.Halted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Engine_Base64UrlDecodeNonCanonicalInputFaults()
     {
         // "ab" has non-zero unused trailing bits; Neo's strict decoder (Microsoft.IdentityModel
