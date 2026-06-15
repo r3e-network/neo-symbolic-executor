@@ -242,11 +242,21 @@ public static class Expr
     //   Null → FALSE
     // Our engine previously treated ByteString as length>0 (wrong for `[0,0,0]`) and
     // returned null for HeapRef (causing NOT/SHR fast-paths to fall through to Pop).
+    // NeoVM's ByteString.GetBoolean / Integer.MaxSize limit.
+    public const int NeoVmIntegerMaxBytes = 32;
+
     public static bool? Truthy(Expression e) => e switch
     {
         IntConst i => !i.Value.IsZero,
         BoolConst b => b.Value,
-        BytesConst by => HasNonZeroByte(by.Value),
+        // Round-3 audit fix: NeoVM's ByteString.GetBoolean faults when the byte length exceeds the
+        // 32-byte integer limit, so a >32-byte ByteString used in ANY boolean context (JMPIF, NOT,
+        // BOOLAND, BOOLOR, ASSERT, CONVERT Boolean, ...) faults (verified on the real VM) rather than
+        // yielding a truthiness. Centralized here so every GetBoolean path is covered.
+        BytesConst by => by.Value.Length > NeoVmIntegerMaxBytes
+            ? throw new VmFaultException(
+                $"ByteString of {by.Value.Length} bytes exceeds NeoVM's {NeoVmIntegerMaxBytes}-byte GetBoolean limit")
+            : HasNonZeroByte(by.Value),
         NullConst => false,
         HeapRef => true,
         // Review fix (#35): NeoVM's Pointer.GetBoolean() and InteropInterface.GetBoolean() always

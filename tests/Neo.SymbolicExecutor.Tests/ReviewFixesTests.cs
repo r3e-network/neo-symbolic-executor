@@ -1168,6 +1168,29 @@ public class ReviewFixesTests
     }
 
     [Fact]
+    public void Engine_ByteStringOver32BytesAsBooleanFaults()
+    {
+        // Round-3 audit fix: NeoVM's ByteString.GetBoolean faults when the byte length exceeds 32, so a
+        // >32-byte ByteString used in any boolean context (here NOT) faults (verified on the real VM).
+        byte[] b33 = new byte[33]; b33[0] = 1;
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHDATA1, (byte)33 }, b33,
+            new[] { (byte)NeoVm.OpCode.NOT, (byte)NeoVm.OpCode.RET });
+        RunNoArgScript(script).Faulted.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Engine_ByteString32BytesAsBooleanIsOk()
+    {
+        // 32 bytes is within the GetBoolean limit, so no fault.
+        byte[] b32 = new byte[32]; b32[0] = 1;
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.PUSHDATA1, (byte)32 }, b32,
+            new[] { (byte)NeoVm.OpCode.NOT, (byte)NeoVm.OpCode.RET });
+        RunNoArgScript(script).Halted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
         // Review fix (#2): APPEND on an open array increments OpenSizeOffset, so SIZE after APPEND is
