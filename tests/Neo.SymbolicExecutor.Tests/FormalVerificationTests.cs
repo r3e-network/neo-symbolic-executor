@@ -6702,7 +6702,7 @@ public class FormalVerificationTests
     }
 
     [Fact]
-    public void CliVerify_FindsCounterexampleForFalseSizeModeledAsOne()
+    public void CliVerify_ProvesBooleanFalseSizeIsOne()
     {
         string dir = CreateTempDirectory();
         try
@@ -6730,7 +6730,7 @@ public class FormalVerificationTests
                   "properties": [
                     {
                       "id": "false_size_is_one",
-                      "description": "Boolean false has an empty primitive span, so SIZE(false) must not be modeled as one.",
+                      "description": "Boolean false has a single-byte primitive span [0x00], so SIZE(false) == 1.",
                       "method": "size",
                       "ensures": [
                         { "return": true, "op": "==", "value": 1 }
@@ -6747,11 +6747,12 @@ public class FormalVerificationTests
                 "--format", "json",
                 "--out", reportPath);
 
-            exit.Should().Be(3, "NeoVM Boolean false has an empty primitive span, so SIZE(false) returns 0");
+            // Round-3 audit fix: NeoVM's Boolean false has a single-byte primitive span [0x00] (verified
+            // by executing PUSHF SIZE on the real VM => 1), so SIZE(false) is 1 and the spec is proved.
+            exit.Should().Be(0, "NeoVM Boolean false has a single-byte span [0x00], so SIZE(false) returns 1");
             var root = JsonNode.Parse(File.ReadAllText(reportPath))!;
             var result = root["results"]!.AsArray().Single()!;
-            result["status"]!.GetValue<string>().Should().Be("violated");
-            result["reason"]!.GetValue<string>().Should().Contain("violates $return == 1");
+            result["status"]!.GetValue<string>().Should().Be("proved");
         }
         finally
         {
@@ -9376,11 +9377,14 @@ public class FormalVerificationTests
                 "--format", "json",
                 "--out", reportPath);
 
-            exit.Should().Be(0, "-1 <= amount <= 256 discharges the implicit MODPOW exponent fault obligations");
+            exit.Should().Be(0, "-1 <= amount discharges the MODPOW negative-exponent and inverse-branch fault obligations");
             var root = JsonNode.Parse(File.ReadAllText(reportPath))!;
             var result = root["results"]!.AsArray().Single()!;
             result["status"]!.GetValue<string>().Should().Be("proved");
-            result["obligations_checked"]!.GetValue<int>().Should().Be(3);
+            // Round-3 audit fix: MODPOW has no NeoVM exponent cap, so the prior third (exponent <= 256)
+            // fault obligation no longer exists — only the negative-exponent and modular-inverse-branch
+            // obligations remain. The `amount <= 256` require is now a harmless tighter precondition.
+            result["obligations_checked"]!.GetValue<int>().Should().Be(2);
             result["reason"]!.GetValue<string>().Should().Contain("fault obligations");
         }
         finally

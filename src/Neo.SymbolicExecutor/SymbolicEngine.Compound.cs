@@ -52,6 +52,11 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.SIZE:
                 {
                     var v = state.Pop();
+                    // Round-3 audit fix: NeoVM's SIZE faults (uncatchable, verified on the real VM) on
+                    // Null — only primitives (Size = GetSpan().Length) and compounds (Count) are valid.
+                    // The prior ConcreteSize mapping of Null to 0 silently hid that fault.
+                    if (v.IsConcreteNull)
+                        throw new VmFaultException("SIZE of Null");
                     if (TryOpenSequenceSize(state, v) is { } openSize)
                     {
                         state.Push(openSize);
@@ -283,8 +288,10 @@ public sealed partial class SymbolicEngine
                 _ => null,
             },
             IntConst i => Expr.IntegerToBytes(i.Value).Length,
-            BoolConst b => b.Value ? 1 : 0,
-            NullConst => 0,
+            // Round-3 audit fix: a Boolean's GetSpan() is a single byte ([0x00]/[0x01]), so SIZE is
+            // always 1 (the prior `false => 0` was wrong). Null is handled (faulted) by the SIZE
+            // handler before reaching here.
+            BoolConst => 1,
             _ => null,
         };
     }
@@ -347,7 +354,12 @@ public sealed partial class SymbolicEngine
         var index = idx.Value;
         if (mode == LookupMode.HasKey)
         {
-            state.Push(SymbolicValue.Bool(index >= 0 && index < bytes.Length));
+            // Round-3 audit fix: NeoVM's HASKEY on a ByteString/Buffer/Array faults (uncatchable
+            // InvalidOperationException, verified on the real VM) for a negative index — it does not
+            // push false. Only a non-negative index pushes the in-bounds boolean.
+            if (index < 0)
+                throw new VmFaultException($"HASKEY negative index {index}");
+            state.Push(SymbolicValue.Bool(index < bytes.Length));
         }
         else
         {
@@ -465,12 +477,11 @@ public sealed partial class SymbolicEngine
             var i = idx.Value;
             if (i < 0)
             {
+                // Round-3 audit fix: NeoVM's HASKEY faults (uncatchable) on a negative index rather
+                // than pushing false. PICKITEM's out-of-range fault is catchable (both verified on the
+                // real VM), so the two diverge in fault kind.
                 if (mode == LookupMode.HasKey)
-                {
-                    state.Push(SymbolicValue.Bool(false));
-                    state.Pc = inst.EndOffset;
-                    return Single(state);
-                }
+                    throw new VmFaultException($"HASKEY negative index {i} on {kindLabel}");
 
                 throw new CatchableVmException($"PICKITEM index {i} out of {kindLabel} range");
             }
@@ -595,7 +606,11 @@ public sealed partial class SymbolicEngine
         var index = idx.Value;
         if (mode == LookupMode.HasKey)
         {
-            state.Push(SymbolicValue.Bool(index >= 0 && index < items.Count));
+            // Round-3 audit fix: NeoVM's HASKEY faults (uncatchable) on a negative index rather than
+            // pushing false (verified on the real VM); only a non-negative index pushes the bound check.
+            if (index < 0)
+                throw new VmFaultException($"HASKEY negative index {index} on {kindLabel}");
+            state.Push(SymbolicValue.Bool(index < items.Count));
         }
         else
         {
@@ -684,7 +699,11 @@ public sealed partial class SymbolicEngine
         var index = idx.Value;
         if (mode == LookupMode.HasKey)
         {
-            state.Push(SymbolicValue.Bool(index >= 0 && index < b.Length));
+            // Round-3 audit fix: NeoVM's HASKEY faults (uncatchable) on a negative buffer index rather
+            // than pushing false (verified on the real VM).
+            if (index < 0)
+                throw new VmFaultException($"HASKEY negative index {index} on buffer");
+            state.Push(SymbolicValue.Bool(index < b.Length));
         }
         else
         {
@@ -1517,6 +1536,11 @@ public sealed partial class SymbolicEngine
         }
     }
 
+    // NeoVM faults (uncatchable) when a Map key exceeds Map.MaxKeySize — verified on the real VM
+    // (a 65-byte key faults, a 64-byte key succeeds). Integer keys are <= 32 bytes and Boolean keys
+    // are 1 byte, so only a ByteString key can exceed the limit.
+    private const int MapMaxKeySize = 64;
+
     private static void EnsureMapKeyPrimitive(
         ExecutionState state,
         Instruction inst,
@@ -1524,7 +1548,16 @@ public sealed partial class SymbolicEngine
         SymbolicValue key)
     {
         if (key.Sort is Sort.Int or Sort.Bool or Sort.Bytes)
+        {
+            // Round-3 audit fix: enforce Map.MaxKeySize for a concrete ByteString key (an Integer key
+            // is <= 32 bytes and a Boolean key is 1 byte, so only a ByteString can exceed the limit).
+            // The symbolic-length case is left to the existing symbolic key machinery to avoid emitting
+            // an over-conservative oversize fault on every unbounded map key.
+            if (key.Sort == Sort.Bytes && key.AsConcreteBytes() is { Length: > MapMaxKeySize } keyBytes)
+                throw new VmFaultException(
+                    $"{operation}: Map key size {keyBytes.Length} exceeds MaxKeySize {MapMaxKeySize}");
             return;
+        }
 
         if (key.Sort == Sort.Unknown)
         {

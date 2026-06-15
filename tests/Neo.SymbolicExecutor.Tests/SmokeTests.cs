@@ -232,17 +232,22 @@ public class SmokeTests
     }
 
     [Fact]
-    public void CrossTypeEquality_IntZeroEqualsEmptyBytes()
+    public void CrossTypeEquality_IntegerVsByteStringIsAlwaysFalse()
     {
-        // Audit HIGH-2 fix: Integer(0) and ByteString(b"") must be equal per NeoVM semantics.
-        var lhs = Expr.Eq(Expr.Int(0), Expr.Bytes(System.Array.Empty<byte>()));
-        lhs.Should().BeOfType<BoolConst>().Which.Value.Should().BeTrue();
+        // Round-3 audit fix: NeoVM's EQUAL is type-strict StackItem.Equals — an Integer is never equal
+        // to a ByteString regardless of byte canonicalization. Verified by executing EQUAL on the real
+        // VM: Int(0) vs Bytes(b"") and Int(5) vs Bytes(b"\x05") both push False in both orderings.
+        Expr.Eq(Expr.Int(0), Expr.Bytes(System.Array.Empty<byte>()))
+            .Should().BeOfType<BoolConst>().Which.Value.Should().BeFalse();
+        Expr.Eq(Expr.Int(1), Expr.Bytes(new byte[] { 1 }))
+            .Should().BeOfType<BoolConst>().Which.Value.Should().BeFalse();
+        Expr.Eq(Expr.Int(1), Expr.Bytes(new byte[] { 2 }))
+            .Should().BeOfType<BoolConst>().Which.Value.Should().BeFalse();
 
-        var rhs = Expr.Eq(Expr.Int(1), Expr.Bytes(new byte[] { 1 }));
-        rhs.Should().BeOfType<BoolConst>().Which.Value.Should().BeTrue();
-
-        var ne = Expr.Eq(Expr.Int(1), Expr.Bytes(new byte[] { 2 }));
-        ne.Should().BeOfType<BoolConst>().Which.Value.Should().BeFalse();
+        // Same-type pairs still compare by value/bytes.
+        Expr.Eq(Expr.Int(5), Expr.Int(5)).Should().BeOfType<BoolConst>().Which.Value.Should().BeTrue();
+        Expr.Eq(Expr.Bytes(new byte[] { 5 }), Expr.Bytes(new byte[] { 5 }))
+            .Should().BeOfType<BoolConst>().Which.Value.Should().BeTrue();
     }
 
     [Fact]

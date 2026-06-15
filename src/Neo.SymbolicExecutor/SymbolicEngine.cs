@@ -576,6 +576,13 @@ public sealed partial class SymbolicEngine
         // a JMP whose target lands inside the operand of a prior instruction; our engine
         // used to fault on "unaligned offset" — a structural divergence the differential
         // target found within 10 seconds.
+        // Round-3 audit fix: NeoVM performs an IMPLICIT RET when the program counter reaches (or
+        // passes) the end of the script — falling off the end is a clean HALT/return, not a fault
+        // (verified on the real VM: a script `PUSH1` with no RET HALTs with 1 on the stack). The prior
+        // code faulted here, pruning that feasible terminal path.
+        if (state.Pc >= _program.Bytes.Length)
+            return ImplicitReturn(state, "implicit RET at end of script");
+
         var inst = _program.AtOffsetOrDecode(state.Pc);
         if (inst is null)
         {

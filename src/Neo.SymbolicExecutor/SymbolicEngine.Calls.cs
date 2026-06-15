@@ -42,7 +42,15 @@ public sealed partial class SymbolicEngine
         return Single(state);
     }
 
-    private IEnumerable<ExecutionState> HandleReturn(ExecutionState state, Instruction inst)
+    private IEnumerable<ExecutionState> HandleReturn(ExecutionState state, Instruction inst) =>
+        ImplicitReturn(state, "outermost RET");
+
+    /// <summary>
+    /// Shared RET semantics: pop the current call frame and either resume the caller or halt at the
+    /// outermost frame. Used both by the RET opcode and by the implicit RET NeoVM performs when the
+    /// program counter reaches the end of the script (see the engine fetch loop).
+    /// </summary>
+    private IEnumerable<ExecutionState> ImplicitReturn(ExecutionState state, string outermostReason)
     {
         if (state.CallStack.Count == 0)
         {
@@ -54,7 +62,7 @@ public sealed partial class SymbolicEngine
         if (state.CallStack.Count == 0)
         {
             // Returning from outermost frame -> halt.
-            state.Terminate(TerminalStatus.Halted, "outermost RET");
+            state.Terminate(TerminalStatus.Halted, outermostReason);
             return Single(state);
         }
         state.Pc = top.ReturnPc;

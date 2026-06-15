@@ -10,13 +10,12 @@ namespace Neo.SymbolicExecutor;
 /// This is the fast path that runs every time. The optional Z3 layer (Neo.SymbolicExecutor.Smt)
 /// adds full SMT-backed reasoning on top.
 ///
-/// IMPORTANT: cross-type equality follows NeoVM's PrimitiveType.GetSpan().SequenceEqual rule
-/// (audit HIGH-2). Integer(0) == ByteString(b"") and Boolean(false) == Integer(0) when their
-/// canonical byte encodings match. We do NOT short-circuit cross-sort equality to false.
+/// IMPORTANT: the EQUAL opcode (<see cref="Eq"/>) follows NeoVM's TYPE-STRICT StackItem.Equals —
+/// only same-type primitives can be equal, so Integer vs ByteString is always false. The numeric
+/// cross-type comparison (NUMEQUAL / JMP*) is GetInteger-based and lives in <see cref="NumEq"/>.
 /// </summary>
 public static class Expr
 {
-    public const int MaxConcreteModPowExponent = 256;
     public const string CryptoSha256Op = "crypto.sha256";
     public const string CryptoRipemd160Op = "crypto.ripemd160";
     public const string CryptoKeccak256Op = "crypto.keccak256";
@@ -96,14 +95,6 @@ public static class Expr
         BinaryExpr { Sort: Sort.Bytes, Op: CryptoBlsPairingOp } => 576,
         _ => null,
     };
-
-    public static bool PrimitiveEqualsConcrete(Expression a, Expression b)
-    {
-        var ab = CanonicalBytes(a);
-        var bb = CanonicalBytes(b);
-        if (ab is null || bb is null) return false;
-        return ab.AsSpan().SequenceEqual(bb);
-    }
 
     /// <summary>
     /// Audit fix (iter-2 wakeup-5 differential): NeoVM's `Pop().GetInteger()` converts Boolean
@@ -413,8 +404,9 @@ public static class Expr
                 return Int(ModInverse(mp_a, mp_m));
             if (mp_b < 0)
                 throw new VmFaultException($"MODPOW with negative exponent {mp_b}");
-            if (mp_b > MaxConcreteModPowExponent)
-                throw new VmFaultException($"MODPOW exponent {mp_b} exceeds max {MaxConcreteModPowExponent}");
+            // Round-3 audit fix: NeoVM's MODPOW has NO exponent cap (verified by executing
+            // `2^300 mod 1000` on the real VM => 376). BigInteger.ModPow is O(log exponent), so even a
+            // 255-bit exponent is cheap; the prior 256-exponent fault pruned feasible paths.
             return Int(BigInteger.ModPow(mp_a, mp_b, mp_m));
         }
         return new TernaryExpr(Sort.Int, "modpow", a, b, m);
@@ -506,26 +498,25 @@ public static class Expr
     {
         if (a.Equals(b)) return BoolConst.True;
 
-        // Audit fix (iter-2 wakeup-7 differential): NeoVM's Equals is more nuanced than
-        // "cross-type byte canonical". Boolean.Equals returns false for any non-Boolean (even
-        // bytes [1] vs true). Integer.Equals(ByteString) does byte-level compare; Integer.Equals(
-        // Boolean) returns false. So we must distinguish:
-        //   (Bool, Bool)            : compare values
-        //   (Int|Bytes, Int|Bytes)  : byte-canonical compare (NeoVM's PrimitiveType cross-equality)
-        //   (Bool, Int|Bytes), sym. : false (different StackItem types per NeoVM)
-        //   (Int, Int)              : direct compare (handled below)
-        //   (Bytes, Bytes)          : byte compare (handled by PrimitiveEqualsConcrete)
-        // The prior `IsCrossTypeEqualityCandidate` swept Bool into the cross-type bucket, which
-        // made `1 == true` reduce to BoolConst.True — and Ne/JMPNE around it produced the wrong
-        // branch direction. The differential target found this in 60 s.
+        // NeoVM's EQUAL opcode is StackItem.Equals, which is TYPE-STRICT for every primitive:
+        // Boolean.Equals/Integer.Equals/ByteString.Equals each `isinst`-check the operand and return
+        // false for any other StackItem type. So the only EQUAL-true pairs are same-type:
+        //   (Bool, Bool)   : compare values
+        //   (Int, Int)     : compare values
+        //   (Bytes, Bytes) : compare bytes
+        // and EVERY cross-type concrete pair — including Integer vs ByteString — is FALSE. Verified by
+        // decompiling Neo.VM 3.10.0 (Integer.Equals: `if (other is Integer) value-compare else false`;
+        // ByteString.Equals symmetric) and by executing EQUAL on the real VM: Int(0) vs Bytes(b""),
+        // Int(5) vs Bytes(b"\x05") both push False in both stack orderings. (The numeric cross-type
+        // compare NeoVM uses for NUMEQUAL/JMP* is GetInteger-based and lives in NumEq, not here.)
         if (a.IsConcrete && b.IsConcrete && a is not NullConst && b is not NullConst)
         {
-            bool aBool = a is BoolConst, bBool = b is BoolConst;
-            if (aBool && bBool) return Bool(((BoolConst)a).Value == ((BoolConst)b).Value);
-            // Bool vs (Int|Bytes) — NeoVM treats as different StackItem types: false.
-            if (aBool != bBool) return BoolConst.False;
-            // (Int|Bytes, Int|Bytes) — byte canonical.
-            return Bool(PrimitiveEqualsConcrete(a, b));
+            if (a is BoolConst aBoolC && b is BoolConst bBoolC) return Bool(aBoolC.Value == bBoolC.Value);
+            if (a is IntConst aIntC && b is IntConst bIntC) return Bool(aIntC.Value == bIntC.Value);
+            if (a is BytesConst aBytesC && b is BytesConst bBytesC)
+                return Bool(aBytesC.Value.AsSpan().SequenceEqual(bBytesC.Value));
+            // Any cross-type concrete pair (Bool/Int/Bytes mixed): different StackItem types => false.
+            return BoolConst.False;
         }
         if (a is NullConst && b is NullConst) return BoolConst.True;
         if ((a is NullConst) != (b is NullConst))

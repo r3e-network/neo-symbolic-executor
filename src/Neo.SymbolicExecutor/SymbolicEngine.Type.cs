@@ -113,7 +113,7 @@ public sealed partial class SymbolicEngine
 
             state.PathConditions = state.PathConditions.Add(Expr.Not(condition));
             state.Push(SymbolicValue
-                .HeapRef(Sort.Buffer, state.Heap.NewBuffer(System.Array.Empty<byte>()).Id)
+                .HeapRef(Sort.Buffer, state.Heap.NewBuffer(new byte[] { 0 }).Id)
                 .WithTaints(v.Taints));
             state.Pc = inst.EndOffset;
             return new[] { trueState, state };
@@ -149,11 +149,14 @@ public sealed partial class SymbolicEngine
                     // Audit C# #4 fix: for symbolic ints we previously returned the Int unchanged,
                     // which broke downstream ISTYPE Bytes checks. Wrap so the sort propagates.
                     : SymbolicValue.Of(new UnaryExpr(Sort.Bytes, "i2b", v.Expression), v.Taints),
+            // Round-3 audit fix: NeoVM's Boolean.GetSpan() is [0x01] for true and [0x00] for false
+            // (verified on the real VM), so CONVERT Boolean(false) -> ByteString/Buffer is a single
+            // zero byte, not empty.
             (StackItemTypeCodes.ByteString, Sort.Bool) =>
                 v.AsConcreteBool() is { } boolValue
-                    ? (boolValue ? SymbolicValue.Bytes(new byte[] { 1 }) : SymbolicValue.Bytes(System.Array.Empty<byte>()))
+                    ? (boolValue ? SymbolicValue.Bytes(new byte[] { 1 }) : SymbolicValue.Bytes(new byte[] { 0 }))
                     : SymbolicValue.Of(
-                        Expr.Ite(v.Expression, Expr.Bytes(new byte[] { 1 }), Expr.Bytes(System.Array.Empty<byte>())),
+                        Expr.Ite(v.Expression, Expr.Bytes(new byte[] { 1 }), Expr.Bytes(new byte[] { 0 })),
                         v.Taints),
             (StackItemTypeCodes.ByteString, Sort.Buffer) =>
                 v.Expression is HeapRef hbs && state.Heap.Objects.TryGetValue(hbs.ObjectId, out var bobj2) && bobj2 is BufferObject buf2
@@ -168,14 +171,14 @@ public sealed partial class SymbolicEngine
                     ? SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(Expr.IntegerToBytes(bi2)).Id)
                         .WithTaints(v.Taints)
                     : ConvertSymbolicIntegerToBuffer(state, v),
-            // Audit fix (iter-2 wakeup-5 differential): NeoVM's PrimitiveType.ConvertTo(Buffer)
-            // is `new Buffer(GetSpan())` — works for ANY primitive (Boolean, Integer, ByteString).
-            // Boolean's GetSpan returns [] for false and [1] for true.
+            // NeoVM's PrimitiveType.ConvertTo(Buffer) is `new Buffer(GetSpan())` — works for ANY
+            // primitive. Round-3 audit fix: Boolean's GetSpan returns [0x00] for false (NOT empty) and
+            // [0x01] for true.
             (StackItemTypeCodes.Buffer, Sort.Bool) =>
                 v.AsConcreteBool() == true
                     ? SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(new byte[] { 1 }).Id)
                         .WithTaints(v.Taints)
-                    : SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(System.Array.Empty<byte>()).Id)
+                    : SymbolicValue.HeapRef(Sort.Buffer, state.Heap.NewBuffer(new byte[] { 0 }).Id)
                         .WithTaints(v.Taints),
 
             // Struct ↔ Array — sort change with content preserved per NeoVM rules. We allocate

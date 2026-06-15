@@ -288,12 +288,8 @@ public sealed partial class SymbolicEngine
             case NeoVm.OpCode.SQRT: return UnaryArith(state, inst, "SQRT", Expr.Sqrt, overflow: false);
             case NeoVm.OpCode.MODMUL: return TernaryArith(state, inst, "MODMUL", Expr.ModMul);
             case NeoVm.OpCode.MODPOW:
-                return TernaryArith(
-                    state,
-                    inst,
-                    "MODPOW",
-                    Expr.ModPow,
-                    maxRight: Expr.MaxConcreteModPowExponent);
+                // Round-3 audit fix: NeoVM imposes no MODPOW exponent cap, so no maxRight bound.
+                return TernaryArith(state, inst, "MODPOW", Expr.ModPow);
             // Audit fix (iter-2 wakeup-4 differential): NeoVM's SHL/SHR pop the SHIFT first,
             // then check `if (shift == 0) return;` BEFORE popping x. So a script with stack=[x]
             // and SHL/SHR consuming a 0 shift leaves x on the stack — Neo.VM HALTs cleanly.

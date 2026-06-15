@@ -1024,6 +1024,77 @@ public class ReviewFixesTests
         result.FinalStates.Should().OnlyContain(s => s.Status == TerminalStatus.Stopped);
     }
 
+    private static ExecutionResult RunNoArgScript(params byte[] script)
+    {
+        var engine = new SymbolicEngine(ScriptDecoder.Decode(script));
+        return engine.Run(engine.CreateMethodEntryState(0, parameters: null));
+    }
+
+    [Fact]
+    public void Engine_EqualIntegerVsByteStringIsFalse()
+    {
+        // Round-3 audit fix: NeoVM's EQUAL is type-strict, so an Integer never equals a same-canonical
+        // -bytes ByteString (verified on the real VM: Int(5) EQUAL Bytes([5]) -> False).
+        var halted = RunNoArgScript(
+            (byte)NeoVm.OpCode.PUSH5, (byte)NeoVm.OpCode.PUSHDATA1, 0x01, 0x05,
+            (byte)NeoVm.OpCode.EQUAL, (byte)NeoVm.OpCode.RET).Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteBool().Should().BeFalse();
+    }
+
+    [Fact]
+    public void Engine_SizeOfNullFaults()
+    {
+        // Round-3 audit fix: NeoVM's SIZE faults (uncatchable) on Null (verified on the real VM).
+        var result = RunNoArgScript((byte)NeoVm.OpCode.PUSHNULL, (byte)NeoVm.OpCode.SIZE, (byte)NeoVm.OpCode.RET);
+        result.Faulted.Should().ContainSingle();
+        result.Halted.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(NeoVm.OpCode.PUSHT)]
+    [InlineData(NeoVm.OpCode.PUSHF)]
+    public void Engine_SizeOfBooleanIsOne(NeoVm.OpCode push)
+    {
+        // Round-3 audit fix: a Boolean's primitive span is a single byte ([0x00]/[0x01]), so SIZE is 1
+        // for both true and false (verified on the real VM).
+        var halted = RunNoArgScript((byte)push, (byte)NeoVm.OpCode.SIZE, (byte)NeoVm.OpCode.RET)
+            .Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteInt().Should().Be(new BigInteger(1));
+    }
+
+    [Fact]
+    public void Engine_HasKeyNegativeIndexFaults()
+    {
+        // Round-3 audit fix: NeoVM's HASKEY faults (uncatchable) on a negative index (verified on the
+        // real VM); it does not push false.
+        var result = RunNoArgScript(
+            (byte)NeoVm.OpCode.PUSH3, (byte)NeoVm.OpCode.NEWARRAY, (byte)NeoVm.OpCode.PUSHM1,
+            (byte)NeoVm.OpCode.HASKEY, (byte)NeoVm.OpCode.RET);
+        result.Faulted.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Engine_FallingOffScriptEndIsImplicitReturn()
+    {
+        // Round-3 audit fix: NeoVM performs an implicit RET when the program counter reaches the end of
+        // the script — a clean HALT, not a fault (verified: `PUSH1` with no RET HALTs with 1).
+        var halted = RunNoArgScript((byte)NeoVm.OpCode.PUSH1)
+            .Halted.Should().ContainSingle().Which;
+        halted.EvaluationStack.Single().AsConcreteInt().Should().Be(new BigInteger(1));
+    }
+
+    [Fact]
+    public void Engine_MapByteStringKeyOver64BytesFaults()
+    {
+        // Round-3 audit fix: NeoVM faults on a Map key longer than 64 bytes (verified: a 65-byte key
+        // faults, a 64-byte key succeeds).
+        byte[] script = Concat(
+            new[] { (byte)NeoVm.OpCode.NEWMAP, (byte)NeoVm.OpCode.DUP, (byte)NeoVm.OpCode.PUSHDATA1, (byte)65 },
+            new byte[65],
+            new[] { (byte)NeoVm.OpCode.PUSH1, (byte)NeoVm.OpCode.SETITEM, (byte)NeoVm.OpCode.RET });
+        RunNoArgScript(script).Faulted.Should().ContainSingle();
+    }
+
     [Fact]
     public void Engine_AppendOnOpenArrayGrowsModeledSize()
     {
@@ -7355,12 +7426,14 @@ public class ReviewFixesTests
 
         result.FinalStates.Should().ContainSingle();
         var value = result.FinalStates.Single().EvaluationStack.Single();
-        value.AsConcreteBytes().Should().BeNull("symbolic true converts to [1] while false converts to an empty ByteString");
+        // Round-3 audit fix: NeoVM's Boolean.GetSpan() is [0x01] for true and [0x00] for false, so the
+        // symbolic conversion selects between [1] and [0] (not an empty ByteString).
+        value.AsConcreteBytes().Should().BeNull("symbolic true converts to [1] while false converts to [0]");
         var choice = value.Expression.Should().BeOfType<TernaryExpr>().Which;
         choice.Op.Should().Be("ite");
         choice.A.Should().Be(Expr.Sym(Sort.Bool, "arg_flag"));
         choice.B.Should().Be(Expr.Bytes(new byte[] { 1 }));
-        choice.C.Should().Be(Expr.Bytes(Array.Empty<byte>()));
+        choice.C.Should().Be(Expr.Bytes(new byte[] { 0 }));
     }
 
     [Fact]
@@ -7391,8 +7464,9 @@ public class ReviewFixesTests
         BufferObject falseBuffer = falseState.Heap.Get<BufferObject>(
             falseState.EvaluationStack.Single().Expression.Should().BeOfType<HeapRef>().Which.ObjectId);
 
+        // Round-3 audit fix: Boolean false converts to a single zero byte [0x00], not an empty buffer.
         trueBuffer.Cells.Should().Equal(new[] { Expr.Int(1) });
-        falseBuffer.Cells.Should().BeEmpty();
+        falseBuffer.Cells.Should().Equal(new[] { Expr.Int(0) });
     }
 
     [Fact]

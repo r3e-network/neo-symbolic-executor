@@ -137,12 +137,14 @@ public class SecurityHardeningTests
     }
 
     [Fact]
-    public void ExpressionFactory_ModPowRejectsOversizedConcreteExponent()
+    public void ExpressionFactory_ModPowComputesLargeConcreteExponent()
     {
-        var act = () => Expr.ModPow(Expr.Int(2), Expr.Int(257), Expr.Int(1009));
-
-        act.Should().Throw<VmFaultException>()
-            .WithMessage("*exponent*exceeds*");
+        // Round-3 audit fix: NeoVM imposes no MODPOW exponent cap (verified on the real VM:
+        // 2^300 mod 1000 = 376). BigInteger.ModPow is O(log exponent), so a large exponent is computed
+        // exactly rather than faulted.
+        Expr.ModPow(Expr.Int(2), Expr.Int(257), Expr.Int(1009))
+            .Should().BeOfType<IntConst>()
+            .Which.Value.Should().Be(System.Numerics.BigInteger.ModPow(2, 257, 1009));
     }
 
     [Fact]
