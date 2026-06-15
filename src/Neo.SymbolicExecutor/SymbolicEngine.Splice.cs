@@ -165,6 +165,13 @@ public sealed partial class SymbolicEngine
                 return Single(state);
             }
 
+            // NOTE (#13/#14, deferred): NeoVM's CAT yields a mutable Buffer; a later MEMCPY/SETITEM into
+            // a symbolic CAT result therefore spuriously faults here on an immutable ByteString. Modeling
+            // it as an open (symbolic-length) Buffer loses the length precision that storage-key and
+            // comparison paths rely on (it makes every CAT-built Storage.Put key length unknown, so
+            // EnforceStorageKeyLength flags a false >64-byte fault). The ByteString `cat` expression is
+            // the better representation for the common case; the mutable-Buffer modeling needs a
+            // length-preserving symbolic Buffer, left as a deliberate follow-up.
             state.Push(SymbolicValue.Of(new BinaryExpr(Sort.Bytes, "cat", ae, be), a.Taints.Union(b.Taints)));
             state.Pc = inst.EndOffset;
             return Single(state);

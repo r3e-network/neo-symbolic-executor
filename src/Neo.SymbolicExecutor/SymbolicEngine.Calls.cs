@@ -193,6 +193,11 @@ public sealed partial class SymbolicEngine
     /// </summary>
     private static void MarkExternalCallReturnChecked(ExecutionState state, SymbolicValue v)
     {
+        // Round-3 audit fix (#33): the ext_ret_ scan walks the full expression tree (FreeSymbols) and
+        // allocates on every comparison/assert. ext_ret_ symbols only exist once the contract has made an
+        // external call, so skip the walk entirely when there have been none (the common case).
+        if (state.Telemetry.ExternalCalls.Count == 0)
+            return;
         foreach (var name in v.Expression.FreeSymbols().Concat(v.Taints))
         {
             if (!name.StartsWith("ext_ret_", System.StringComparison.Ordinal)) continue;

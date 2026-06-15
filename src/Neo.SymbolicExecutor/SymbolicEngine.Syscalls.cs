@@ -7596,7 +7596,7 @@ public sealed partial class SymbolicEngine
             "base58CheckDecode" => TryHandleStdLibUtf8ToBytes(call.Args, TryDecodeBase58Check, "StdLib.base58CheckDecode", "valid base58check text", out result),
             "base64Encode" => TryHandleStdLibBytesToUtf8(call.Args, System.Convert.ToBase64String, "StdLib.base64Encode", out result),
             "base64Decode" => TryHandleStdLibUtf8ToBytes(call.Args, TryDecodeBase64, "StdLib.base64Decode", "valid base64 text", out result),
-            "base64UrlEncode" => TryHandleStdLibBytesToUtf8(call.Args, Base64UrlEncode, "StdLib.base64UrlEncode", out result),
+            "base64UrlEncode" => TryHandleStdLibBytesToUtf8(call.Args, Base64UrlEncode, "StdLib.base64UrlEncode", out result, requireStrictUtf8Input: true),
             "base64UrlDecode" => TryHandleStdLibUtf8ToBytes(call.Args, TryDecodeBase64Url, "StdLib.base64UrlDecode", "valid base64url text", out result),
             "hexEncode" => TryHandleStdLibBytesToUtf8(call.Args, HexEncodeLower, "StdLib.hexEncode", out result),
             "hexDecode" => TryHandleStdLibUtf8ToBytes(call.Args, TryDecodeHex, "StdLib.hexDecode", "valid hexadecimal text", out result),
@@ -7919,13 +7919,19 @@ public sealed partial class SymbolicEngine
         IReadOnlyList<SymbolicValue> args,
         System.Func<byte[], string> encode,
         string operation,
-        out SymbolicValue result)
+        out SymbolicValue result,
+        bool requireStrictUtf8Input = false)
     {
         result = SymbolicValue.Null();
         if (args.Count != 1 || args[0].AsConcreteBytes() is not { } bytes)
             return false;
 
         EnforceStdLibMaxLength(operation, "value", bytes);
+        // Round-3 audit fix (#20): base64UrlEncode binds its parameter as a UTF-8 STRING (unlike
+        // base64Encode, which takes byte[]), so non-UTF-8 input faults at argument binding on the real
+        // VM rather than being encoded.
+        if (requireStrictUtf8Input)
+            DecodeStrictUtf8OrThrow(bytes, operation, "data");
         result = SymbolicValue.Bytes(StrictUtf8.GetBytes(encode(bytes)));
         return true;
     }
