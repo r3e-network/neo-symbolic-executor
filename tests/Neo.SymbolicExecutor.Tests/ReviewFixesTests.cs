@@ -7638,10 +7638,47 @@ public class ReviewFixesTests
         help.Should().Contain("--fail-on-incomplete-coverage");
         help.Should().Contain("--allow-incomplete-coverage");
         help.Should().Contain("--max-entrypoints");
-        help.Should().Contain("Engine budget flags above also apply to verify");
+        help.Should().Contain("Engine budget flags from the analyze section above also apply to verify");
+        help.Should().Contain("--fail-on-smt-fallback");
         help.Should().Contain("external Z3 or portable fallback");
         help.Should().Contain("Exit codes:");
         help.Should().Contain("3   Gate violation");
+    }
+
+    [Theory]
+    [InlineData("verify", "--help", "verify options:", "analyze options:")]
+    [InlineData("verify", "-h", "verify options:", "analyze options:")]
+    [InlineData("analyze", "--help", "analyze options:", "verify options:")]
+    [InlineData("decode", "--help", "decode:", "analyze options:")]
+    [InlineData("explore", "--help", "explore:", "verify options:")]
+    public void CliHelp_PerSubcommandHelpPrintsFocusedSectionAndExitsZero(
+        string command, string helpFlag, string expectedSection, string excludedSection)
+    {
+        var cliProgram = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "neo-sym.dll"))
+            .GetType("Neo.SymbolicExecutor.Cli.Program", throwOnError: true)!;
+        var main = cliProgram.GetMethod("Main", BindingFlags.Public | BindingFlags.Static)!;
+
+        using var output = new StringWriter();
+        var originalOut = Console.Out;
+        int exit;
+        try
+        {
+            Console.SetOut(output);
+            exit = (int)main.Invoke(null, new object[] { new[] { command, helpFlag } })!;
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        // `neo-sym <command> --help` must print that command's focused usage and exit 0 — not treat
+        // --help as the input path (which previously errored with a confusing "script not found").
+        exit.Should().Be(0);
+        string help = output.ToString();
+        help.Should().Contain(expectedSection);
+        help.Should().NotContain(excludedSection);
+        help.Should().Contain("Exit codes:");
+        help.Should().NotContain("not found");
     }
 
     [Fact]

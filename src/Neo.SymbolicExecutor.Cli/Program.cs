@@ -29,6 +29,14 @@ internal static class Program
             PrintUsage();
             return 0;
         }
+        // `neo-sym <command> -h|--help` prints that command's usage and exits 0, rather than treating
+        // `--help` as the input path (which produced a confusing "script not found: --help" error).
+        if (args[0] is "decode" or "explore" or "analyze" or "verify"
+            && args[1..].Any(a => a is "-h" or "--help"))
+        {
+            PrintCommandUsage(args[0]);
+            return 0;
+        }
         // --verbose / NEO_SYM_VERBOSE preserves stack traces on the error path. Off by default
         // because end-user error output should be one short line; on for triage.
         bool verbose = args.Contains("--verbose")
@@ -1117,92 +1125,128 @@ internal static class Program
         return 2;
     }
 
-    private static void PrintUsage()
+    private static readonly string UsageHeader = """
+        Neo Symbolic Executor CLI
+
+        Commands:
+          neo-sym decode  <path>                  Disassemble a .bin or .nef script.
+          neo-sym explore <path>                  Symbolic exploration without detectors.
+          neo-sym analyze <path> [options]        Run detectors and emit a report.
+          neo-sym verify  <path> [options]        Prove spec properties or emit counterexamples.
+          neo-sym version
+
+        Global options:
+          --verbose                               Print full stack trace on error
+                                                  (also enabled by NEO_SYM_VERBOSE=1).
+          -h, --help                              Show usage (per-command when placed after a command).
+        """;
+
+    private static readonly string DecodeUsage = """
+        decode:
+          neo-sym decode <path.bin|.nef>          Disassemble a script and print offset/opcode/operand.
+        """;
+
+    private static readonly string ExploreUsage = """
+        explore:
+          neo-sym explore <path.bin|.nef>         Run the engine without detectors; print final-state summary.
+        """;
+
+    private static readonly string AnalyzeUsage = """
+        analyze options:
+          --manifest <path.manifest.json>         Manifest sidecar (enables ABI detectors).
+          --source <file-or-dir>                  Optional C# source hints for protocol detectors; repeatable.
+          --format json|markdown                  Report format (default: markdown).
+          --out <path>                            Write report to file (default: stdout).
+
+          # SMT (external Z3 or portable fallback):
+          --smt                                   Engage SMT path pruning + finding validation.
+          --smt-timeout <ms>                      Per-query timeout (default 5000).
+          --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
+          --smt-drop-unsat                        Drop findings whose path conditions are UNSAT.
+
+          # Engine budgets (per manifest entrypoint):
+          --max-entrypoints <n>                   Cap manifest ABI entrypoints analyzed/proved by default budget (default 128).
+          --max-paths <n>                         Cap on terminal paths (default 512).
+          --max-steps <n>                         Cap on symbolic steps (default 200000).
+          --per-run-deadline-ms <ms>              Wall-clock cap on a single entrypoint run.
+          --max-queued-states <n>                 Cap on worklist size; primary path-explosion escape valve (default 4096; 0 disables).
+          --max-visits-per-offset <n>             Cap revisits of the same PC (default 16; cuts tight symbolic loops).
+          --max-concretizations <n>               Cap SMT concretizations per state (default 8; 0 disables concretization).
+          --max-stack-size <n>                    Eval-stack ceiling (default 2048).
+          --max-invocation-stack-depth <n>        Call-frame ceiling (default 1024).
+          --max-try-depth <n>                     TRY-frame ceiling (default 16).
+          --max-item-size <n>                     Per-item byte ceiling (default 65536).
+          --max-collection-size <n>               Compound-collection element ceiling (default 512).
+          --max-heap-objects <n>                  Live-heap object ceiling (default 1024).
+          --max-shift-count <n>                   SHL/SHR amount ceiling (default 256).
+          --max-pow-exponent <n>                  POW exponent ceiling (default 256).
+
+          # Gate flags:
+          --fail-on-max-severity <sev>            sev in info|low|medium|high|critical (default: high)
+          --fail-on-total-findings <count>
+          --fail-on-weighted-score <score>
+          --fail-on-confidence-weighted-score <score>
+          --fail-on-severity-count <sev>=<count>  Repeatable.
+          --fail-on-detector-severity <det>=<sev> Repeatable.
+          --min-confidence <sev>=<float>          Repeatable.
+          --fail-on-budget-exceeded               Fail when analysis hit a budget cap (default).
+          --fail-on-incomplete-coverage           Fail when manifest entrypoints are skipped (default).
+          --allow-incomplete-coverage             Do not fail when manifest entrypoints are skipped.
+        """;
+
+    private static readonly string VerifyUsage = """
+        verify options:
+          --manifest <path.manifest.json>         Required manifest sidecar; supplies ABI methods and parameters.
+          --spec <path.neo-sym.json>              Formal verification spec; optional when --profile is supplied.
+          --profile neo-n3-security               Add a built-in Neo N3 safety proof profile; repeatable.
+          --dependency-proof-summary <path.json>  External contract proof summary; repeatable.
+          --dependency-proof-artifact <hash=program,manifest>
+                                                  Bind a dependency proof summary to local artifact SHA-256 values; repeatable.
+          --trust-dependency-proof-summaries      Allow provided summaries to close external-call proofs after out-of-band artifact trust.
+          --allow-unbound-dependency-proof-summaries
+                                                  Permit trusted summaries without local artifact binding (legacy/offline only).
+          --emit-dependency-proof-summary <path>  Write a reusable proof summary for this verified NEF dependency.
+          --deploy-sender-hash <hash160>          Optional 20-byte little-endian UInt160 deploy sender for contract hash metadata.
+          --format json|markdown                  Verification report format (default: markdown).
+          --out <path>                            Write verification report to file (default: stdout).
+          --smt-timeout <ms>                      Per-query timeout (default 5000).
+          --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
+          --require-external-smt                  Fail if z3 is unavailable and portable fallback is used.
+          --fail-on-smt-fallback                  Alias of --require-external-smt.
+          --require-unqualified-proofs            Require unqualified proofs (default; kept for explicit CI policy).
+          --allow-assumption-backed-proofs        Do not fail when properties are proved only under explicit assumptions.
+          --fail-on-unproved                      Fail on violated, unknown, or incomplete properties (default).
+          --allow-unproved                        Emit report but do not fail on unproved properties.
+          Engine budget flags from the analyze section above also apply to verify.
+        """;
+
+    private static readonly string ExitCodes = """
+        Exit codes:
+          0   OK / gate passed
+          1   Analyzer error (parse failure, etc.)
+          2   Bad arguments
+          3   Gate violation
+        """;
+
+    /// <summary>Full usage: header, every command's option block, and exit codes.</summary>
+    private static void PrintUsage() =>
+        Console.WriteLine(string.Join(
+            "\n\n", UsageHeader, AnalyzeUsage, VerifyUsage, ExitCodes));
+
+    /// <summary>Focused usage for a single command (printed for `neo-sym &lt;command&gt; --help`).</summary>
+    private static void PrintCommandUsage(string command)
     {
-        Console.WriteLine("""
-            Neo Symbolic Executor CLI
-
-            Commands:
-              neo-sym decode  <path>                  Disassemble a .bin or .nef script.
-              neo-sym explore <path>                  Symbolic exploration without detectors.
-              neo-sym analyze <path> [options]        Run detectors and emit a report.
-              neo-sym verify  <path> [options]        Prove spec properties or emit counterexamples.
-              neo-sym version
-
-            Global options:
-              --verbose                               Print full stack trace on error
-                                                      (also enabled by NEO_SYM_VERBOSE=1).
-
-            analyze options:
-              --manifest <path.manifest.json>         Manifest sidecar (enables ABI detectors).
-              --source <file-or-dir>                  Optional C# source hints for protocol detectors; repeatable.
-              --format json|markdown                  Report format (default: markdown).
-              --out <path>                            Write report to file (default: stdout).
-
-              # SMT (external Z3 or portable fallback):
-              --smt                                   Engage SMT path pruning + finding validation.
-              --smt-timeout <ms>                      Per-query timeout (default 5000).
-              --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
-              --smt-drop-unsat                        Drop findings whose path conditions are UNSAT.
-
-              # Engine budgets (per manifest entrypoint):
-              --max-entrypoints <n>                   Cap manifest ABI entrypoints analyzed/proved by default budget (default 128).
-              --max-paths <n>                         Cap on terminal paths (default 512).
-              --max-steps <n>                         Cap on symbolic steps (default 200000).
-              --per-run-deadline-ms <ms>              Wall-clock cap on a single entrypoint run.
-              --max-queued-states <n>                 Cap on worklist size; primary path-explosion escape valve (default 4096; 0 disables).
-              --max-visits-per-offset <n>             Cap revisits of the same PC (default 16; cuts tight symbolic loops).
-              --max-concretizations <n>               Cap SMT concretizations per state (default 8; 0 disables concretization).
-              --max-stack-size <n>                    Eval-stack ceiling (default 2048).
-              --max-invocation-stack-depth <n>        Call-frame ceiling (default 1024).
-              --max-try-depth <n>                     TRY-frame ceiling (default 16).
-              --max-item-size <n>                     Per-item byte ceiling (default 65536).
-              --max-collection-size <n>               Compound-collection element ceiling (default 512).
-              --max-heap-objects <n>                  Live-heap object ceiling (default 1024).
-              --max-shift-count <n>                   SHL/SHR amount ceiling (default 256).
-              --max-pow-exponent <n>                  POW exponent ceiling (default 256).
-
-              # Gate flags:
-              --fail-on-max-severity <sev>            sev in info|low|medium|high|critical (default: high)
-              --fail-on-total-findings <count>
-              --fail-on-weighted-score <score>
-              --fail-on-confidence-weighted-score <score>
-              --fail-on-severity-count <sev>=<count>  Repeatable.
-              --fail-on-detector-severity <det>=<sev> Repeatable.
-              --min-confidence <sev>=<float>          Repeatable.
-              --fail-on-budget-exceeded               Fail when analysis hit a budget cap (default).
-              --fail-on-incomplete-coverage           Fail when manifest entrypoints are skipped (default).
-              --allow-incomplete-coverage             Do not fail when manifest entrypoints are skipped.
-
-            verify options:
-              --manifest <path.manifest.json>         Required manifest sidecar; supplies ABI methods and parameters.
-              --spec <path.neo-sym.json>              Formal verification spec; optional when --profile is supplied.
-              --profile neo-n3-security               Add a built-in Neo N3 safety proof profile; repeatable.
-              --dependency-proof-summary <path.json>   External contract proof summary; repeatable.
-              --dependency-proof-artifact <hash=program,manifest>
-                                                      Bind a dependency proof summary to local artifact SHA-256 values; repeatable.
-              --trust-dependency-proof-summaries       Allow provided summaries to close external-call proofs after out-of-band artifact trust.
-              --allow-unbound-dependency-proof-summaries
-                                                      Permit trusted summaries without local artifact binding (legacy/offline only).
-              --emit-dependency-proof-summary <path>   Write a reusable proof summary for this verified NEF dependency.
-              --deploy-sender-hash <hash160>          Optional 20-byte little-endian UInt160 deploy sender for contract hash metadata.
-              --format json|markdown                  Verification report format (default: markdown).
-              --out <path>                            Write verification report to file (default: stdout).
-              --smt-timeout <ms>                      Per-query timeout (default 5000).
-              --smt-bytes-bound <n>                   Max modeled bytes length (default 64).
-              --require-external-smt                  Fail if z3 is unavailable and portable fallback is used.
-              --require-unqualified-proofs            Require unqualified proofs (default; kept for explicit CI policy).
-              --allow-assumption-backed-proofs        Do not fail when properties are proved only under explicit assumptions.
-              --fail-on-unproved                      Fail on violated, unknown, or incomplete properties (default).
-              --allow-unproved                        Emit report but do not fail on unproved properties.
-              Engine budget flags above also apply to verify.
-
-            Exit codes:
-              0   OK / gate passed
-              1   Analyzer error (parse failure, etc.)
-              2   Bad arguments
-              3   Gate violation
-            """);
+        string? section = command switch
+        {
+            "decode" => DecodeUsage,
+            "explore" => ExploreUsage,
+            "analyze" => AnalyzeUsage,
+            "verify" => VerifyUsage,
+            _ => null,
+        };
+        Console.WriteLine(section is null
+            ? string.Join("\n\n", UsageHeader, AnalyzeUsage, VerifyUsage, ExitCodes)
+            : string.Join("\n\n", UsageHeader, section, ExitCodes));
     }
 }
 
