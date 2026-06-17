@@ -17,7 +17,7 @@ and the default `neo-sym verify --profile neo-n3-security` proof gate automatica
 | Fuzzer (23 targets, multi-worker) | ~3,800 |
 | **Total** | **~56,700** |
 
-**Tests:** 1420 xUnit cases passing (smoke + audit-regression + security-hardening + per-detector + parser
+**Tests:** 1421 xUnit cases passing (smoke + audit-regression + security-hardening + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation + formal-verification/security-profile regressions).
 

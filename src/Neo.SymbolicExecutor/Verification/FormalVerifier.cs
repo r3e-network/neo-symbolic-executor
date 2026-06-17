@@ -6736,6 +6736,24 @@ public static partial class FormalVerifier
         bool subtract) =>
         ValueMatchesBalanceDelta(value, state, storageGetOffset, amount => amount.Equals(amountExpression), subtract);
 
+    // Recognizes a balance write that equals `prior - amount` (debit) or `prior + amount` (credit),
+    // where `prior` is the storage read at <paramref name="storageGetOffset"/> (or a proven-missing zero).
+    //
+    // SCOPE: this is a SYNTACTIC AST matcher, not an SMT equivalence check. It relies on the engine's
+    // constant-folding (Expr.Add/Sub/Mul fold x+0->x, 0+x->x, x-0->x, x*1->x), so identity-wrapped
+    // codegen such as `prior - (amount + 0)` or `prior + amount*1` reaches this method already in
+    // canonical form. The credit case also accepts the commuted `amount + prior`. Real neo-devpack-dotnet
+    // transfer codegen emits the canonical SUB/ADD shapes this recognizes.
+    //
+    // SOUNDNESS: the matcher is false-NEGATIVE-safe by construction — it returns true ONLY for a write it
+    // can prove equals the correct delta, so a genuine wrong-delta write (e.g. a missing or inverted
+    // debit) never matches and the obligation correctly reports Violated. It therefore never discharges
+    // an incorrect delta, i.e. it cannot produce a false "proved". The residual is a false-POSITIVE risk:
+    // a *correct* delta written in a non-canonical AST that survives folding (e.g. `prior + (0 - amount)`)
+    // would not match and would be reported Violated. That shape is not produced by canonical codegen; if
+    // it becomes a real-world concern, the principled fix is an SMT equivalence discharge (assert the write
+    // != prior ∓ amount and require UNSAT) — deliberately NOT a route-to-Incomplete, which would regress
+    // genuine wrong-delta detection.
     private static bool ValueMatchesBalanceDelta(
         Expression? value,
         ExecutionState? state,
