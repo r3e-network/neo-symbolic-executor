@@ -9,6 +9,9 @@ obj/
 *.suo
 *.userprefs
 
+# Claude Code harness runtime files
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
