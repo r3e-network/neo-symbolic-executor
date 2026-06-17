@@ -8,7 +8,13 @@ public sealed partial class SymbolicEngine
     private IEnumerable<ExecutionState> HandleTry(ExecutionState state, Instruction inst)
     {
         var (catchOffset, finallyOffset) = ScriptDecoder.ResolveTryTargets(inst);
-        if (catchOffset < 0 && finallyOffset < 0)
+        // NeoVM JumpTable.ExecuteTry faults ONLY when BOTH raw operand offsets are 0 (a TRY with neither
+        // a catch nor a finally handler). It does NOT validate handler target ranges at TRY time — an
+        // out-of-range target only faults if a later THROW transfers control there (where both engine and
+        // NeoVM fault on the bad jump). The prior `< 0` check also tripped when a non-zero offset RESOLVED
+        // to a negative (out-of-script) address, faulting where NeoVM HALTs (differential fuzzer:
+        // seed=1700441197). NoTryHandler is the raw-zero sentinel, distinct from such resolved negatives.
+        if (catchOffset == ScriptDecoder.NoTryHandler && finallyOffset == ScriptDecoder.NoTryHandler)
             throw new VmFaultException("TRY requires catch or finally target");
         var frame = state.CurrentFrame;
         if (frame.TryStack.Count >= _options.MaxTryDepth)

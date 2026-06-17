@@ -164,6 +164,14 @@ public sealed partial class SymbolicEngine
         if (idx.Value < 0 || idx.Value > int.MaxValue)
             throw new VmFaultException($"ROLL index {idx.Value} out of Int32 range");
         int i = (int)idx.Value;
+        // NeoVM JumpTable.Roll: `if (num != 0) { Remove(num); Push }` — a count of 0 is a no-op that
+        // never touches the stack, so it must NOT fault even when the stack is empty. The prior code
+        // faulted on `0 >= Count` (Count == 0), diverging from NeoVM which HALTs (differential fuzzer).
+        if (i == 0)
+        {
+            state.Pc = inst.EndOffset;
+            return Single(state);
+        }
         if (i < 0 || i >= state.EvaluationStack.Count)
             throw new VmFaultException($"ROLL index {i} out of range");
         var picked = state.EvaluationStack[^(i + 1)];

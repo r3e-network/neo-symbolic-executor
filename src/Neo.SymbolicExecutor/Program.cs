@@ -193,6 +193,16 @@ public static class ScriptDecoder
         return new Instruction(offset, op, operandMem, totalSize, target);
     }
 
+    /// <summary>
+    /// Sentinel for a TRY operand offset of 0, meaning "no handler" (mirroring NeoVM's catchPointer/
+    /// finallyPointer = -1). Distinct from a resolved target that lands at a negative (out-of-script)
+    /// address: NeoVM's ExecuteTry faults a TRY only when BOTH raw offsets are 0, and does NOT validate
+    /// handler target ranges at TRY time, so the two cases must not be conflated. <see cref="int.MinValue"/>
+    /// can never collide with a resolved <c>inst.Offset + offset</c>, and stays &lt; 0 so the existing
+    /// <c>HasCatch/HasFinally =&gt; offset &gt;= 0</c> "no handler" semantics are preserved.
+    /// </summary>
+    public const int NoTryHandler = int.MinValue;
+
     public static (int CatchOffset, int FinallyOffset) ResolveTryTargets(Instruction inst)
     {
         var op = inst.Operand.Span;
@@ -200,13 +210,13 @@ public static class ScriptDecoder
         {
             int c = (sbyte)op[0];
             int f = (sbyte)op[1];
-            return (c == 0 ? -1 : inst.Offset + c, f == 0 ? -1 : inst.Offset + f);
+            return (c == 0 ? NoTryHandler : inst.Offset + c, f == 0 ? NoTryHandler : inst.Offset + f);
         }
         if (op.Length == 8)
         {
             int c = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(op[..4]);
             int f = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(op[4..]);
-            return (c == 0 ? -1 : inst.Offset + c, f == 0 ? -1 : inst.Offset + f);
+            return (c == 0 ? NoTryHandler : inst.Offset + c, f == 0 ? NoTryHandler : inst.Offset + f);
         }
         throw new VmFaultException("Bad TRY operand length");
     }

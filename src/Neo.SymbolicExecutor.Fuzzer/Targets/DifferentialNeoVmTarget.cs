@@ -153,6 +153,15 @@ public sealed class DifferentialNeoVmTarget : IFuzzTarget
         // MaxStackSize / MaxInvocationStackDepth caps.
         || r.Contains("evaluation stack overflow")
         || r.Contains("invocation stack overflow")
+        // Configurable-MaxStackSize caps. This target runs the symbolic engine with a deliberately tight
+        // MaxStackSize (see _engineOptions) but real Neo.VM at its default 2048 limit, so a collection
+        // size (NEWARRAY/NEWSTRUCT/PACK) or reference count in (engineMaxStackSize, 2048] faults the
+        // engine while Neo.VM succeeds — a config-mismatch cap, not a semantic divergence. Neither can
+        // hide a genuine NeoVM fault: above Neo.VM's real limit, Neo.VM also faults and the "Neo.VM
+        // HALTED" precondition above would not hold. Matched specifically by the two producers'
+        // messages (ResolveConcreteCollectionSize, EnforceReferenceCount).
+        || r.Contains("is outside NeoVM's [0,")
+        || r.Contains("exceeds NeoVM MaxStackSize")
         // Symbolic-fuzz scheduler / budget caps.
         || r.Contains("budget:")
         || r.Contains("max paths")

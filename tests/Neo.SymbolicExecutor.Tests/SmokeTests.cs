@@ -333,6 +333,43 @@ public class SmokeTests
     }
 
     [Fact]
+    public void Run_TryWithNonZeroOutOfRangeOffsetsDoesNotFaultAtTryTime()
+    {
+        // NeoVM's ExecuteTry faults ONLY when BOTH raw offsets are 0; it does not validate handler
+        // target ranges at TRY time. A non-zero offset that resolves to a negative (out-of-script)
+        // address must NOT fault at TRY. The engine previously faulted here (differential fuzzer:
+        // Neo.VM HALT but symbolic engine FAULTED). catch=0xEF(-17), finally=0xF6(-10) resolve negative.
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.TRY, 0xEF, 0xF6,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+
+        result.FinalStates.Should().NotContain(
+            s => s.Status == TerminalStatus.Faulted
+                 && s.TerminationReason != null
+                 && s.TerminationReason.Contains("TRY requires catch or finally"));
+    }
+
+    [Fact]
+    public void Run_RollZeroCountOnEmptyStackIsNoOp()
+    {
+        // NeoVM's Roll skips the stack entirely when the count is 0 (`if (num != 0)`), so ROLL 0 is a
+        // no-op even with an empty remaining stack. The engine previously faulted on `0 >= Count`
+        // (Count == 0), diverging from NeoVM which HALTs (differential fuzzer).
+        byte[] script =
+        {
+            (byte)NeoVm.OpCode.PUSH0, (byte)NeoVm.OpCode.ROLL,
+            (byte)NeoVm.OpCode.RET,
+        };
+        var result = new SymbolicEngine(ScriptDecoder.Decode(script)).Run();
+
+        result.Faulted.Should().BeEmpty();
+        result.Halted.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Run_PushaIsTypePointerReturnsTrue()
     {
         byte[] script =
