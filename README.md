@@ -8,16 +8,16 @@ and the default `neo-sym verify --profile neo-n3-security` proof gate automatica
 
 | Component | LOC |
 |---|---|
-| Engine + decoder + types | ~15,600 |
-| Formal verifier / proof engine | ~26,300 |
+| Engine + decoder + types | ~16,500 |
+| Formal verifier / proof engine | ~26,400 |
 | NEF + manifest parsers | ~900 |
-| 37 detectors + reports + gates + framework | ~4,700 |
-| CLI | ~1,600 |
+| 37 detectors + reports + gates + framework | ~5,300 |
+| CLI | ~1,700 |
 | SMT-LIB layer | ~2,100 |
-| Fuzzer (23 targets, multi-worker) | ~3,700 |
-| **Total** | **~55,000** |
+| Fuzzer (23 targets, multi-worker) | ~3,800 |
+| **Total** | **~56,700** |
 
-**Tests:** 1362 xUnit cases passing (smoke + audit-regression + security-hardening + per-detector + parser
+**Tests:** 1420 xUnit cases passing (smoke + audit-regression + security-hardening + per-detector + parser
 edge cases + end-to-end vulnerability showcase + property-style fuzz harness +
 locale-stability + clone-isolation + formal-verification/security-profile regressions).
 
